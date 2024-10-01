@@ -1,11 +1,10 @@
----
 webPortNum: "80"
-webDir: "../scoring-engine/tests/site_infos/site_info.html"
+webDir: "./tests/site_infos/site_info.html"
 httpAdd: 1
 
 ftpPortNum: "21"
 ftpCreds:
-  user1 : pass1
+  ftpuser : SuperSecure
 
 ftpAdd: 1
 
@@ -15,20 +14,29 @@ sshCreds:
 
 sshAdd: 1
 
-teamScores: 
-  team1 : 0
-  team2 : 0
+teamScores:
+  team0: 0
+  team1: 0
+  team2: 0
+  team3: 0
 
 teamIpsftp:
-  team1 : "localhost"
-  team2 : "localhost"
+  team0 : 172.31.255.5
+  team1 : 172.31.255.10
+  team2 : 172.31.255.14
+  team3 : 172.31.255.17
 
 teamIpsssh:
-  team1 : "10.176.5.20"
-  team2 : "10.176.6.20"
+  team0 : 172.31.255.4
+  team1 : 172.31.255.8
+  team2 : 172.31.255.13
+  team3 : 172.31.255.16
 
 teamIpsweb:
-  team1 : "localhost"
-  team2 : "localhost"
+  team0 : 172.31.255.2
+  team1 : 172.31.255.6
+  team2 : 172.31.255.12
+  team3 : 172.31.255.15
+
 
 sleepTime: 1

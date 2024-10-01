@@ -19,7 +19,7 @@ func main() {
 	e.Use(middleware.Recover())
 
 	// Get the project root directory
-	projectRoot, _ := filepath.Abs("../")
+	projectRoot, _ := filepath.Abs("./")
 
 	// Serve static files from the "web/images" directory
 	e.Static("/images", filepath.Join(projectRoot, "web", "images"))

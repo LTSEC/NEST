@@ -1,0 +1,27 @@
+package main
+
+templ Sidebar(activePage string) {
+    <div class="sidebar">
+        <div class="logo">Q</div>
+        <nav>
+            <ul>
+                <li class={if activePage == "Announcements" {"active"} else {""}}>
+                    <a href="/">Announcements</a>
+                </li>
+                <li class={if activePage == "Graphs" {"active"} else {""}}>
+                    <a href="/graphs">Graphs</a>
+                </li>
+                <li class={if activePage == "Services" {"active"} else {""}}>
+                    <a href="/services">Services</a>
+                </li>
+                <li class={if activePage == "Injects" {"active"} else {""}}>
+                    <a href="/injects">Injects</a>
+                </li>
+                <li class={if activePage == "PCRs" {"active"} else {""}}>
+                    <a href="/pcrs">PCRs</a>
+                </li>
+            </ul>
+        </nav>
+        <div class="team">team19</div>
+    </div>
+}

@@ -1,0 +1,28 @@
+package main
+
+templ Layout(activePage string) {
+    <html>
+        <head>
+            <link rel="stylesheet" href="/static/styles.css">
+        </head>
+        <body>
+            <div class="container">
+                <Sidebar activePage={ activePage } />
+                
+                <div class="main-content">
+                    if activePage == "Announcements" {
+                        AnnouncementsPage()
+                    } else if activePage == "Graphs" {
+                        GraphsPage()
+                    } else if activePage == "Services" {
+                        ServicesPage()
+                    } else if activePage == "Injects" {
+                        InjectsPage()
+                    } else if activePage == "PCRs" {
+                        PCRsPage()
+                    }
+                </div>
+            </div>
+        </body>
+    </html>
+}

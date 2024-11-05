@@ -1,0 +1,55 @@
+body, html {
+    margin: 0;
+    font-family: Arial, sans-serif;
+}
+
+.container {
+    display: flex;
+}
+
+.sidebar {
+    width: 200px;
+    background-color: #4B0082; /* Dark purple */
+    color: white;
+    height: 100vh;
+    padding-top: 20px;
+}
+
+.sidebar .logo {
+    font-size: 24px;
+    font-weight: bold;
+    text-align: center;
+}
+
+.sidebar nav ul {
+    list-style-type: none;
+    padding: 0;
+}
+
+.sidebar nav ul li {
+    padding: 15px 20px;
+}
+
+.sidebar nav ul li a {
+    color: white;
+    text-decoration: none;
+}
+
+.sidebar nav ul li.active {
+    background-color: #800080; /* Lighter purple for active item */
+}
+
+.main-content {
+    flex: 1;
+    padding: 20px;
+}
+
+.table, .table th, .table td {
+    border: 1px solid black;
+    font-size: 18px;
+}
+
+.small-image {
+    width: 30px;
+    height: 30px;
+}

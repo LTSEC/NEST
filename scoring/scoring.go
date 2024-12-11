@@ -26,8 +26,9 @@ const (
 )
 
 type Team struct {
-	ID   int    // Corresponds to team_id in the database
-	Name string // Corresponds to team_name in the database
+	ID    int    // Corresponds to team_id in the database
+	Name  string // Corresponds to team_name in the database
+	Color string // Corresponds to team_color in the database
 }
 
 type Service struct {
@@ -90,11 +91,11 @@ func ScoringStartup(cfg database.Config, yamlConfig *config.Yaml) error {
 
 // Inserts a team into the database
 func addTeamToDatabase(db *sql.DB, team config.Team) error {
-	query := `INSERT INTO teams (team_id, team_name, team_password) VALUES ($1, $2, $3) ON CONFLICT (team_name) DO NOTHING;`
+	query := `INSERT INTO teams (team_id, team_name, team_password, team_color) VALUES ($1, $2, $3, $4) ON CONFLICT (team_name) DO NOTHING;`
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	_, err := db.ExecContext(ctx, query, team.ID, team.Name, team.Password)
+	_, err := db.ExecContext(ctx, query, team.ID, team.Name, team.Password, team.Color)
 	if err != nil {
 		logger.LogMessage(fmt.Sprintf("Failed to insert team into database: %s", err.Error()), "ERROR")
 	}
@@ -227,7 +228,7 @@ func RunScoring(db *sql.DB, yamlConfig *config.Yaml) error {
 
 // Gets all the teams from the SQL database
 func getAllTeams(db *sql.DB) ([]Team, error) {
-	query := "SELECT team_id, team_name FROM teams"
+	query := "SELECT team_id, team_name, team_color FROM teams"
 	rows, err := db.Query(query)
 	if err != nil {
 		return nil, err
@@ -237,7 +238,7 @@ func getAllTeams(db *sql.DB) ([]Team, error) {
 	var teams []Team
 	for rows.Next() {
 		var team Team
-		if err := rows.Scan(&team.ID, &team.Name); err != nil {
+		if err := rows.Scan(&team.ID, &team.Name, &team.Color); err != nil {
 			return nil, err
 		}
 		teams = append(teams, team)

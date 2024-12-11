@@ -212,17 +212,127 @@ a:hover {
 
 /* Navbar styling */
 .navbar {
-    width: 100%;
-    background-color: #4a4a48;
     display: flex;
     align-items: center;
+    background-color: #4a4a48;
     padding: 10px 20px;
     position: fixed;
     top: 0;
     left: 0;
     height: 60px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    width: 100%;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
     z-index: 10;
+}
+
+.left-section {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.logo img {
+    max-height: 40px;
+}
+
+.team-info {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    color: #ebebe3;
+    font-size: 1em;
+    font-weight: bold;
+}
+
+.team-circle {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: -50px;
+}
+
+.team-name {
+    color: #ebebe3;
+    margin-right:2px;
+}
+
+.team-caret {
+    font-size: 0.8em;
+    color: #ebebe3;
+    margin-right:10px;
+}
+
+.mode-dropdown {
+    position: relative;
+    display: inline-block;
+    cursor: pointer;
+}
+
+.selected-mode img {
+    width: 24px;
+    height: 24px;
+}
+
+.mode-dropdown select {
+    background: none;
+    border: none;
+    color: inherit;
+    font-size: inherit;
+    cursor: pointer;
+    padding-right: 20px;
+    appearance: none;       /* Remove default arrow */
+    -webkit-appearance: none;
+    -moz-appearance: none;
+}
+
+.mode-options {
+    display: none;
+    position: absolute;
+    background-color: #4a4a48;
+    border: 1px solid #ebebe3;
+    border-radius: 4px;
+    margin-top: 5px;
+    padding: 5px;
+}
+
+.mode-option {
+    padding: 5px;
+}
+
+.mode-option img {
+    width: 24px;
+    height: 24px;
+}
+
+.mode-option:hover {
+    background-color: #3a3a36;
+}
+
+.mode-dropdown::after {
+    content: "▾";
+    position: absolute;
+    top: 50%;
+    right: -10px;
+    transform: translateY(-50%);
+    pointer-events: none;
+    color: #ebebe3;
+}
+
+/* Optional hover style */
+.mode-dropdown:hover::after {
+    color: #c19898;
+}
+
+.nav-links {
+    display: flex;
+    align-items: center;
+    margin-left: auto;
+}
+
+.divider {
+    height: 24px;
+    width: 1px;
+    background-color: #3a3a36;
 }
 
 /* Logo styling */
@@ -230,28 +340,6 @@ a:hover {
     height: 50%;
     max-height: 40px;
     margin-right: 15px; /* Space between logo and night mode toggle */
-}
-
-/* Night Mode Toggle and Team Name */
-.navbar .mode-toggle {
-    display: flex;
-    flex-direction: row; /* Stacks items vertically */
-    align-items: center;    /* Center-aligns items horizontally */
-    margin-top: auto;
-    margin-right: auto;     /* Pushes navigation links to the far right */
-    gap: -10px;               /* Adds space between elements */
-}
-
-
-.navbar .mode-toggle .team-name {
-    color: #ebebe3;
-    font-size: 0.9em;
-    margin-right: 10px; /* Space between team name and toggle switch */
-}
-
-.navbar .mode-toggle span {
-    color: #ebebe3;
-    margin-left: 5px;
 }
 
 /* Navigation links styling */

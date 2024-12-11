@@ -78,7 +78,7 @@ func checkWeb(dir string, ip string, portNum int) (bool, error) {
 func ScoreWeb(dir string, ip string, portNum int) (int, bool, error) {
 	_, err := checkWeb(dir, ip, portNum)
 	if err != nil {
-		return 0, false, fmt.Errorf("Web scoring failed: %v", err)
+		return 0, false, fmt.Errorf("web scoring failed: %v", err)
 	}
 	return successPoints, true, nil
 }

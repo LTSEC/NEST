@@ -30,9 +30,10 @@ allowed_templates = {
 
 # User model class
 class User(UserMixin):
-    def __init__(self, id, username):
+    def __init__(self, id, username, color):
         self.id = id
         self.username = username
+        self.color = color
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -41,11 +42,11 @@ def load_user(user_id):
     try:
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
-        cursor.execute("SELECT team_id, team_name FROM teams WHERE team_id = %s", (user_id,))
+        cursor.execute("SELECT team_id, team_name, team_color FROM teams WHERE team_id = %s", (user_id,))
         team = cursor.fetchone()
         
         if team:
-            return User(id=team['team_id'], username=team['team_name'])
+            return User(id=team['team_id'], username=team['team_name'], color=team['team_color'])
     except Exception as e:
         print(f"Error loading user: {e}")
     finally:
@@ -74,14 +75,14 @@ def login():
             # Secure parameterized query for fetching user data
             conn = get_db_connection()
             cursor = conn.cursor(cursor_factory=RealDictCursor)
-            cursor.execute("SELECT team_id, team_password FROM teams WHERE team_name = %s", (team_name,))
+            cursor.execute("SELECT team_id, team_password, team_color FROM teams WHERE team_name = %s", (team_name,))
             team = cursor.fetchone()
 
             # Verify password if team exists
             if team and team['team_password'] == team_password:
-                user = User(id=team['team_id'], username=team_name)
+                user = User(id=team['team_id'], username=team_name, color=team['team_color'])
                 login_user(user)
-                return redirect(url_for('dashboard'))
+                return redirect(url_for('render_page', page=''))
             else:
                 flash('Invalid credentials', 'error')
         except Exception as e:

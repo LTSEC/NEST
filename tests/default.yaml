@@ -54,10 +54,12 @@ teams:
     id: 0
     name: "team0"
     password: "abcd"
+    color: "#ccd3e9"
   team1:
     id: 1
     name: "team1"
     password: "efgh"
+    color: "#e09e44"
 
 interior_ip: "192.168.0.0"
 exterior_ip: "172.0.0.0"

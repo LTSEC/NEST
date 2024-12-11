@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Services - Scoring Engine{% endblock %}
+{% block title %}Services{% endblock %}
 
 {% block content %}
 <div class="services">
@@ -25,7 +25,7 @@
                         <h2>Last 10 Rounds</h2>
                         <div class="round-icons">
                             {% for i in range(10) %}
-                                <span class="round-icon {{ 'up' }}">&#9679;</span>
+                                <span class="round-icon {{ 'down' }}">&#9679;</span>
                             {% endfor %}
                         </div>
                     </div>

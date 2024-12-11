@@ -36,6 +36,7 @@ type Team struct {
 	ID       int    `yaml:"id"`
 	Name     string `yaml:"name"`
 	Password string `yaml:"password"`
+	Color    string `yaml:"color"`
 }
 
 // Parse uses the go-yaml library in order to take information out of a .yaml config file and place into a Yaml struct.

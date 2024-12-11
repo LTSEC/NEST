@@ -4,7 +4,8 @@
 CREATE TABLE teams (
     team_id SERIAL PRIMARY KEY,
     team_name VARCHAR(50) UNIQUE NOT NULL,
-    team_password TEXT NOT NULL
+    team_password TEXT NOT NULL,
+    team_color TEXT NOT NULL
 );
 
 -- Services Table

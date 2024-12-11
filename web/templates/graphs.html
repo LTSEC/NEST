@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Service Status - Scoring Engine{% endblock %}
+{% block title %}Graphs{% endblock %}
 
 {% block content %}
 <div class="graphs-page">
@@ -18,7 +18,7 @@
                         {% endfor %}
                     </tr>
                 </thead>
-                <tbody>
+                <tbody> 
                     {% for team, statuses in services_data.items() %}
                         <tr>
                             <td>{{ team }}</td>

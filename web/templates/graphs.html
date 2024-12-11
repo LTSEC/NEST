@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Service Status - Scoring Engine{% endblock %}
+
+{% block content %}
+<div class="graphs-page">
+    <!-- Service Status Graph -->
+    <div class="graph-container">
+        <p>Last updated graphs at: {{ last_updated }}</p>
+        <h2>Service Status</h2>
+        <div class="table-container">
+            <table class="status-table">
+                <thead>
+                    <tr>
+                        <th>Team</th>
+                        {% for service in services %}
+                            <th>{{ service }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for team, statuses in services_data.items() %}
+                        <tr>
+                            <td>{{ team }}</td>
+                            {% for service in services %}
+                                {% set is_up = statuses.get(service, False) %}
+                                <td class="{{ 'up' if is_up else 'down' }}"></td>
+                            {% endfor %}
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Leaderboard Graph -->
+    <div class="graph-container">
+        <h2>Leaderboard</h2>
+        <div class="leaderboard">
+            {% for team in leaderboard_data %}
+                <div class="leaderboard-item">
+                    <span class="team-name">{{ team.team_name }}</span>
+                    <div class="score-bar"style="width: {{ team.total_points / 45 }}%;">
+                        <span class="score-text">{{ team.total_points }}</span>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

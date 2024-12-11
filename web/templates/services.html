@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Services - Scoring Engine{% endblock %}
+
+{% block content %}
+<div class="services">
+    {% if services %}
+        <div class="service-list">
+            {% for service in services %}
+                <div class="service-card">
+                    <div class="service-info">
+                        <h2>Name</h2>
+                        <p>{{ service.service_name }}</p>
+                    </div>
+                    <div class="service-uptime">
+                        <h2>Uptime</h2>
+                        <div class="progress-bar-container">
+                            <span class="progress-text">{{ service.uptime }}%</span>
+                            <div class="progress-bar {{ 'green' if service.uptime >= 75 else 'yellow' if service.uptime >= 45 else 'red' }}"style="width: {{ service.uptime }}%;">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="service-rounds">
+                        <h2>Last 10 Rounds</h2>
+                        <div class="round-icons">
+                            {% for i in range(10) %}
+                                <span class="round-icon {{ 'up' }}">&#9679;</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p>No services found for your team.</p>
+    {% endif %}
+</div>
+{% endblock %}

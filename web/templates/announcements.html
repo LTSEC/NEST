@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block title %}Announcements - Scoring Engine{% endblock %}
+
+{% block content %}
+<div class="announcements">
+    <h1>Announcements</h1>
+    
+    {% if announcements %}
+        <div class="announcement-list">
+            {% for announcement in announcements %}
+                <div class="announcement-card">
+                    <h2>{{ announcement.title }}</h2>
+                    <p class="date">{{ announcement.date.strftime('%B %d, %Y') }}</p>
+                    <p class="description">{{ announcement.description }}</p>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p>No announcements available at the moment.</p>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Scoring Engine{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    {% if current_user.is_authenticated %}
+        <nav class="navbar">
+            <!-- Logo on the left -->
+            <div class="logo">
+                <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo">
+            </div>
+
+            <!-- Night Mode Toggle and Team Name next to the logo -->
+            <div class="mode-toggle">
+                <div class="team-name">{{ current_user.username }}</div> <!-- Team name display -->
+                <label class="switch">
+                    <input type="checkbox" id="theme-toggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <!-- Navigation links on the right -->
+            <div class="nav-links">
+                <div class="divider"></div>
+                <a href="{{ url_for('render_page', page='') }}">Dashboard</a>
+                <div class="divider"></div>
+                <a href="{{ url_for('render_page', page='announcements') }}">Announcements</a>
+                <div class="divider"></div>
+                <a href="{{ url_for('services') }}">Services</a>
+                <div class="divider"></div>
+                <a href="{{ url_for('graphs') }}">Graphs</a>
+                <div class="divider"></div>
+                <a href="{{ url_for('logout') }}">Logout</a>
+                <div class="divider"></div>
+            </div>
+        </nav>
+    {% endif %}
+    
+    <div class="content">
+        {% block content %}{% endblock %}
+    </div>
+
+    <script>
+        // Function to apply night mode based on the setting
+        function applyNightMode(isNightMode) {
+            document.body.classList.toggle('night-mode', isNightMode);
+            document.getElementById('theme-toggle').checked = isNightMode;
+        }
+
+        // Check local storage for the saved night mode preference on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            const nightModeSetting = localStorage.getItem('nightMode') === 'true';
+            applyNightMode(nightModeSetting);
+        });
+
+        // Add event listener to the toggle switch to update night mode
+        const themeToggle = document.getElementById('theme-toggle');
+        themeToggle.addEventListener('change', function() {
+            const isNightMode = themeToggle.checked;
+            applyNightMode(isNightMode);
+            // Save the user's preference in local storage
+            localStorage.setItem('nightMode', isNightMode);
+        });
+    </script>
+
+</body>
+</html>

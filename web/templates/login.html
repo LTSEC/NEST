@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scoring Engine</title>
+    <link rel="stylesheet" href="../static/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="content">
+        <!-- Right Side Login Container -->
+        <div class="container">
+            <h1>Scoring Engine</h1>
+            <h3>CSEC</h3>
+            <form method="post">
+                <label for="username">Username</label>
+                <input type="text" name="username" id="username" placeholder="Username" required>
+
+                <label for="password">Password</label>
+                <input type="password" name="password" id="password" placeholder="Password" required>
+
+                <button type="submit">Login</button>
+            </form>
+
+            <div class="mode-toggle">
+                <label class="switch">
+                    <input type="checkbox" id="theme-toggle">
+                    <span class="slider"></span>
+                </label>
+                <span>Day/Night Mode</span>
+            </div>
+
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    <ul>
+                    {% for message in messages %}
+                        <li>{{ message }}</li>
+                    {% endfor %}
+                    </ul>
+                {% endif %}
+            {% endwith %}
+        </div>
+
+        <!-- Left Side Logo Container -->
+        <div class="logo-container">
+            <img src="../static/images/logo.png" alt="Logo">
+        </div>
+    </div>
+
+    <script>
+        // Function to apply night mode based on the setting
+        function applyNightMode(isNightMode) {
+            document.body.classList.toggle('night-mode', isNightMode);
+            document.getElementById('theme-toggle').checked = isNightMode;
+        }
+
+        // Check local storage for the saved night mode preference on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            const nightModeSetting = localStorage.getItem('nightMode') === 'true';
+            applyNightMode(nightModeSetting);
+        });
+
+        // Add event listener to the toggle switch to update night mode
+        const themeToggle = document.getElementById('theme-toggle');
+        themeToggle.addEventListener('change', function() {
+            const isNightMode = themeToggle.checked;
+            applyNightMode(isNightMode);
+            // Save the user's preference in local storage
+            localStorage.setItem('nightMode', isNightMode);
+        });
+    </script>
+</body>
+</html>

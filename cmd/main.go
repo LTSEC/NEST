@@ -1,41 +1,35 @@
 package main
 
 import (
+	"log"
 	"path/filepath"
 
 	"github.com/LTSEC/scoring-engine/cli"
-	"github.com/LTSEC/scoring-engine/web"
-	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
+	"github.com/LTSEC/scoring-engine/database"
 )
 
 func main() {
+	projectRoot, err := filepath.Abs("./")
+	if err != nil {
+		log.Fatalf("Error getting the working directory: %v", err)
+	}
 
-	// Echo instance
-	e := echo.New()
+	cfg := database.Config{
+		User:     "root",
+		Password: "root",
+		Host:     "localhost",
+		Port:     5432,
+		DBName:   "scoring",
+	}
 
-	// Middleware
-	e.Use(middleware.Logger())
-	e.Use(middleware.Recover())
+	schemaFP := filepath.Join(projectRoot, "database", "schema.sql")
+	if err := database.CreateDatabase(cfg); err != nil {
+		log.Printf("Could not create database: %s", err.Error())
+	}
+	if err := database.SetupSchema(cfg, schemaFP); err != nil {
+		log.Printf("Could not create database: %s", err.Error())
+	}
 
-	// Get the project root directory
-	projectRoot, _ := filepath.Abs("./")
-
-	// Serve static files from the "web/images" directory
-	e.Static("/images", filepath.Join(projectRoot, "web", "images"))
-
-	// Routes
-	e.GET("/", web.TableHandler)
-
-	// WebSocket route
-	e.GET("/ws", web.WebSocketHandler)
-
-	// Start the CLI in a separate goroutine
-	go cli.Cli()
-
-	// Start the WebSocket broadcasting
-	go web.BroadcastUpdates()
-
-	// Start web server
-	e.Logger.Fatal(e.Start(":8080"))
+	// Start the internal services
+	cli.Cli(cfg)
 }

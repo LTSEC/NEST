@@ -2,6 +2,7 @@ package scoring
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -55,13 +56,13 @@ func onPage(link string, ip string) ([]byte, error) {
 
 // Dials website directly for speed then tries to download and compare website HTMLs if successful.
 // DOESN'T CHECK HTTPS ONLY HTTP
-func CheckWeb(dir string, ip string, portNum string) (bool, error) {
+func checkWeb(dir string, ip string, portNum int) (bool, error) {
 
 	err := web_startup(dir)
 	if err != nil {
 		return false, err
 	}
-	pagehtml, err := onPage("http://"+ip, ip+":"+portNum)
+	pagehtml, err := onPage("http://"+ip, fmt.Sprint(ip, ":", portNum))
 	if err != nil {
 		return false, err
 	}
@@ -72,4 +73,12 @@ func CheckWeb(dir string, ip string, portNum string) (bool, error) {
 	webserv_up := bytes.Equal(bytes.TrimSpace(site_info), bytes.TrimSpace(pagehtml))
 
 	return webserv_up, nil
+}
+
+func ScoreWeb(dir string, ip string, portNum int) (int, bool, error) {
+	_, err := checkWeb(dir, ip, portNum)
+	if err != nil {
+		return 0, false, fmt.Errorf("Web scoring failed: %v", err)
+	}
+	return successPoints, true, nil
 }

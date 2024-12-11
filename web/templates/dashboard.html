@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Scoring Engine{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+    <div class="dashboard-sections">
+        <!-- Link to Services Page -->
+        <a href="{{ url_for('services') }}" class="section-link">
+            <div class="section">
+                <h2>Services</h2>
+                <p>View your team's services.</p>
+            </div>
+        </a>
+
+        <!-- Link to Graphs Page -->
+        <a href="{{ url_for('graphs') }}" class="section-link">
+            <div class="section">
+                <h2>Graphs</h2>
+                <p>View a graphical representation of your and other team's services.</p>
+            </div>
+        </a>
+
+        <!-- Link to Announcements Page -->
+        <a href="{{ url_for('render_page', page='announcements') }}" class="section-link">
+            <div class="section">
+                <h2>Announcements</h2>
+                <p>View competition announcements.</p>
+            </div>
+        </a>
+    </div>
+</div>
+{% endblock %}

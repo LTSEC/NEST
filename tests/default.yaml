@@ -1,0 +1,63 @@
+boxes:
+  testbox1: # YOU CANNOT USE UNDERSCORES IN THE NAME
+    fourth_octet: 50
+    services:
+      web:
+        username: "root"
+        password: "changeme"
+        bt_username: "greg"
+        bt_password: "changeme"
+        port: 80
+
+  testbox2:
+    fourth_octet: 51
+    services:
+      dns:
+        username: "root"
+        password: "changeme"
+        port: 53
+
+  testbox3:
+    fourth_octet: 52
+    services:
+      db:
+        username: "root"
+        password: "changeme"
+        bt_username: "greg"
+        bt_password: "changeme"
+        port: 5432
+      ftp:
+        username: "root"
+        password: "changeme"
+        bt_username: "greg"
+        bt_password: "changeme"
+        port: 21
+
+  testbox4:
+    fourth_octet: 53
+    services:
+      web:
+        username: "root"
+        password: "changeme"
+        bt_username: "john"
+        bt_password: "btpass"
+        port: 80
+      ftp:
+        username: "root"
+        password: "changeme"
+        bt_username: "greg"
+        bt_password: "changeme"
+        port: 21
+
+teams:
+  team0:
+    id: 0
+    name: "team0"
+    password: "abcd"
+  team1:
+    id: 1
+    name: "team1"
+    password: "efgh"
+
+interior_ip: "192.168.0.0"
+exterior_ip: "172.0.0.0"

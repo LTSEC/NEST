@@ -41,31 +41,31 @@ func Cli(cfg database.Config) {
 		if err != nil {
 			fmt.Println("directory error")
 		}
-		fmt.Print(currDirectory + "$ ")
+		fmt.Print(currDirectory + "X ")
 		userInput = inputParser()
-		// slicing off the new line character for ease in manipulation and such
+
+		// Skip empty input
+		if strings.TrimSpace(userInput) == "" {
+			continue
+		}
+
 		userInput = strings.TrimSuffix(userInput, "\r\n")
-		// if exit is typed, we want to exit the program
 		if userInput == "exit" {
 			break
 		}
 		userArgs := tokenizer(userInput)
-
 		commandSelector(userArgs)
 	}
+
 }
 
 func inputParser() string {
-
 	inputReader := bufio.NewReader(os.Stdin)
 	userInput, err := inputReader.ReadString('\n')
-
 	if err != nil {
-		return "Something went wrong"
-	} else {
-		return userInput
+		return ""
 	}
-
+	return userInput
 }
 
 func tokenizer(userInput string) []string {
@@ -126,7 +126,11 @@ func commandSelector(tokenizedInput []string) {
 		os.Exit(0)
 
 	default:
-		bashInjection(tokenizedInput)
+		if len(tokenizedInput[0]) > 0 {
+			bashInjection(tokenizedInput)
+		} else {
+			fmt.Println("Invalid command.")
+		}
 	}
 }
 

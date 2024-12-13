@@ -2,7 +2,7 @@
 FROM golang:1.23.2 AS builder
 
 # Set the working directory inside the container
-WORKDIR /app
+WORKDIR /engine
 
 # Copy the Go module files and download dependencies
 COPY go.mod go.sum ./
@@ -16,12 +16,12 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o scoring-engine ./cmd/main.
 
 # Use a smaller base image for the final container
 FROM alpine:latest
-
-# Set the working directory for the container
-WORKDIR /root/
+# to make sure that postgres is fully running before starting scoring engine
+RUN apk add --no-cache postgresql-client
 
 # Copy the compiled Go program from the builder stage
-COPY --from=builder /app/scoring-engine .
+COPY --from=builder /engine/scoring-engine .
+COPY --from=builder /engine/database /database
 
 # Ensure the binary is executable
 RUN chmod +x scoring-engine

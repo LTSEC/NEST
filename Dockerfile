@@ -2,7 +2,7 @@
 FROM golang:1.23.2 AS builder
 
 # Set the working directory inside the container
-WORKDIR /engine
+WORKDIR /
 
 # Copy the Go module files and download dependencies
 COPY go.mod go.sum ./
@@ -20,8 +20,8 @@ FROM alpine:latest
 RUN apk add --no-cache postgresql-client
 
 # Copy the compiled Go program from the builder stage
-COPY --from=builder /engine/scoring-engine .
-COPY --from=builder /engine/database /database
+COPY --from=builder /scoring-engine .
+COPY --from=builder /database /database
 
 # Ensure the binary is executable
 RUN chmod +x scoring-engine

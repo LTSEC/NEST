@@ -41,7 +41,7 @@ func Cli(cfg database.Config) {
 		if err != nil {
 			fmt.Println("directory error")
 		}
-		fmt.Print(currDirectory + "X ")
+		fmt.Print(currDirectory + "$ ")
 		userInput = inputParser()
 
 		// Skip empty input

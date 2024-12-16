@@ -77,6 +77,7 @@ func ScoringStartup(cfg database.Config, yamlConfig *config.Yaml) error {
 	ticker := time.NewTicker(time.Duration(RefreshTime) * time.Second)
 	defer ticker.Stop()
 
+	// Every *RefreshTime* seconds, score every service
 	for range ticker.C {
 		if ScoringOn {
 			err := RunScoring(db, yamlConfig)
@@ -212,7 +213,6 @@ func RunScoring(db *sql.DB, yamlConfig *config.Yaml) error {
 			)
 			if err != nil {
 				logger.LogMessage(fmt.Sprintf("Error scoring team %d for service %s: %v", team.ID, service.Name, err), "INFO")
-				continue
 			}
 
 			// Update the score and status in the team_services table
@@ -296,18 +296,69 @@ func updateServiceScore(db *sql.DB, teamID, serviceID, points int, isUp bool) er
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	// Define the SQL query for updating the team_services table
-	query := `
-		UPDATE team_services
-		SET points = $1, is_up = $2
-		WHERE team_id = $3 AND service_id = $4
-	`
-
-	// Execute the update query with the provided points and status
-	_, err := db.ExecContext(ctx, query, points, isUp, teamID, serviceID)
+	// Start a transaction to ensure atomic operations
+	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
-		logger.LogMessage(fmt.Sprintf("Failed to update score for team %d, service %d: %s", teamID, serviceID, err.Error()), "ERROR")
-		return fmt.Errorf("failed to update service score for team %d and service %d: %w", teamID, serviceID, err)
+		return fmt.Errorf("failed to start transaction: %w", err)
+	}
+
+	// Update points and status in team_services
+	queryUpdate := `
+	 UPDATE team_services
+	 SET 
+		 points = points + $1, 
+		 is_up = $2,
+		 total_checks = total_checks + 1,
+		 successful_checks = successful_checks + CASE WHEN $2 THEN 1 ELSE 0 END
+	 WHERE team_id = $3 AND service_id = $4
+ `
+	_, err = tx.ExecContext(ctx, queryUpdate, points, isUp, teamID, serviceID)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to update team_services: %w", err)
+	}
+
+	queryInsert := `
+		INSERT INTO service_checks (team_service_id, status)
+		SELECT team_service_id, $1
+		FROM team_services
+		WHERE team_id = $2 AND service_id = $3
+	`
+	_, err = tx.ExecContext(ctx, queryInsert, isUp, teamID, serviceID)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to insert into service_checks: %w", err)
+	}
+
+	// Trim to keep only the last 10 checks
+	queryTrim := `
+		DELETE FROM service_checks
+		WHERE team_service_id = (
+			SELECT team_service_id
+			FROM team_services
+			WHERE team_id = $1 AND service_id = $2
+		)
+		AND check_id NOT IN (
+			SELECT check_id
+			FROM service_checks
+			WHERE team_service_id = (
+				SELECT team_service_id
+				FROM team_services
+				WHERE team_id = $1 AND service_id = $2
+			)
+			ORDER BY timestamp DESC
+			LIMIT 10
+		)
+	`
+	_, err = tx.ExecContext(ctx, queryTrim, teamID, serviceID)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to trim service_checks: %w", err)
+	}
+
+	// Commit the transaction
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	return nil

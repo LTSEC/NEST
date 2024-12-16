@@ -95,7 +95,6 @@ def login():
     
     return render_template('login.html')
 
-
 @app.route('/dashboard', defaults={'page': ''})
 @app.route('/dashboard/<page>')
 @login_required
@@ -157,20 +156,26 @@ def graphs():
     
     return render_template('graphs.html', services_data=services_data, services=services, leaderboard_data=leaderboard_data, last_updated=last_updated)
 
-
 @app.route('/dashboard/services')
 @login_required
 def services():
-    """Fetch and display services for the current user's team."""
+    """Fetch and display services for the current user's team, including the last 10 checks."""
     conn = None
     services_data = []
     try:
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
-        
-        # Query to fetch services associated with the current user's team
+
+        # Query to fetch services and their last 10 checks for the current user's team
         query = """
-        SELECT s.service_name, s.box_name, ts.points, ts.is_up
+        SELECT s.service_name, s.box_name, ts.points, ts.is_up,
+               ARRAY(
+                   SELECT json_build_object('status', sc.status, 'timestamp', sc.timestamp)
+                   FROM service_checks sc
+                   WHERE sc.team_service_id = ts.team_service_id
+                   ORDER BY sc.timestamp DESC
+                   LIMIT 10
+               ) AS last_10_checks
         FROM team_services ts
         JOIN services s ON ts.service_id = s.service_id
         WHERE ts.team_id = %s
@@ -180,13 +185,13 @@ def services():
 
         # Example calculation for uptime percentage
         for service in services_data:
-            service['uptime'] = service['points']  # Replace with actual uptime calculation
+            service['uptime'] = service['points']  # Replace with actual uptime calculation if needed
     except Exception as e:
         print(f"Error fetching services: {e}")
     finally:
         if conn:
             conn.close()
-    
+
     return render_template('services.html', services=services_data)
 
 @app.route('/logout')

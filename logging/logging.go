@@ -71,7 +71,7 @@ func (l *Logger) initialize() error {
 }
 
 // for creating a "Logs" folder in the directory. arguments are '\\' for windows and '/' for linux
-// currently it is set for Windows. if you want to change it, go to initilaize and change it there.
+// currently it is set for Windows. if you want to change it, go to initialize and change it there.
 func getLogPath(fileSeparator byte) string {
 	var lastIndex int
 	// gets current directory
@@ -90,7 +90,7 @@ func getLogPath(fileSeparator byte) string {
 	// truncates everything until that index. this gives us the base path
 	dirPath = dirPath[:lastIndex+1]
 	// joins "Logs" with the base path which is where we will store our Log files
-	newPath := fmt.Sprintf("%sscoring-engine/Logs", dirPath)
+	newPath := fmt.Sprintf("%sscoring-engine\\Logs", dirPath)
 	fmt.Println("\n" + Green + "[LOGGER INITALIZED] " + Reset + newPath)
 	// if the path doesn't exist, it creates one. may need to change the permissions later
 	if _, err := os.Stat(newPath); err != nil {

@@ -25,7 +25,8 @@
                         <h2>Last 10 Rounds</h2>
                         <div class="round-icons">
                             {% for i in range(10) %}
-                                <span class="round-icon {{ 'down' }}">&#9679;</span>
+                                {% set check = service.last_10_checks[i] if i < service.last_10_checks|length else {'status': None, 'timestamp': 'N/A'} %}
+                                <span class="round-icon {{ 'up' if check.status == True else 'down' if check.status == False else 'not-scored' }}" title="{{ check.timestamp }}">&#9679;</span>
                             {% endfor %}
                         </div>
                     </div>

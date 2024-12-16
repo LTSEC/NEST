@@ -195,9 +195,16 @@ ul {
     list-style-type: none;
     margin-top: 15px;
     padding: 10px;
-    background-color: var(--button-hover-bg);
-    color: var(--text-color);
-    border-radius: 4px;
+    background-color: var(--input-bg); /* Adapts to light or dark mode */
+    color: var(--text-color); /* Ensures text is readable */
+    border: 1px solid var(--text-color); /* Optional: adds a subtle border for better visibility */
+    border-radius: 8px; /* Smooth edges */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
+}
+
+ul li {
+    margin-bottom: 5px; /* Space between list items */
+    line-height: 1.5; /* Better readability */
 }
 
 /* Links */
@@ -629,7 +636,7 @@ body.night-mode .progress-text {
     width: 90%; /* Set each graph container width relative to the screen */
     max-width: 80%; /* Set a maximum width to avoid it getting too wide on large screens */
     margin-top: 60px;
-    margin-bottom: 40px; /* Space between graphs */
+    margin-bottom: -10px; /* Space between graphs */
     padding: 20px;
     background-color: #333; /* Background for each graph container */
     border-radius: 8px;

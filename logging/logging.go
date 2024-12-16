@@ -58,7 +58,7 @@ func (l *Logger) StopLog() error {
 // serves as the constructor for the logger struct. sets the fields for what file to use and creates the logger
 func (l *Logger) initialize() error {
 	var err error
-	filePath := getLogPath('\\')
+	filePath := getLogPath('/')
 	timeAndDate := time.Now().Format("2006-01-02 15-04-05")
 	fileName := fmt.Sprintf("%s%s.log", filePath, timeAndDate)
 	l.logFile, err = os.Create(fileName)
@@ -90,7 +90,7 @@ func getLogPath(fileSeparator byte) string {
 	// truncates everything until that index. this gives us the base path
 	dirPath = dirPath[:lastIndex+1]
 	// joins "Logs" with the base path which is where we will store our Log files
-	newPath := fmt.Sprintf("%sscoring-engine\\Logs", dirPath)
+	newPath := fmt.Sprintf("%sscoring-engine/Logs", dirPath)
 	fmt.Println("\n" + Green + "[LOGGER INITALIZED] " + Reset + newPath)
 	// if the path doesn't exist, it creates one. may need to change the permissions later
 	if _, err := os.Stat(newPath); err != nil {

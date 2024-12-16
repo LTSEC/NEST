@@ -22,6 +22,7 @@ RUN apk add --no-cache postgresql-client
 # Copy the compiled Go program from the builder stage
 COPY --from=builder /scoring-engine .
 COPY --from=builder /database /database
+COPY --from=builder /tests /tests
 
 # Ensure the binary is executable
 RUN chmod +x scoring-engine

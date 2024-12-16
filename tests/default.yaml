@@ -61,5 +61,5 @@ teams:
     password: "efgh"
     color: "#e09e44"
 
-interior_ip: "192.168.0.0"
-exterior_ip: "172.0.0.0"
+interior_ip: "192.168.0.0" # For boxes inside a team's network
+exterior_ip: "172.0.0.0" # For the external network

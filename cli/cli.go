@@ -65,7 +65,7 @@ func inputParser() string {
 	if err != nil {
 		return ""
 	}
-	return userInput
+	return strings.TrimSpace(userInput)
 }
 
 func tokenizer(userInput string) []string {

@@ -2,6 +2,7 @@ from flask import Flask, render_template, redirect, url_for, request, flash, abo
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from datetime import datetime
 import psycopg2
+import os
 from psycopg2.extras import RealDictCursor
 
 app = Flask(__name__)
@@ -13,11 +14,11 @@ login_manager.login_view = 'login'
 
 # PostgreSQL connection details
 DATABASE = {
-    'dbname': 'scoring',
-    'user': 'root',
-    'password': 'root',
-    'host': 'localhost',
-    'port': 5432
+    'dbname': os.getenv('DATABASE_NAME', 'scoring'),
+    'user': os.getenv('DATABASE_USER', 'root'),
+    'password': os.getenv('DATABASE_PASSWORD', 'root'),
+    'host': os.getenv('DATABASE_HOST', 'localhost'),
+    'port': os.getenv('DATABASE_PORT', 5432)
 }
 
 # Define allowed templates

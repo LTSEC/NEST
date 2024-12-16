@@ -27,3 +27,19 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+
+  webserver:
+    build:
+      context: ./web
+    ports:
+      - "5000:5000"
+    environment:
+      FLASK_ENV: development
+      DATABASE_HOST: localhost
+      DATABASE_PORT: 5432
+      DATABASE_USER: root
+      DATABASE_PASSWORD: root
+      DATABASE_NAME: scoring
+    depends_on:
+      postgres:
+        condition: service_healthy

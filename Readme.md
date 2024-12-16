@@ -16,9 +16,7 @@ The purpose of this scoring engine is to emulate a competition's scoring system
 - Docker
 
 ## Startup
-For now, you'll have to run
-- docker compose up
-- webserver.py
-And finally the scoring engine .exe (or go run main.go)
-Once you've run the scoring engine, you can run defaultconfig or insert your own config
-After inserting a config, run startup and everything should work.
+- Run docker compose up --build
+- docker ps
+- docker attach [scoring-engine container id]
+From there, you're free to interact with the CLI, use "help" if you don't know the commands

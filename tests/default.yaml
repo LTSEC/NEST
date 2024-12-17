@@ -5,7 +5,7 @@ boxes:
       web:
         username: "root"
         password: "changeme"
-        bt_username: "greg"
+        bt_username: "greg" # i think this stands for bot test
         bt_password: "changeme"
         port: 80
 

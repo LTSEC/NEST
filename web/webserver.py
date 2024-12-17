@@ -54,6 +54,10 @@ def load_user(user_id):
     try:
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
+        try:
+            user_id = int(user_id)
+        except:
+            pass
         if type(user_id) == int:
 
             # Check if the user is a regular team user

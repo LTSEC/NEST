@@ -1,0 +1,769 @@
+/* Basic Reset */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Roboto', sans-serif;
+}
+
+:root {
+    --background-color: #ebebe3;
+    --text-color: #2b2b28;
+    --container-bg: #c19898;
+    --input-bg: #f2f2ed;
+    --input-text-color: #2b2b28;
+    --button-bg: #ebebe3;
+    --button-hover-bg: #ebebe3;
+}
+
+body.night-mode {
+    --background-color: #2b2b28;
+    --text-color: #ebebe3;
+    --container-bg: #4a4a48;
+    --input-bg: #2b2b28;
+    --input-text-color: #ebebe3;
+    --button-bg: #c19898;
+    --button-hover-bg: #f2f2ed;
+}
+
+body {
+    background-color: var(--background-color);
+    color: var(--text-color);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.content {
+    display: flex;
+    width: 100%;
+    height: 100vh;
+}
+
+/* Left Logo Section */
+.logo-container {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--background-color);
+}
+
+.logo-container img {
+    max-width: 80%;
+    height: auto;
+    max-height: 200px;
+}
+
+/* Right Login Section */
+.container {
+    flex: 1;
+    background-color: var(--container-bg);
+    padding: 40px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    border-top-right-radius: 20px;
+    border-bottom-right-radius: 20px;
+    color: var(--text-color);
+    text-align: center;
+}
+
+/* Title and Subtitle */
+h1 {
+    font-size: 2em;
+    color: var(--button-bg);
+    margin-bottom: 5px;
+}
+
+h3 {
+    font-size: 1.2em;
+    color: var(--text-color);
+    margin-bottom: 20px;
+}
+
+/* Form */
+form {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+}
+
+label {
+    align-self: center; /* Center-aligns labels with inputs */
+    margin-top: 15px;
+    margin-bottom: 5px; /* Adds a small gap below the label */
+    color: var(--text-color);
+    font-size: 1em;
+    width: 80%;
+    text-align: left; /* Align text to the left within the label area */
+}
+
+input[type="text"],
+input[type="password"] {
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
+    background-color: var(--input-bg);
+    color: var(--input-text-color);
+    outline: none;
+    transition: background-color 0.3s;
+    width: 80%;
+    box-sizing: border-box; /* Ensures padding doesn’t expand width */
+}
+
+input::placeholder {
+    color: #999; /* Placeholder color for better readability */
+}
+
+button {
+    margin-top: 20px;
+    padding: 10px;
+    background-color: var(--button-bg);
+    color: var(--text-color);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background-color 0.3s;
+    width: 80%;
+}
+
+button:hover {
+    background-color: var(--button-hover-bg);
+    color: var(--text-color);
+}
+
+/* Day/Night Mode Toggle */
+.mode-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 20px;
+}
+
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 40px;
+    height: 20px;
+    margin-right: 10px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: 0.4s;
+    border-radius: 20px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 14px;
+    width: 14px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.4s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: #c19898;
+}
+
+input:checked + .slider:before {
+    transform: translateX(20px);
+}
+
+/* Flash Messages */
+ul {
+    list-style-type: none;
+    margin-top: 15px;
+    padding: 10px;
+    background-color: var(--input-bg); /* Adapts to light or dark mode */
+    color: var(--text-color); /* Ensures text is readable */
+    border: 1px solid var(--text-color); /* Optional: adds a subtle border for better visibility */
+    border-radius: 8px; /* Smooth edges */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
+}
+
+ul li {
+    margin-bottom: 5px; /* Space between list items */
+    line-height: 1.5; /* Better readability */
+}
+
+/* Links */
+a {
+    color: var(--button-bg);
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+/* Navbar styling */
+.navbar {
+    display: flex;
+    align-items: center;
+    background-color: #4a4a48;
+    padding: 10px 20px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 60px;
+    width: 100%;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    z-index: 10;
+}
+
+.left-section {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.logo img {
+    max-height: 40px;
+}
+
+.team-info {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    color: #ebebe3;
+    font-size: 1em;
+    font-weight: bold;
+}
+
+.team-circle {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: -50px;
+}
+
+.team-name {
+    color: #ebebe3;
+    margin-right:2px;
+}
+
+.team-caret {
+    font-size: 0.8em;
+    color: #ebebe3;
+    margin-right:10px;
+}
+
+.mode-dropdown {
+    position: relative;
+    display: inline-block;
+    cursor: pointer;
+}
+
+.selected-mode img {
+    width: 24px;
+    height: 24px;
+}
+
+.mode-dropdown select {
+    background: none;
+    border: none;
+    color: inherit;
+    font-size: inherit;
+    cursor: pointer;
+    padding-right: 20px;
+    appearance: none;       /* Remove default arrow */
+    -webkit-appearance: none;
+    -moz-appearance: none;
+}
+
+.mode-options {
+    display: none;
+    position: absolute;
+    background-color: #4a4a48;
+    border: 1px solid #ebebe3;
+    border-radius: 4px;
+    margin-top: 5px;
+    padding: 5px;
+}
+
+.mode-option {
+    padding: 5px;
+}
+
+.mode-option img {
+    width: 24px;
+    height: 24px;
+}
+
+.mode-option:hover {
+    background-color: #3a3a36;
+}
+
+.mode-dropdown::after {
+    content: "▾";
+    position: absolute;
+    top: 50%;
+    right: -10px;
+    transform: translateY(-50%);
+    pointer-events: none;
+    color: #ebebe3;
+}
+
+/* Optional hover style */
+.mode-dropdown:hover::after {
+    color: #c19898;
+}
+
+.nav-links {
+    display: flex;
+    align-items: center;
+    margin-left: auto;
+}
+
+.divider {
+    height: 24px;
+    width: 1px;
+    background-color: #3a3a36;
+}
+
+/* Logo styling */
+.navbar .logo img {
+    height: 50%;
+    max-height: 40px;
+    margin-right: 15px; /* Space between logo and night mode toggle */
+}
+
+/* Navigation links styling */
+.navbar .nav-links {
+    display: flex;
+    align-items: center;
+}
+
+.navbar .nav-links a {
+    color: #ebebe3;
+    text-decoration: none;
+    padding: 0 15px;
+    font-size: 1em;
+    font-weight: bold;
+    transition: color 0.3s;
+}
+
+.navbar .nav-links a:hover {
+    color: #c19898;
+}
+
+/* Divider between links */
+.navbar .divider {
+    height: 24px;
+    width: 1px;
+    background-color: #3a3a36;
+}
+
+/* General styling for the toggle switch */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 40px;
+    height: 20px;
+    margin-right: 5px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: -4px;
+    bottom: 0;
+    background-color: #ccc;
+    transition: 0.4s;
+    border-radius: 20px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 14px;
+    width: 14px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.4s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: #c19898;
+}
+
+input:checked + .slider:before {
+    transform: translateX(20px);
+}
+
+
+/* Dashboard Content */
+.dashboard {
+    margin-top: 80px;  /* Adjust this value to match your navbar height */
+}
+
+/* Center the Admin Header */
+.dashboard h1 {
+    text-align: center;
+    font-size: 2.5em;
+    margin-bottom: 30px;
+    color: var(--text-color); /* Ensures it uses text color for visibility */
+    font-weight: bold;
+}
+
+/* Special Styling for Admin Username */
+.admin-username {
+    color: #d9534f; /* Red shade for better visibility */
+    font-weight: bold;
+}
+
+body.night-mode .admin-username {
+    color: #ff6961; /* Lighter red shade for dark mode */
+}
+
+.dashboard-sections {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.section-link {
+    text-decoration: none;  /* Removes underline from links */
+    width: 300px;
+}
+
+.section {
+    background-color: #c19898;
+    padding: 20px;
+    margin-left: 20px;
+    border-radius: 8px;
+    width: 100%;  /* Full width within the section link */
+    height: 150px;
+    text-align: center;
+    color: #252525;  /* Ensure text is visible on the button */
+    transition: transform 0.2s;  /* Button effect */
+}
+
+.section:hover {
+    transform: scale(1.05);  /* Slight zoom on hover for button effect */
+    cursor: pointer;
+}
+
+
+/* Announcements Page */
+.announcements {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+    text-align: center;
+}
+
+.announcements h1 {
+    font-size: 2em;
+    margin-bottom: 20px;
+}
+
+.announcement-list {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.announcement-card {
+    background-color: var(--container-bg);
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    text-align: left;
+}
+
+.announcement-card h2 {
+    font-size: 1.5em;
+    color: var(--text-color);
+    margin-bottom: 5px;
+}
+
+.announcement-card .date {
+    font-size: 0.9em;
+    color: #666;
+    margin-bottom: 15px;
+}
+
+.announcement-card .description {
+    font-size: 1em;
+    color: var(--text-color);
+}
+
+/* Service page */
+.services {
+    margin: 0 auto;
+    padding: 20px;
+    margin-top: 60px;
+    text-align: center;
+    width: 75%;
+}
+
+.service-list {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.service-card {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    padding: 15px;
+    border: 1px solid #2525258a;
+    border-radius: 4px; /* Subtle corner rounding */
+    background-color: #ebebe3; /* Default light mode background */
+    width: 100%; /* Full width container */
+    color: #333; /* Default text color */
+    transition: background-color 0.3s, color 0.3s;
+}
+
+/* Night mode styling for service card */
+body.night-mode .service-card {
+    background-color: #333; /* Darker background for night mode */
+    color: #ebebe3; /* Light text color for night mode */
+    border-color: #444;
+}
+
+.service-info, .service-uptime, .service-rounds {
+    text-align: left;
+}
+
+.service-info h2, .service-uptime h2, .service-rounds h2 {
+    font-size: 1em;
+    color: inherit; /* Inherit color to adapt to light/dark mode */
+    margin-bottom: 5px;
+}
+
+/* Progress bar styling */
+.progress-bar-container {
+    position: relative;
+    width: 300px;
+    height: 15px;
+    background-color: #e0e0e0; /* Default light background */
+    border-radius: 5px;
+    overflow: hidden;
+    text-align: center;
+}
+
+/* Night mode for progress bar container */
+body.night-mode .progress-bar-container {
+    background-color: #555; /* Darker background for night mode */
+}
+
+.progress-bar {
+    height: 100%;
+    color: white;
+}
+
+.progress-bar.green {
+    background-color: green;
+}
+
+.progress-bar.yellow {
+    background-color: #ffc107;
+    color: black;
+}
+
+.progress-bar.red {
+    background-color: red;
+}
+
+/* Center the progress text in the container */
+.progress-text {
+    position: absolute;
+    top: 45%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 0.8em;
+    font-weight: bold;
+    color: #444444; /* Dark gray color for text */
+}
+
+/* Night mode for progress text */
+body.night-mode .progress-text {
+    color: #ddd; /* Lighter color for readability in dark mode */
+}
+
+.round-icons {
+    display: flex;
+    gap: 5px;
+}
+
+.round-icon {
+    font-size: 1.2em;
+}
+
+.round-icon.up {
+    color: green;
+}
+
+.round-icon.down {
+    color: red;
+}
+
+/* Graphs page */
+
+/* Graphs page */
+.graphs-page {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    padding: 20px 0;
+    color: #ebebe3; /* Ensures all text inside graphs-page is consistently light gray */
+}
+
+.graph-container {
+    width: 90%; /* Set each graph container width relative to the screen */
+    max-width: 80%; /* Set a maximum width to avoid it getting too wide on large screens */
+    margin-top: 60px;
+    margin-bottom: -10px; /* Space between graphs */
+    padding: 20px;
+    background-color: #333; /* Background for each graph container */
+    border-radius: 8px;
+}
+
+/* Specific color for Service Status and Last Updated text */
+.graph-container h2,
+.graph-container p {
+    color: #ebebe3; /* Light gray for readability */
+}
+
+.table-container {
+    overflow-x: auto;
+    margin-top: 10px;
+}
+
+.status-table {
+    width: 100%; /* Take up the full width of the container */
+    border-collapse: separate;
+    border-spacing: 1px;
+    color: #ebebe3; /* Set text color to light gray */
+}
+
+.status-table th, .status-table td {
+    text-align: center;
+    min-width: 100px;
+    height: 25px;
+    padding: 0;
+}
+
+.status-table td.up {
+    background-color: #006400; /* Dark green */
+    color: #ebebe3; /* Consistent text color for up cells */
+}
+
+.status-table td.down {
+    background-color: #8B0000; /* Dark red */
+    color: #ebebe3; /* Consistent text color for down cells */
+}
+
+.status-table th {
+    background-color: #333;
+    color: #ebebe3;
+    font-weight: bold;
+    border-bottom: 2px solid #444;
+}
+
+/* Remove borders from the outer edges */
+.status-table td:first-child,
+.status-table th:first-child {
+    border-left: none;
+}
+
+.status-table td:last-child,
+.status-table th:last-child {
+    border-right: none;
+}
+
+/* Remove the top and bottom borders */
+.status-table tr:first-child th {
+    border-top: none;
+}
+
+.status-table tr:last-child td {
+    border-bottom: none;
+}
+
+/* Responsive style for narrow screens */
+@media (max-width: 768px) {
+    .status-table th, .status-table td {
+        min-width: 80px;
+    }
+}
+
+/* Leaderboard styling */
+.leaderboard {
+    display: flex;
+    flex-direction: column;
+    gap: 0px; /* Remove extra gap, since we’ll use borders to separate items */
+    width: 100%;
+}
+
+.leaderboard-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 0; /* Add vertical padding for spacing around the content */
+    border-top: 1px solid #444; /* Line above each item */
+    border-bottom: 1px solid #444; /* Line below each item */
+}
+
+.team-name {
+    width: 100px; /* Fixed width for team name */
+    text-align: right;
+    font-weight: bold;
+    color: #ebebe3;
+}
+
+.score-bar {
+    height: 25px;
+    background-color: #20b2aa; /* Teal color for score bar */
+    border-radius: 4px;
+    position: relative; /* Required for centering .score-text */
+    text-align: center;
+    color: #ebebe3;
+}
+
+.score-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%); /* Center the text within the bar */
+    font-weight: bold;
+}
+
+

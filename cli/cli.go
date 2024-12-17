@@ -5,16 +5,24 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"reflect"
 	"strings"
 
 	"github.com/LTSEC/scoring-engine/config"
-	"github.com/LTSEC/scoring-engine/score_holder"
+	"github.com/LTSEC/scoring-engine/database"
 	"github.com/LTSEC/scoring-engine/scoring"
 )
 
 var yamlConfig *config.Yaml
 var ScoringStarted = false
+var dbConfig database.Config
+
+const (
+	Red    = "\033[31m"
+	Green  = "\033[32m"
+	Yellow = "\033[33m"
+	Blue   = "\033[34m"
+	Reset  = "\033[0m"
+)
 
 // The CLI takes in user input from stdin to execute predetermined commands.
 // This is intended to be the primary method of control for the scoring engine.
@@ -23,8 +31,9 @@ var ScoringStarted = false
 // The subsequent inputs are meant to be passed to a later function that is called by the command if applicable.
 //
 // If input does not match any commands for the engine, then the entire command is passed into bash for handling.
-func Cli() {
+func Cli(cfg database.Config) {
 
+	dbConfig = cfg
 	var userInput string
 
 	for {
@@ -34,29 +43,29 @@ func Cli() {
 		}
 		fmt.Print(currDirectory + "$ ")
 		userInput = inputParser()
-		// slicing off the new line character for ease in manipulation and such
+
+		// Skip empty input
+		if strings.TrimSpace(userInput) == "" {
+			continue
+		}
+
 		userInput = strings.TrimSuffix(userInput, "\r\n")
-		// if exit is typed, we want to exit the program
 		if userInput == "exit" {
 			break
 		}
 		userArgs := tokenizer(userInput)
-
 		commandSelector(userArgs)
 	}
+
 }
 
 func inputParser() string {
-
 	inputReader := bufio.NewReader(os.Stdin)
 	userInput, err := inputReader.ReadString('\n')
-
 	if err != nil {
-		return "Something went wrong"
-	} else {
-		return userInput
+		return ""
 	}
-
+	return strings.TrimSpace(userInput)
 }
 
 func tokenizer(userInput string) []string {
@@ -69,75 +78,59 @@ func tokenizer(userInput string) []string {
 func commandSelector(tokenizedInput []string) {
 
 	HelpOutput := `Available commands:
-	hello (Testing output)
 	help (Outputs some helpful information)
 	config (Recieves a path and parses the yaml config given)
+	defaultconfig (Just loads test_yaml.yaml)
 	checkconfig (Outputs the currently parsed yaml config)
-	score (Starts the scoring engine)
-	togglescore (Toggles the scoring engine on/off if its already started)
+	startup (Starts the scoring engine)
+	toggle (Toggles the activity of the scoring engine)
 	exit (exits the CLI)
 	`
 
 	// the switch acts on the first word of the command
 	// the idea is that you'd pass the remaining args to the requisit functions
 	switch tokenizedInput[0] {
-	// test case
-	case "hello":
-		fmt.Println("it was hello!")
 	case "help":
 		fmt.Println(HelpOutput)
 	case "config":
 		if len(tokenizedInput) != 2 {
-			fmt.Println("config requires a path")
+			fmt.Println(Red + "[FAILURE] " + Reset + "The config requires a path")
 		} else {
 			yamlConfig = config.Parse(tokenizedInput[1])
+			fmt.Println(Green + "[SUCCESS] " + Reset + "Added config.")
 		}
+	case "defaultconfig":
+		yamlConfig = config.Parse("tests/default.yaml")
+		fmt.Println(Green + "[SUCCESS] " + Reset + "Added config.")
 	case "checkconfig":
 		fmt.Printf("%+v\n", yamlConfig)
-	case "score":
-		if ScoringStarted == false {
+	case "startup":
+		if ScoringStarted == false && yamlConfig != nil {
 			ScoringStarted = true
-			if yamlConfig != nil {
-				go scoring.ScoringStartup(yamlConfig)
-			} else {
-				fmt.Println("Provide a config first.")
-			}
-
-			// Setting the variables for frontend
-			//web.SetData(getKeys(yamlConfig.TeamScores), []string{"ssh", "ftp", "html"})
-
+			fmt.Println(Green + "[SUCCESS] " + Reset + "Run toggle to start scoring.")
+			go scoring.ScoringStartup(dbConfig, yamlConfig)
+		} else if yamlConfig == nil {
+			fmt.Println(Red + "[FAILURE] " + Reset + "Provide a config first.")
 		} else {
-			fmt.Println("The scoring engine has already been initalized.")
+			fmt.Println(Red + "[FAILURE] " + Reset + "The scoring engine has already been started.")
 		}
-	case "togglescore":
-		if ScoringStarted == true {
-			if scoring.ScoringOn == true {
-				scoring.ScoringToggle(false, yamlConfig)
-			} else if scoring.ScoringOn == false {
-				go scoring.ScoringToggle(true, yamlConfig)
-			}
+	case "toggle":
+		if ScoringStarted == false {
+			fmt.Println(Red + "[FAILURE] " + Reset + "Initalize the scoring engine first")
 		} else {
-			fmt.Println("Initalize the scoring engine first.")
-		}
-	case "listscore":
-		if ScoringStarted == true {
-			for TeamName, TeamData := range score_holder.GetMap() {
-				for _, Data := range TeamData {
-					for dtype, Score := range Data {
-						if reflect.TypeOf(Score) == reflect.TypeOf(1) {
-							fmt.Println(fmt.Sprint("Team ", TeamName, ":	", dtype, " ", Score))
-						}
-					}
-				}
-			}
-		} else {
-			fmt.Println("Initalize the scoring engine first.")
+			engine_status := scoring.ToggleScoring()
+			fmt.Printf(Green+"[SUCCESS] "+Reset+"Scoring engine toggled "+Yellow+"%s"+Reset+".\n", engine_status)
 		}
 	case "exit":
+		fmt.Println(Red + "[SHUTDOWN]")
 		os.Exit(0)
 
 	default:
-		bashInjection(tokenizedInput)
+		if len(tokenizedInput[0]) > 0 {
+			bashInjection(tokenizedInput)
+		} else {
+			fmt.Println("Invalid command.")
+		}
 	}
 }
 

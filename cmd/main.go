@@ -1,41 +1,63 @@
 package main
 
 import (
+	"fmt"
+	"log"
+	"os"
 	"path/filepath"
 
 	"github.com/LTSEC/scoring-engine/cli"
-	"github.com/LTSEC/scoring-engine/web"
-	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
+	"github.com/LTSEC/scoring-engine/database"
 )
 
 func main() {
+	// Get project root directory
+	projectRoot, err := filepath.Abs("./")
+	if err != nil {
+		log.Fatalf("Error getting the working directory: %v", err)
+	}
 
-	// Echo instance
-	e := echo.New()
+	// Read database configuration from environment variables
+	cfg := database.Config{
+		User:     getEnv("DATABASE_USER", "root"),
+		Password: getEnv("DATABASE_PASSWORD", "root"),
+		Host:     getEnv("DATABASE_HOST", "localhost"),
+		Port:     getEnvAsInt("DATABASE_PORT", 5432),
+		DBName:   getEnv("DATABASE_NAME", "scoring"),
+	}
 
-	// Middleware
-	e.Use(middleware.Logger())
-	e.Use(middleware.Recover())
+	// Path to the schema file
+	schemaFP := filepath.Join(projectRoot, "database", "schema.sql")
 
-	// Get the project root directory
-	projectRoot, _ := filepath.Abs("./")
+	// Create the database
+	if err := database.CreateDatabase(cfg); err != nil {
+		log.Printf("Could not create database: %s", err.Error())
+	}
 
-	// Serve static files from the "web/images" directory
-	e.Static("/images", filepath.Join(projectRoot, "web", "images"))
+	// Set up the schema
+	if err := database.SetupSchema(cfg, schemaFP); err != nil {
+		log.Printf("Could not set up database schema: %s", err.Error())
+	}
 
-	// Routes
-	e.GET("/", web.TableHandler)
+	// Start the internal services
+	cli.Cli(cfg)
+}
 
-	// WebSocket route
-	e.GET("/ws", web.WebSocketHandler)
+// getEnv fetches an environment variable or returns a default value
+func getEnv(key, defaultValue string) string {
+	if value, exists := os.LookupEnv(key); exists {
+		return value
+	}
+	return defaultValue
+}
 
-	// Start the CLI in a separate goroutine
-	go cli.Cli()
-
-	// Start the WebSocket broadcasting
-	go web.BroadcastUpdates()
-
-	// Start web server
-	e.Logger.Fatal(e.Start(":8080"))
+// getEnvAsInt fetches an environment variable as an integer or returns a default value
+func getEnvAsInt(key string, defaultValue int) int {
+	if value, exists := os.LookupEnv(key); exists {
+		var intValue int
+		if _, err := fmt.Sscanf(value, "%d", &intValue); err == nil {
+			return intValue
+		}
+	}
+	return defaultValue
 }

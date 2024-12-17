@@ -15,6 +15,14 @@ type Logger struct {
 	initialized bool
 }
 
+const (
+	Red    = "\033[31m"
+	Green  = "\033[32m"
+	Yellow = "\033[33m"
+	Blue   = "\033[34m"
+	Reset  = "\033[0m"
+)
+
 // create logger on the Main body and pass it to any routines. ensures the constructor is only called once
 // for the rest of its life time
 func (l *Logger) StartLog() error {
@@ -50,9 +58,9 @@ func (l *Logger) StopLog() error {
 // serves as the constructor for the logger struct. sets the fields for what file to use and creates the logger
 func (l *Logger) initialize() error {
 	var err error
-	filePath := getLogPath('\\')
+	filePath := getLogPath('/')
 	timeAndDate := time.Now().Format("2006-01-02 15-04-05")
-	fileName := fmt.Sprintf("%s%s.txt", filePath, timeAndDate)
+	fileName := fmt.Sprintf("%s%s.log", filePath, timeAndDate)
 	l.logFile, err = os.Create(fileName)
 	if err != nil {
 		return err
@@ -63,7 +71,7 @@ func (l *Logger) initialize() error {
 }
 
 // for creating a "Logs" folder in the directory. arguments are '\\' for windows and '/' for linux
-// currently it is set for Windows. if you want to change it, go to initilaize and change it there.
+// currently it is set for Windows. if you want to change it, go to initialize and change it there.
 func getLogPath(fileSeparator byte) string {
 	var lastIndex int
 	// gets current directory
@@ -83,7 +91,7 @@ func getLogPath(fileSeparator byte) string {
 	dirPath = dirPath[:lastIndex+1]
 	// joins "Logs" with the base path which is where we will store our Log files
 	newPath := fmt.Sprintf("%sscoring-engine\\Logs", dirPath)
-	fmt.Println(newPath)
+	fmt.Println("\n" + Green + "[LOGGER INITALIZED] " + Reset + newPath)
 	// if the path doesn't exist, it creates one. may need to change the permissions later
 	if _, err := os.Stat(newPath); err != nil {
 		if os.IsNotExist(err) {

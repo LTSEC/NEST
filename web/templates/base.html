@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Scoring Engine{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    {% if current_user.is_authenticated %}
+    <nav class="navbar">
+        <div class="left-section">
+            <div class="logo">
+                <a href="{{ url_for('render_page', page='') }}">
+                    <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo">
+                </a>
+            </div>
+            <div class="team-info">
+                <div class="team-circle"style="background-color: {{ current_user.color }};"></div>
+                <div class="team-name">{{ current_user.username }}</div>
+            </div>
+            <div class="mode-dropdown" id="mode-dropdown">
+                <div class="selected-mode" id="selected-mode">
+                    <img src="{{ url_for('static', filename='images/lightmode.png') }}" alt="Light Mode">
+                </div>
+                <div class="mode-options" id="mode-options">
+                    <div class="mode-option" data-mode="light">
+                        <img src="{{ url_for('static', filename='images/lightmode.png') }}" alt="Light Mode">
+                    </div>
+                    <div class="mode-option" data-mode="dark">
+                        <img src="{{ url_for('static', filename='images/darkmode.png') }}" alt="Dark Mode">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="nav-links">
+            {% if current_user.privilege == 'admin' %}
+                <a href="{{ url_for('admin_landing') }}">Administration</a>
+                <div class="divider"></div>
+            {% else %}
+                <div class="divider"></div>
+                <a href="{{ url_for('render_page', page='') }}">Dashboard</a>
+                <div class="divider"></div>
+                <a href="{{ url_for('render_page', page='announcements') }}">Announcements</a>
+                <div class="divider"></div>
+                <a href="{{ url_for('services') }}">Services</a>
+                <div class="divider"></div>
+                <a href="{{ url_for('graphs') }}">Graphs</a>
+                <div class="divider"></div>
+            {% endif %}
+            <a href="{{ url_for('logout') }}">Logout</a>
+            <div class="divider"></div>
+        </div>
+    </nav>
+    {% endif %}
+    
+    <div class="content">
+        {% block content %}{% endblock %}
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const modeDropdown = document.getElementById('mode-dropdown');
+            const modeOptions = document.getElementById('mode-options');
+            const selectedMode = document.getElementById('selected-mode');
+    
+            let nightModeSetting = localStorage.getItem('nightMode') === 'true';
+            applyNightMode(nightModeSetting);
+    
+            modeDropdown.addEventListener('click', function() {
+                modeOptions.style.display = modeOptions.style.display === 'block' ? 'none' : 'block';
+            });
+    
+            document.querySelectorAll('.mode-option').forEach(option => {
+                option.addEventListener('click', function(e) {
+                    const mode = this.getAttribute('data-mode');
+                    applyNightMode(mode === 'dark');
+                    selectedMode.innerHTML = this.innerHTML;
+                    modeOptions.style.display = 'none';
+                });
+            });
+    
+            document.addEventListener('click', function(e) {
+                if (!modeDropdown.contains(e.target)) {
+                    modeOptions.style.display = 'none';
+                }
+            });
+    
+            function applyNightMode(isNightMode) {
+                document.body.classList.toggle('night-mode', isNightMode);
+                localStorage.setItem('nightMode', isNightMode);
+            }
+        });
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,49 @@
+services:
+  postgres:
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: scoring
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U root -d scoring"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  scoring-engine:
+    build:
+      context: .
+    stdin_open: true
+    tty: true
+    environment:
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_USER: root
+      DATABASE_PASSWORD: root
+      DATABASE_NAME: scoring
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  webserver:
+    build:
+      context: ./web
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./web:/app
+    environment:
+      FLASK_ENV: development
+      FLASK_HOST: "0.0.0.0"
+      FLASK_PORT: 5000
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_USER: root
+      DATABASE_PASSWORD: root
+      DATABASE_NAME: scoring
+    depends_on:
+      postgres:
+        condition: service_healthy

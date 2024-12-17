@@ -55,6 +55,16 @@ func ScoringStartup(cfg database.Config, yamlConfig *config.Yaml) error {
 	defer db.Close()
 	logger.LogMessage("Connected to PostgreSQL database.", "INFO")
 
+	// Add admins to the database
+	query := `INSERT INTO admin_users (name, password) VALUES ($1, $2) ON CONFLICT (name) DO NOTHING;`
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, err = db.ExecContext(ctx, query, "admin", "admin")
+	if err != nil {
+		// No logger initalized here yet
+	}
+
 	// Add teams from YAML config to the database
 	for _, team := range yamlConfig.Teams {
 		// Add the team to the database

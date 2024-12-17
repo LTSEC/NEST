@@ -10,10 +10,11 @@ import (
 // The Yaml type is meant to store the data from a configuration yaml.
 // Root struct for the YAML configuration
 type Yaml struct {
-	InteriorIP string          `yaml:"interior_ip"`
-	ExteriorIP string          `yaml:"exterior_ip"`
-	Boxes      map[string]Box  `yaml:"boxes"`
-	Teams      map[string]Team `yaml:"teams"`
+	InteriorIP string           `yaml:"interior_ip"`
+	ExteriorIP string           `yaml:"exterior_ip"`
+	Boxes      map[string]Box   `yaml:"boxes"`
+	Teams      map[string]Team  `yaml:"teams"`
+	Admin      map[string]Admin `yaml:"admins"`
 }
 
 // Box struct represents each individual box configuration
@@ -37,6 +38,12 @@ type Team struct {
 	Name     string `yaml:"name"`
 	Password string `yaml:"password"`
 	Color    string `yaml:"color"`
+}
+
+// Admin struct represents the administrator user
+type Admin struct {
+	Login    string `yaml:"login"`
+	Password string `yaml:"password"`
 }
 
 // Parse uses the go-yaml library in order to take information out of a .yaml config file and place into a Yaml struct.

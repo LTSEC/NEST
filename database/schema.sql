@@ -35,6 +35,21 @@ CREATE TABLE service_checks (
     timestamp TIMESTAMP DEFAULT now()  -- check time
 );
 
+-- Admin User Table
+CREATE TABLE admin_users (
+    name TEXT PRIMARY KEY,
+    password TEXT NOT NULL
+);
+
+CREATE TABLE announcements (
+    announcement_id SERIAL PRIMARY KEY,            -- Unique ID for each announcement
+    title VARCHAR(255) NOT NULL,                   -- Title of the announcement
+    content TEXT NOT NULL,                         -- Main content/body of the announcement
+    author VARCHAR(100) NOT NULL,                  -- Author of the announcement
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,-- Timestamp for when the announcement is created
+    is_visible BOOLEAN DEFAULT TRUE                -- Controls whether the announcement is visible
+);
+
 -- Indexes for optimized lookups
 CREATE INDEX idx_team_services_team_id ON team_services(team_id);
 CREATE INDEX idx_team_services_service_id ON team_services(service_id);

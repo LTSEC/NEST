@@ -428,9 +428,23 @@ input:checked + .slider:before {
     margin-top: 80px;  /* Adjust this value to match your navbar height */
 }
 
+/* Center the Admin Header */
 .dashboard h1 {
-    font-size: 2em;
-    margin-bottom: 20px;
+    text-align: center;
+    font-size: 2.5em;
+    margin-bottom: 30px;
+    color: var(--text-color); /* Ensures it uses text color for visibility */
+    font-weight: bold;
+}
+
+/* Special Styling for Admin Username */
+.admin-username {
+    color: #d9534f; /* Red shade for better visibility */
+    font-weight: bold;
+}
+
+body.night-mode .admin-username {
+    color: #ff6961; /* Lighter red shade for dark mode */
 }
 
 .dashboard-sections {

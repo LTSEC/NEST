@@ -210,12 +210,12 @@ def services():
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
 
-        if type(current_user) != int:
+        if type(current_user.id) != int:
             return render_template('services.html', services=services_data)
 
         # Query to fetch services and their last 10 checks for the current user's team
         query = """
-        SELECT s.service_name, s.box_name, ts.points, ts.is_up,
+        SELECT s.service_name, s.box_name, ts.points, ts.is_up, ts.total_checks, ts.successful_checks,
                ARRAY(
                    SELECT json_build_object('status', sc.status, 'timestamp', sc.timestamp)
                    FROM service_checks sc
@@ -232,7 +232,7 @@ def services():
 
         # Example calculation for uptime percentage
         for service in services_data:
-            service['uptime'] = service['points']  # Replace with actual uptime calculation if needed
+            service['uptime'] = int(int(service['successful_checks']) / int(service['total_checks']) * 100)
     except Exception as e:
         print(f"Error fetching services: {e}")
     finally:

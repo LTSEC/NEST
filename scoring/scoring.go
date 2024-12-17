@@ -212,6 +212,8 @@ func RunScoring(db *sql.DB, yamlConfig *config.Yaml) error {
 			}
 
 			// Pass relevant details including fourth_octet, but not the full IP address
+			// TODO: Update this interiorip stuff, since going through a router would cause issues
+			// FIX: i dont know
 			points, isUp, err := applyScoringFunction(
 				team.ID,
 				originalServiceName,
@@ -294,6 +296,8 @@ func applyScoringFunction(teamID int, serviceName, baseIP string, fourthOctet in
 		return ScoreFTP(address, port, username, password)
 	case "web":
 		return ScoreWeb("", address, port)
+	case "ssh":
+		return ScoreSSH(address, port, username, password)
 	// Add cases for other services like web, dns, etc.
 	default:
 		return 0, false, fmt.Errorf("unknown service %s", serviceName)

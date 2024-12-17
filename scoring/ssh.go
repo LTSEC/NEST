@@ -1,6 +1,8 @@
 package scoring
 
 import (
+	"fmt"
+	"strconv"
 	"time"
 
 	"golang.org/x/crypto/ssh"
@@ -44,4 +46,13 @@ func SSHConnect(hostname string, port string, username string, password string) 
 	defer session.Close()
 
 	return true, nil
+}
+
+func ScoreSSH(address string, portNum int, username string, password string) (int, bool, error) {
+	_, err := SSHConnect(address, strconv.Itoa(portNum), username, password)
+	if err != nil {
+		return 0, false, fmt.Errorf("SSH scoring failed: %v", err)
+	}
+
+	return successPoints, true, nil
 }

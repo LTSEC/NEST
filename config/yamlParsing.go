@@ -10,17 +10,15 @@ import (
 // The Yaml type is meant to store the data from a configuration yaml.
 // Root struct for the YAML configuration
 type Yaml struct {
-	InteriorIP string           `yaml:"interior_ip"`
-	ExteriorIP string           `yaml:"exterior_ip"`
-	Boxes      map[string]Box   `yaml:"boxes"`
-	Teams      map[string]Team  `yaml:"teams"`
-	Admin      map[string]Admin `yaml:"admins"`
+	AccessIP string           `yaml:"access_ip"`
+	Boxes    map[string]Box   `yaml:"boxes"`
+	Teams    map[string]Team  `yaml:"teams"`
+	Admin    map[string]Admin `yaml:"admins"`
 }
 
 // Box struct represents each individual box configuration
 type Box struct {
-	FourthOctet int                `yaml:"fourth_octet"`
-	Services    map[string]Service `yaml:"services"`
+	Services map[string]Service `yaml:"services"`
 }
 
 // Service struct represents each service configuration for a box

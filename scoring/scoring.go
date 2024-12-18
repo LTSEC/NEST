@@ -217,8 +217,7 @@ func RunScoring(db *sql.DB, yamlConfig *config.Yaml) error {
 			points, isUp, err := applyScoringFunction(
 				team.ID,
 				originalServiceName,
-				yamlConfig.InteriorIP,
-				boxConfig.FourthOctet,
+				yamlConfig.AccessIP,
 				serviceConfig.Port,
 				serviceConfig.Username,
 				serviceConfig.Password,
@@ -284,8 +283,8 @@ func getTeamServices(db *sql.DB, teamID int) ([]Service, error) {
 }
 
 // Applies scoring of each service
-func applyScoringFunction(teamID int, serviceName, baseIP string, fourthOctet int, port int, username, password string) (int, bool, error) {
-	address, err := constructIPAddress(baseIP, teamID, fourthOctet)
+func applyScoringFunction(teamID int, serviceName, baseIP string, port int, username, password string) (int, bool, error) {
+	address, err := constructIPAddress(baseIP, teamID)
 	if err != nil {
 		return 0, false, fmt.Errorf("failed to construct IP address: %w", err)
 	}
@@ -379,15 +378,14 @@ func updateServiceScore(db *sql.DB, teamID, serviceID, points int, isUp bool) er
 }
 
 // Utility function that builds the IP address from the base IP, team ID, and fourth octet
-func constructIPAddress(baseIP string, teamID int, fourthOctet int) (string, error) {
+func constructIPAddress(baseIP string, teamID int) (string, error) {
 	// Split the base IP into quartets
 	ipParts := strings.Split(baseIP, ".")
 	if len(ipParts) != 4 {
 		return "", fmt.Errorf("invalid base IP format: %s", baseIP)
 	}
 
-	ipParts[2] = fmt.Sprintf("%d", teamID)
-	ipParts[3] = fmt.Sprintf("%d", fourthOctet)
+	ipParts[3] = fmt.Sprintf("%d", teamID)
 
 	return strings.Join(ipParts, "."), nil
 }

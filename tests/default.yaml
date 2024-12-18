@@ -1,6 +1,5 @@
 boxes:
-  testbox1: # YOU CANNOT USE UNDERSCORES IN THE NAME
-    fourth_octet: 50
+  testbox1: # YOU CANNOT USE UNDERSCORES IN THE NAM
     services:
       web:
         username: "root"
@@ -10,7 +9,6 @@ boxes:
         port: 80
 
   testbox2:
-    fourth_octet: 51
     services:
       dns:
         username: "root"
@@ -18,7 +16,6 @@ boxes:
         port: 53
 
   testbox3:
-    fourth_octet: 52
     services:
       db:
         username: "root"
@@ -34,7 +31,6 @@ boxes:
         port: 21
 
   testbox4:
-    fourth_octet: 53
     services:
       web:
         username: "root"
@@ -51,12 +47,12 @@ boxes:
 
 teams:
   team0:
-    id: 0
+    id: 21
     name: "team0"
     password: "abcd"
     color: "#ccd3e9"
   team1:
-    id: 1
+    id: 22
     name: "team1"
     password: "efgh"
     color: "#e09e44"
@@ -66,5 +62,4 @@ admins:
     login: "admin"
     password: "admin"
 
-interior_ip: "192.168.0.0" # For boxes inside a team's network
-exterior_ip: "172.0.0.0" # For the external network
+access_ip: "172.31.255.0"

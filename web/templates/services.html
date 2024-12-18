@@ -3,7 +3,7 @@
 {% block title %}Services{% endblock %}
 
 {% block content %}
-<div class="services">
+<div class="services" id="services-container">
     {% if current_user.privilege == 'admin'%}
         <div class="no-view-as" style="text-align: center; margin-top: 50px;">
             <h2>Placeholder for Admin users</h2>
@@ -12,7 +12,7 @@
         {% if services %}
             <div class="service-list">
                 {% for service in services %}
-                    <div class="service-card">
+                    <div class="service-card" data-service-id="{{ service.service_name }}">
                         <div class="service-info">
                             <h2>Name</h2>
                             <p>{{ service.service_name }}</p>
@@ -21,8 +21,7 @@
                             <h2>Uptime</h2>
                             <div class="progress-bar-container">
                                 <span class="progress-text">{{ service.uptime }}%</span>
-                                <div class="progress-bar {{ 'green' if service.uptime >= 75 else 'yellow' if service.uptime >= 45 else 'red' }}"style="width: {{ service.uptime }}%;">
-                                </div>
+                                <div class="progress-bar {{ 'green' if service.uptime >= 75 else 'yellow' if service.uptime >= 45 else 'red' }}"style="width: {{ service.uptime }}%;"></div>
                             </div>
                         </div>
 
@@ -44,4 +43,78 @@
         {% endif %}
     {% endif %}
 </div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    const refreshInterval = 10000; // Refresh every 10 seconds
+
+    async function fetchServicesData() {
+        try {
+            const response = await fetch('/api/services-data');
+            if (!response.ok) throw new Error("Failed to fetch services data");
+            const data = await response.json();
+
+            const servicesContainer = document.getElementById('services-container');
+            servicesContainer.innerHTML = ""; // Clear the existing services content
+
+            if (data.services && data.services.length > 0) {
+                const serviceList = document.createElement('div');
+                serviceList.className = "service-list";
+
+                data.services.forEach(service => {
+                    const serviceCard = document.createElement('div');
+                    serviceCard.className = "service-card";
+
+                    // Service Info
+                    const serviceInfo = document.createElement('div');
+                    serviceInfo.className = "service-info";
+                    serviceInfo.innerHTML = `
+                        <h2>Name</h2>
+                        <p>${service.service_name}</p>
+                    `;
+                    serviceCard.appendChild(serviceInfo);
+
+                    // Service Uptime
+                    const serviceUptime = document.createElement('div');
+                    serviceUptime.className = "service-uptime";
+                    serviceUptime.innerHTML = `
+                        <h2>Uptime</h2>
+                        <div class="progress-bar-container">
+                            <span class="progress-text">${service.uptime}%</span>
+                            <div class="progress-bar ${service.uptime >= 75 ? 'green' : service.uptime >= 45 ? 'yellow' : 'red'}" style="width: ${service.uptime}%;"></div>
+                        </div>
+                    `;
+                    serviceCard.appendChild(serviceUptime);
+
+                    // Last 10 Rounds
+                    const serviceRounds = document.createElement('div');
+                    serviceRounds.className = "service-rounds";
+                    const roundIcons = service.last_10_checks.map((check, i) => `
+                        <span class="round-icon ${check.status === true ? 'up' : check.status === false ? 'down' : 'not-scored'}" title="${check.timestamp || 'N/A'}">&#9679;</span>
+                    `).join('');
+                    serviceRounds.innerHTML = `
+                        <h2>Last 10 Rounds</h2>
+                        <div class="round-icons">
+                            ${roundIcons}
+                        </div>
+                    `;
+                    serviceCard.appendChild(serviceRounds);
+
+                    serviceList.appendChild(serviceCard);
+                });
+
+                servicesContainer.appendChild(serviceList);
+            } else {
+                servicesContainer.innerHTML = `<p>No services found for the selected team.</p>`;
+            }
+        } catch (error) {
+            console.error("Error fetching services data:", error);
+        }
+    }
+
+    // Fetch data initially and set interval
+    fetchServicesData();
+    setInterval(fetchServicesData, refreshInterval);
+});
+</script>
 {% endblock %}

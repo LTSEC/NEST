@@ -1,4 +1,4 @@
-from flask import Flask, render_template, redirect, url_for, request, flash, abort
+from flask import Flask, render_template, redirect, url_for, request, flash, abort, jsonify
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from datetime import datetime
 import psycopg2
@@ -186,7 +186,12 @@ def graphs():
             services_data[team_name][service_name] = is_up
 
         # Fetch team scores for leaderboard
-        cursor.execute("SELECT team_name, SUM(points) as total_points FROM team_services ts JOIN teams t ON ts.team_id = t.team_id GROUP BY team_name ORDER BY total_points DESC")
+        cursor.execute("""
+            SELECT team_name, SUM(points) as total_points 
+            FROM team_services ts JOIN teams t 
+            ON ts.team_id = t.team_id 
+            GROUP BY team_name 
+            ORDER BY total_points DESC""")
         leaderboard_data = cursor.fetchall()
 
     except Exception as e:
@@ -198,6 +203,67 @@ def graphs():
     last_updated = datetime.now().strftime('%m/%d/%Y, %I:%M:%S %p')
     
     return render_template('graphs.html', services_data=services_data, services=services, leaderboard_data=leaderboard_data, last_updated=last_updated)
+
+
+@app.route('/api/graph-data', methods=['GET'])
+@login_required
+def get_graph_data():
+    conn = None
+    services_data = {}
+    services = []
+    leaderboard_data = []
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Fetch all services to determine the column headers
+        cursor.execute("SELECT DISTINCT service_name FROM services ORDER BY service_name")
+        services = [row['service_name'] for row in cursor.fetchall()]
+
+        # Fetch uptime data for each team and service
+        cursor.execute("""
+            SELECT t.team_name, s.service_name, ts.is_up
+            FROM team_services ts
+            JOIN teams t ON ts.team_id = t.team_id
+            JOIN services s ON ts.service_id = s.service_id
+            ORDER BY t.team_name, s.service_name
+        """)
+        rows = cursor.fetchall()
+
+        for row in rows:
+            team_name = row['team_name']
+            service_name = row['service_name']
+            is_up = row['is_up']
+
+            if team_name not in services_data:
+                services_data[team_name] = {}
+            services_data[team_name][service_name] = is_up
+
+        # Fetch team scores for leaderboard
+        cursor.execute("""
+            SELECT team_name, SUM(points) as total_points 
+            FROM team_services ts 
+            JOIN teams t ON ts.team_id = t.team_id 
+            GROUP BY team_name 
+            ORDER BY total_points DESC
+        """)
+        leaderboard_data = cursor.fetchall()
+
+    except Exception as e:
+        print(f"Error fetching graph data: {e}")
+    finally:
+        if conn:
+            conn.close()
+
+    last_updated = datetime.now().strftime('%m/%d/%Y, %I:%M:%S %p')
+
+    return jsonify({
+        "last_updated": last_updated,
+        "services": services,
+        "services_data": services_data,
+        "leaderboard_data": leaderboard_data
+    })
 
 
 @app.route('/dashboard/services')
@@ -232,7 +298,10 @@ def services():
 
         # Example calculation for uptime percentage
         for service in services_data:
-            service['uptime'] = int(int(service['successful_checks']) / int(service['total_checks']) * 100)
+            if service['total_checks'] > 0:
+                service['uptime'] = int(int(service['successful_checks']) / int(service['total_checks']) * 100)
+            else:
+                service['uptime'] = 0
     except Exception as e:
         print(f"Error fetching services: {e}")
     finally:
@@ -242,7 +311,54 @@ def services():
     return render_template('services.html', services=services_data)
 
 
-@app.route('/announcements', methods=['GET', 'POST'])
+@app.route('/api/services-data', methods=['GET'])
+@login_required
+def get_services_data():
+    """API endpoint to fetch services data for the current user's team."""
+    conn = None
+    services_data = []
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+        if type(current_user.id) != int:
+            return jsonify({"services": []}), 200
+
+        # Query to fetch services and their last 10 checks for the current user's team
+        query = """
+        SELECT s.service_name, s.box_name, ts.points, ts.is_up, ts.total_checks, ts.successful_checks,
+               ARRAY(
+                   SELECT json_build_object('status', sc.status, 'timestamp', sc.timestamp)
+                   FROM service_checks sc
+                   WHERE sc.team_service_id = ts.team_service_id
+                   ORDER BY sc.timestamp DESC
+                   LIMIT 10
+               ) AS last_10_checks
+        FROM team_services ts
+        JOIN services s ON ts.service_id = s.service_id
+        WHERE ts.team_id = %s
+        """
+        cursor.execute(query, (current_user.id,))
+        services_data = cursor.fetchall()
+
+        # Calculate uptime percentage
+        for service in services_data:
+            if service['total_checks'] > 0:
+                service['uptime'] = int(int(service['successful_checks']) / int(service['total_checks']) * 100)
+            else:
+                service['uptime'] = 0
+
+    except Exception as e:
+        print(f"Error fetching services data: {e}")
+        return jsonify({"error": "Error fetching services data"}), 500
+    finally:
+        if conn:
+            conn.close()
+
+    return jsonify({"services": services_data}), 200
+
+
+@app.route('/dashboard/announcements', methods=['GET', 'POST'])
 @login_required
 def announcements():
     """Display all announcements and allow admins to add new ones."""
@@ -256,7 +372,7 @@ def announcements():
         # Handle POST request to create a new announcement (Admins only)
         if request.method == 'POST' and current_user.privilege == 'admin':
             title = request.form.get('title')
-            description = request.form.get('description')
+            description = request.form.get('description', '').strip()
             if title and description:
                 cursor.execute(
                     """
@@ -266,10 +382,7 @@ def announcements():
                     (title, description, current_user.username)
                 )
                 conn.commit()
-                flash("Announcement created successfully!", "success")
                 return redirect(url_for('announcements'))  # Redirect to avoid resubmission
-            else:
-                flash("Both title and description are required.", "error")
 
         # Fetch all visible announcements
         if current_user.privilege == 'admin':
@@ -289,7 +402,6 @@ def announcements():
 
     except Exception as e:
         print(f"Error managing announcements: {e}")
-        flash("An error occurred while managing announcements.", "error")
     finally:
         if conn:
             conn.close()

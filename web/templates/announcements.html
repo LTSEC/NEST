@@ -3,66 +3,76 @@
 {% block title %}Announcements{% endblock %}
 
 {% block content %}
-<div class="announcements" style="width: 90%; margin: 0 auto; font-family: 'Roboto', sans-serif;">
-    <h1 style="text-align: center; margin-bottom: 20px;">Announcements</h1>
-
-    <!-- Admin-only form to create announcements -->
+<div class="announcements">
     {% if current_user.privilege == 'admin' %}
-    <div class="create-announcement" style="margin-bottom: 30px; padding: 20px; background-color: #ffffff; border-radius: 10px; box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);">
-        <h2 style="margin-bottom: 15px; text-align: center; color: #333;">Create a New Announcement</h2>
-        <form method="POST" action="{{ url_for('announcements') }}" style="display: flex; flex-direction: column; gap: 15px;">
-            <label for="title" style="font-weight: bold; color: #555;">Title:</label>
-            <input type="text" id="title" name="title" placeholder="Enter the announcement title..." required 
-                   style="padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 1em;">
+    <!-- Floating button for admins -->
+    <button class="floating-button" id="toggle-form-button" onclick="toggleAnnouncementForm()">+</button>
+    {% endif %}
+    
+    <h1 class="announcement-header">Announcements</h1>
 
-            <label for="description" style="font-weight: bold; color: #555;">Description:</label>
-            <textarea id="description" name="description" rows="5" placeholder="Enter the announcement content..." required
-                      style="padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 1em;"></textarea>
+    <!-- Admin-only form to create announcements (Hidden by default) -->
+    {% if current_user.privilege == 'admin' %}
+    <div id="create-announcement" class="create-announcement" style="display: none;">
+        <h2 class="form-title">Create a New Announcement</h2>
+        <form id="create-announcement-form" action="{{ url_for('announcements') }}" class="form-container" method="POST">
+            <label class="form-label" for="title">Title:</label>
+            <input class="form-input" id="title" name="title" placeholder="Enter the announcement title..." required type="text" />
 
-            <button type="submit" style="align-self: center; padding: 10px 20px; background-color: #4CAF50; color: white; border: none; border-radius: 5px; font-size: 1em; cursor: pointer;">
-                Post Announcement
-            </button>
+            <label class="form-label" for="description">Description:</label>
+            <textarea class="textarea-input" id="description" name="description" placeholder="Enter the announcement content..." required rows="3"></textarea>
+
+            <button class="form-submit-button" type="submit">Post Announcement</button>
         </form>
     </div>
     {% endif %}
 
     <!-- List of Announcements -->
     {% if announcements %}
-        <div class="announcement-list" style="display: flex; flex-direction: column; gap: 20px;">
+        <div class="announcement-list">
             {% for announcement in announcements %}
-                <div class="announcement-card" style="width: 100%; border: 1px solid #ddd; padding: 15px; border-radius: 10px; background-color: #ffffff; box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.1);">
-                    <h2 style="margin-bottom: 10px; color: #333;">{{ announcement.title }}</h2>
-                    <p class="description" style="white-space: pre-wrap; font-size: 1em; color: #555; line-height: 1.5;">
-                        {{ announcement.content }}
-                    </p>
-                    <p style="font-size: 0.9em; color: gray; margin-top: 10px;">
+                <div class="announcement-card" id="announcement-{{ announcement.announcement_id }}">
+                    <h2 class="announcement-title">{{ announcement.title }}</h2>
+                    <p class="description">{{ announcement.content | trim }}</p>
+                    <p class="announcement-meta">
                         Posted by: {{ announcement.author }} | {{ announcement.created_at.strftime('%B %d, %Y') }} | Visible {{ announcement.is_visible }}
                     </p>
 
                     {% if current_user.privilege == 'admin' %}
-                    <div class="admin-actions" style="margin-top: 10px; display: flex; gap: 5px; align-items: center;">
+                    <div class="admin-actions">
                         <!-- Edit -->
-                        <button onclick="editAnnouncement({{ announcement.announcement_id }})" style="padding: 3px 5px; background-color: #5bc0de; color: white; border: none; border-radius: 3px;">Edit</button>
-
+                        <button class="admin-edit-button" onclick="editAnnouncement({{ announcement.announcement_id }})">Edit</button>
                         <!-- Hide/Unhide -->
-                        <button onclick="toggleAnnouncement({{ announcement.announcement_id }})" style="padding: 3px 5px; background-color: #f0ad4e; color: white; border: none; border-radius: 3px;">
+                        <button class="admin-toggle-button" onclick="toggleAnnouncement({{ announcement.announcement_id }})">
                             {{ 'Hide' if announcement.is_visible else 'Unhide' }}
                         </button>
-
                         <!-- Delete -->
-                        <button onclick="deleteAnnouncement({{ announcement.announcement_id }})" style="padding: 3px 5px; background-color: #d9534f; color: white; border: none; border-radius: 3px;">Delete</button>
+                        <button class="admin-delete-button" onclick="deleteAnnouncement({{ announcement.announcement_id }})">Delete</button>
                     </div>
                     {% endif %}
-
                 </div>
             {% endfor %}
         </div>
     {% else %}
-        <p style="text-align: center; color: #555;">No announcements available at the moment.</p>
+        <p class="no-announcements-message">No announcements available at the moment.</p>
     {% endif %}
 </div>
 
 <script>
+    // Toggle Create Announcement Form
+    function toggleAnnouncementForm() {
+        const formContainer = document.getElementById("create-announcement");
+        const button = document.getElementById("toggle-form-button");
+
+        if (formContainer.style.display === "none" || formContainer.style.display === "") {
+            formContainer.style.display = "block";
+            button.textContent = "×"; // Change "+" to "×"
+        } else {
+            formContainer.style.display = "none";
+            button.textContent = "+"; // Change back to "+"
+        }
+    }
+
     // Function to handle AJAX form submission for creating an announcement
     document.getElementById('create-announcement-form').addEventListener('submit', function (e) {
         e.preventDefault();

@@ -1,60 +1,32 @@
 boxes:
-  testbox1: # YOU CANNOT USE UNDERSCORES IN THE NAM
+  test-ssh-newnetwork: # YOU CANNOT USE UNDERSCORES IN THE NAM
     services:
-      web:
+      ssh:
         username: "root"
         password: "changeme"
         bt_username: "greg" # i think this stands for bot test
         bt_password: "changeme"
-        port: 80
+        port: 2200
 
-  testbox2:
+  ftp-test-scoring:
     services:
-      dns:
-        username: "root"
-        password: "changeme"
-        port: 53
-
-  testbox3:
-    services:
-      db:
-        username: "root"
-        password: "changeme"
-        bt_username: "greg"
-        bt_password: "changeme"
-        port: 5432
       ftp:
         username: "root"
         password: "changeme"
         bt_username: "greg"
-        bt_password: "changeme"
-        port: 21
-
-  testbox4:
-    services:
-      web:
-        username: "root"
-        password: "changeme"
-        bt_username: "john"
-        bt_password: "btpass"
-        port: 80
-      ftp:
-        username: "root"
-        password: "changeme"
-        bt_username: "greg"
-        bt_password: "changeme"
-        port: 21
+        bt_password: "greg"
+        port: 2100
 
 teams:
   team0:
-    id: 21
+    id: 12
     name: "team0"
-    password: "abcd"
+    password: "team0"
     color: "#ccd3e9"
   team1:
-    id: 22
+    id: 13
     name: "team1"
-    password: "efgh"
+    password: "team1"
     color: "#e09e44"
 
 admins:

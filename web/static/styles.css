@@ -567,6 +567,13 @@ body.night-mode .service-card {
     margin-bottom: 5px;
 }
 
+.service-info p {
+    width: 12ch; /* Approximately limits to 12 characters */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 /* Progress bar styling */
 .progress-bar-container {
     position: relative;
@@ -633,8 +640,6 @@ body.night-mode .progress-text {
 .round-icon.down {
     color: red;
 }
-
-/* Graphs page */
 
 /* Graphs page */
 .graphs-page {
@@ -766,4 +771,182 @@ body.night-mode .progress-text {
     font-weight: bold;
 }
 
+/* Announcements Styling */
+.announcements {
+    width: 90%;
+    margin: 0 auto;
+    font-family: 'Roboto', sans-serif;
+}
 
+.announcement-header {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.create-announcement {
+    margin-bottom: 30px;
+    padding: 20px;
+    background-color: var(--container-bg);
+    border-radius: 10px;
+    box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.form-title {
+    margin-bottom: 15px;
+    text-align: center;
+    color: #333;
+}
+
+.form-container {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.form-label {
+    font-weight: bold;
+    color: #ffffff;
+}
+
+.form-input {
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 1em;
+}
+
+.textarea-label {
+    font-weight: bold;
+    color: #ffffff;
+}
+
+.textarea-input {
+    width: 80%; /* Match title input width */
+    max-width: 600px;
+    min-height: 100px; /* Starting height (~3 lines) */
+    max-height: 300px; /* Limit to ~15 lines */
+    overflow-y: auto; /* Add scroll when reaching the max height */
+    background-color: var(--input-bg);
+    border: 1px solid #555;
+    color: var(--input-text-color);
+    padding: 10px;
+    border-radius: 5px;
+    line-height: 1.5; /* Line spacing for better readability */
+    resize: none; /* Prevent manual resizing */
+}
+
+/* Update title color to match labels */
+.form-title {
+    color: var(--input-text-color); /* Matches Title/Description labels */
+    font-weight: bold;
+    text-align: center;
+}
+
+.form-submit-button {
+    align-self: center;
+    padding: 10px 20px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    font-size: 1em;
+    cursor: pointer;
+}
+
+.announcement-list {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.announcement-card {
+    width: 100%;
+    border: 1px solid #ddd;
+    padding: 15px;
+    border-radius: 10px;
+    background-color: var(--container-bg);
+    box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.announcement-title {
+    margin-bottom: 10px;
+    color: #333;
+}
+
+.description {
+    white-space: pre-wrap;
+    font-size: 1em;
+    color: #555;
+    line-height: 1.5;
+}
+
+.announcement-meta {
+    font-size: 0.9em;
+    color: gray;
+    margin-top: 10px;
+}
+
+.admin-actions {
+    margin-top: 10px;
+    display: flex;
+    gap: 5px;
+    align-items: center;
+}
+
+.admin-edit-button {
+    padding: 3px 5px;
+    background-color: #5bc0de;
+    color: white;
+    border: none;
+    border-radius: 3px;
+}
+
+.admin-toggle-button {
+    padding: 3px 5px;
+    background-color: #f0ad4e;
+    color: white;
+    border: none;
+    border-radius: 3px;
+}
+
+.admin-delete-button {
+    padding: 3px 5px;
+    background-color: #d9534f;
+    color: white;
+    border: none;
+    border-radius: 3px;
+}
+
+.no-announcements-message {
+    text-align: center;
+    color: #555;
+    padding-bottom: 30px;
+}
+
+/* Floating circular button */
+.floating-button {
+    position: fixed;
+    bottom: 20px; /* Distance from the bottom */
+    left: 20px;   /* Distance from the left */
+    width: 60px;
+    height: 60px;
+    background-color: #4CAF50; /* Match Post Announcement button color */
+    color: white;
+    border: none;
+    border-radius: 50%; /* Makes it circular */
+    font-size: 2em;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    z-index: 1000; /* Ensure it stays on top */
+}
+
+/* Hover effect */
+.floating-button:hover {
+    transform: scale(1.1); /* Slight zoom effect */
+    box-shadow: 0 6px 10px rgba(0, 0, 0, 0.3);
+}

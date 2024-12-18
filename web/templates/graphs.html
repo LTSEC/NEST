@@ -6,19 +6,19 @@
 <div class="graphs-page">
     <!-- Service Status Graph -->
     <div class="graph-container">
-        <p>Last updated graphs at: {{ last_updated }}</p>
+        <p id="last-updated">Last updated graphs at: {{ last_updated }}</p>
         <h2>Service Status</h2>
         <div class="table-container">
             <table class="status-table">
                 <thead>
                     <tr>
-                        <th>Team</th>
+                        <th style="max-width: 8ch; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Team</th>
                         {% for service in services %}
-                            <th>{{ service }}</th>
+                            <th style="max-width: 8ch; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ service }}</th>
                         {% endfor %}
                     </tr>
                 </thead>
-                <tbody> 
+                <tbody id="status-table-body"> 
                     {% for team, statuses in services_data.items() %}
                         <tr>
                             <td>{{ team }}</td>
@@ -36,7 +36,7 @@
     <!-- Leaderboard Graph -->
     <div class="graph-container">
         <h2>Leaderboard</h2>
-        <div class="leaderboard">
+        <div class="leaderboard" id="leaderboard">
             {% for team in leaderboard_data %}
                 <div class="leaderboard-item">
                     <span class="team-name">{{ team.team_name }}</span>
@@ -48,4 +48,71 @@
         </div>
     </div>
 </div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const refreshInterval = 5000; // Refresh every 5 seconds
+
+        async function fetchData() {
+            try {
+                const response = await fetch('/api/graph-data');
+                if (!response.ok) throw new Error("Failed to fetch data");
+                const data = await response.json();
+
+                // Update "last updated" time
+                document.getElementById('last-updated').textContent = `Last updated graphs at: ${data.last_updated}`;
+
+                // Update services data
+                const tbody = document.getElementById('status-table-body');
+                tbody.innerHTML = ""; // Clear existing rows
+                for (const [team, statuses] of Object.entries(data.services_data)) {
+                    const row = document.createElement('tr');
+                    const teamCell = document.createElement('td');
+                    teamCell.textContent = team;
+                    row.appendChild(teamCell);
+
+                    data.services.forEach(service => {
+                        const serviceCell = document.createElement('td');
+                        serviceCell.className = statuses[service] ? 'up' : 'down';
+                        row.appendChild(serviceCell);
+                    });
+
+                    tbody.appendChild(row);
+                }
+
+                // Update leaderboard data
+                const leaderboard = document.getElementById('leaderboard');
+                leaderboard.innerHTML = ""; // Clear existing items
+                data.leaderboard_data.forEach(team => {
+                    const item = document.createElement('div');
+                    item.className = 'leaderboard-item';
+
+                    const teamName = document.createElement('span');
+                    teamName.className = 'team-name';
+                    teamName.textContent = team.team_name;
+
+                    const scoreBar = document.createElement('div');
+                    scoreBar.className = 'score-bar';
+                    scoreBar.style.width = `${team.total_points / 45}%`;
+
+                    const scoreText = document.createElement('span');
+                    scoreText.className = 'score-text';
+                    scoreText.textContent = team.total_points;
+
+                    scoreBar.appendChild(scoreText);
+                    item.appendChild(teamName);
+                    item.appendChild(scoreBar);
+                    leaderboard.appendChild(item);
+                });
+
+            } catch (error) {
+                console.error("Error fetching or updating data:", error);
+            }
+        }
+
+        // Fetch data initially and set interval
+        fetchData();
+        setInterval(fetchData, refreshInterval);
+    });
+</script>
 {% endblock %}

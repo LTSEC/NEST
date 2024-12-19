@@ -219,8 +219,8 @@ func RunScoring(db *sql.DB, yamlConfig *config.Yaml) error {
 				originalServiceName,
 				yamlConfig.AccessIP,
 				serviceConfig.Port,
-				serviceConfig.Username,
-				serviceConfig.Password,
+				serviceConfig.BtUsername,
+				serviceConfig.BtPassword,
 			)
 			if err != nil {
 				logger.LogMessage(fmt.Sprintf("Error scoring team %d for service %s: %v", team.ID, service.Name, err), "INFO")

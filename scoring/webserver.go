@@ -8,77 +8,73 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
 var site_info []byte
+var loadOnce sync.Once
 
-// Runs on startup of the web server checker to read the html of the site into memory.
-// Takes a string which represents the directory that will be read from
+// Load the HTML file into memory once
 func web_startup(dir string) error {
-
-	content, err := os.ReadFile(dir)
-	if err != nil {
-		return err
-	}
-	site_info = []byte(strings.ReplaceAll(string(content), "\n", "")) // Converting from byte to string to byte to remove stray eol
-
-	return nil
+	var err error
+	loadOnce.Do(func() {
+		var content []byte
+		content, err = os.ReadFile(dir)
+		if err == nil {
+			site_info = []byte(strings.ReplaceAll(string(content), "\n", ""))
+		}
+	})
+	return err
 }
 
-// Returns the HTML data on the given website, takes a link as an input and returns a byte array.
-func onPage(link string, ip string) ([]byte, error) {
-	// First dial the website to ensure its even alive
-	_, err := net.DialTimeout("tcp", ip, 150*time.Millisecond)
-
-	if err != nil {
-		return make([]byte, 0), err
+// Fetch the HTML content from a web server
+func onPage(ip string, port int) ([]byte, error) {
+	url := fmt.Sprintf("http://%s:%d", ip, port)
+	if port == 443 {
+		url = fmt.Sprintf("https://%s", ip)
 	}
 
-	// Get HTML data from the website
-	res, err := http.Get(link)
-
+	// Dial server to ensure it's alive
+	_, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", ip, port), 500*time.Millisecond)
 	if err != nil {
-		return make([]byte, 0), err
+		return nil, fmt.Errorf("server unreachable: %v", err)
 	}
 
+	// Fetch the page content
+	res, err := http.Get(url)
+	if err != nil {
+		return nil, err
+	}
 	defer res.Body.Close()
 
-	// Read it into memory as bytes
-	res_body, err := io.ReadAll(res.Body)
-
-	if err != nil {
-		return make([]byte, 0), err
-	}
-
-	return res_body, nil
+	return io.ReadAll(res.Body)
 }
 
-// Dials website directly for speed then tries to download and compare website HTMLs if successful.
-// DOESN'T CHECK HTTPS ONLY HTTP
-func checkWeb(dir string, ip string, portNum int) (bool, error) {
-
-	err := web_startup(dir)
-	if err != nil {
+// Check if the website is up and matches expected content
+func checkWeb(dir, ip string, portNum int) (bool, error) {
+	if err := web_startup(dir); err != nil {
 		return false, err
 	}
-	pagehtml, err := onPage("http://"+ip, fmt.Sprint(ip, ":", portNum))
+
+	pageHTML, err := onPage(ip, portNum)
 	if err != nil {
 		return false, err
 	}
 
-	pagehtml = bytes.TrimSuffix(pagehtml, []byte{10})                // Trim byte 10 (eof) from end of file
-	site_info := bytes.ReplaceAll(site_info, []byte{13}, []byte{10}) // Exchange byte 13 for byte 10 (im not sure why eof is at the end of every line)
-
-	webserv_up := bytes.Equal(bytes.TrimSpace(site_info), bytes.TrimSpace(pagehtml))
-
-	return webserv_up, nil
+	return bytes.Equal(bytes.TrimSpace(site_info), bytes.TrimSpace(pageHTML)), nil
 }
 
-func ScoreWeb(dir string, ip string, portNum int) (int, bool, error) {
-	_, err := checkWeb(dir, ip, portNum)
+// Scoring logic for the web server
+func ScoreWeb(dir, ip string, portNum int) (int, bool, error) {
+	match, err := checkWeb(dir, ip, portNum)
 	if err != nil {
 		return 0, false, fmt.Errorf("web scoring failed: %v", err)
 	}
-	return successPoints, true, nil
+
+	if match {
+		return 10, true, nil
+	}
+
+	return 5, false, nil // Example for partial score
 }

@@ -86,14 +86,25 @@ func ScoringStartup(cfg database.Config, yamlConfig *config.Yaml) error {
 
 	ticker := time.NewTicker(time.Duration(RefreshTime) * time.Second)
 	defer ticker.Stop()
+	rounds := 0 // for tracking the amount of scoring rounds processed
 
 	// Every *RefreshTime* seconds, score every service
 	for range ticker.C {
 		if ScoringOn {
+			rounds++
 			err := RunScoring(db, yamlConfig)
+			start_time := time.Now()
 			if err != nil {
 				fmt.Printf("Error running scoring: %v\n", err)
 			}
+			elapsed := time.Since(start_time)
+			seconds := elapsed / time.Second
+			milliseconds := elapsed.Milliseconds() % 1000
+
+			logger.LogMessage(
+				fmt.Sprintf("Scoring round %d took %d seconds and %d milliseconds.", rounds, seconds, milliseconds),
+				"STATUS",
+			)
 		}
 	}
 
@@ -399,5 +410,15 @@ func ToggleScoring() string {
 	}
 	logger.LogMessage(fmt.Sprintf("Scoring is now %s", state), "INFO")
 
+	return state
+}
+
+// Utility function to get the scoring engine's scoring status (on/off)
+func ScoringStatus() string {
+	ScoringOn = !ScoringOn
+	state := "off"
+	if ScoringOn {
+		state = "on"
+	}
 	return state
 }

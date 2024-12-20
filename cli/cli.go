@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/LTSEC/scoring-engine/config"
 	"github.com/LTSEC/scoring-engine/database"
@@ -15,6 +16,8 @@ import (
 var yamlConfig *config.Yaml
 var ScoringStarted = false
 var dbConfig database.Config
+var uptime int
+var lastUptimeCheck time.Time
 
 const (
 	Red    = "\033[31m"
@@ -74,34 +77,49 @@ func tokenizer(userInput string) []string {
 
 }
 
+// Utility function that gets the current scoring engine uptime
+func getuptime() int {
+	if lastUptimeCheck.IsZero() {
+		lastUptimeCheck = time.Now()
+	}
+	elapsed := time.Since(lastUptimeCheck)
+	seconds := elapsed / time.Second
+	uptime += int(seconds)
+	lastUptimeCheck = time.Now()
+	return uptime
+}
+
 // switch statement for command selection
 func commandSelector(tokenizedInput []string) {
 
 	HelpOutput := `Available commands:
-	help
-		- Outputs some helpful information
-	config
-		- Recieves a path and parses the yaml config given
-	defaultconfig / dc
-		- Loads the default configuration
-	checkconfig / cc
-		- Outputs the currently parsed yaml config
-	startup / start / up
-		- Starts the scoring engine in an off state (scoring not activated)
-	toggle / score
-		- Toggles the activity of the scoring engine
-	quickstart / qs
-		- Loads the default configuration and starts the scoring engine in an off state (scoring not activated)
+	
+help
+	- Outputs some helpful information
+config / cf
+	- Recieves a path and parses the yaml config given
+defaultconfig / dc
+	- Loads the default configuration
+checkconfig / cc
+	- Outputs the currently parsed yaml config
+startup / start / up
+	- Starts the scoring engine in an off state (scoring not activated)
+toggle / score / tg
+	- Toggles the activity of the scoring engine
+status / stat
+	- Shows current state of the scoring engine
+quickstart / qs
+	- Loads the default configuration and starts the scoring engine in an off state (scoring not activated)
 
-	exit (exits the CLI)
-	`
+exit (exits the CLI)
+`
 
 	// the switch acts on the first word of the command
 	// the idea is that you'd pass the remaining args to the requisit functions
 	switch tokenizedInput[0] {
 	case "help":
 		fmt.Println(HelpOutput)
-	case "config":
+	case "config", "cf":
 		if len(tokenizedInput) != 2 {
 			fmt.Println(Red + "[FAILURE] " + Reset + "The config requires a path")
 		} else {
@@ -115,6 +133,8 @@ func commandSelector(tokenizedInput []string) {
 		fmt.Printf("%+v\n", yamlConfig)
 	case "startup", "start", "up":
 		if ScoringStarted == false && yamlConfig != nil {
+			uptime = 0
+			lastUptimeCheck = time.Now()
 			ScoringStarted = true
 			fmt.Println(Green + "[SUCCESS] " + Reset + "Run toggle to start scoring.")
 			go scoring.ScoringStartup(dbConfig, yamlConfig)
@@ -123,13 +143,15 @@ func commandSelector(tokenizedInput []string) {
 		} else {
 			fmt.Println(Red + "[FAILURE] " + Reset + "The scoring engine has already been started.")
 		}
-	case "toggle", "score":
+	case "toggle", "score", "tg":
 		if ScoringStarted == false {
 			fmt.Println(Red + "[FAILURE] " + Reset + "Initalize the scoring engine first")
 		} else {
 			engine_status := scoring.ToggleScoring()
 			fmt.Printf(Green+"[SUCCESS] "+Reset+"Scoring engine toggled "+Yellow+"%s"+Reset+".\n", engine_status)
 		}
+	case "status", "stat":
+		fmt.Printf(Green+"[SUCCESS] "+Reset+"Scoring is currently "+Yellow+"%s"+Reset+".\n", scoring.ScoringStatus())
 	case "quickstart", "qs":
 		if ScoringStarted == false {
 			ScoringStarted = true
@@ -140,6 +162,8 @@ func commandSelector(tokenizedInput []string) {
 		} else {
 			fmt.Println(Red + "[FAILURE] " + Reset + "The scoring engine has already been started.")
 		}
+	case "uptime", "ut":
+		fmt.Printf(Yellow+"[INFO] "+Reset+"Uptime: %ds\n", getuptime())
 	case "exit":
 		fmt.Println(Red + "[SHUTDOWN]")
 		os.Exit(0)
@@ -165,13 +189,15 @@ func bashInjection(command []string) {
 
 		// check for error and print
 		if err := cmd.Run(); err != nil {
-			fmt.Println("couldn't run the guy", err)
+			fmt.Println("Couldn't run the guy", err)
 		}
 	} else {
 		if len(command) == 2 {
 			os.Chdir(command[1])
+		} else if len(command) < 2 {
+			fmt.Println("Please include dir")
 		} else {
-			fmt.Println("please include dir")
+			fmt.Println("Too many arguments")
 		}
 	}
 }

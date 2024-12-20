@@ -76,5 +76,5 @@ func ScoreWeb(dir, ip string, portNum int) (int, bool, error) {
 		return 10, true, nil
 	}
 
-	return 5, false, nil // Example for partial score
+	return 0, false, nil
 }

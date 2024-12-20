@@ -18,7 +18,9 @@ DATABASE = {
     'user': os.getenv('DATABASE_USER', 'root'),
     'password': os.getenv('DATABASE_PASSWORD', 'root'),
     'host': os.getenv('DATABASE_HOST', 'localhost'),
-    'port': os.getenv('DATABASE_PORT', 5432)
+    'port': os.getenv('DATABASE_PORT', 5432),
+    'scoring-host': os.getenv('SCORING_HOST', "localhost"),
+    'scoring-port': os.getenv('SCORING_PORT', 8080)
 }
 
 
@@ -87,6 +89,10 @@ def load_user(user_id):
 def get_db_connection():
     """Establishes and returns a new connection to the PostgreSQL database."""
     return psycopg2.connect(**DATABASE)
+
+
+def toggle_scoring_engine():
+    pass
 
 
 @app.route('/')
@@ -558,7 +564,26 @@ def add_team(team_id):
     if current_user.privilege != 'admin':
         abort(403)
 
-    print(team_id)
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        team_name = request.form.get('team_name')
+        team_password = request.form.get('team_password')
+        team_color = request.form.get('team_color')
+        cursor.execute(
+                """
+                INSERT INTO teams (team_id, team_name, team_password, team_color)
+                VALUES (%s, %s, %s, %s)
+                """, 
+                (team_id, team_name, team_password, team_color)
+            )
+        conn.commit()
+    except Exception as e:
+        print(f"Error getting password: {e}")
+        abort(500, description="An error occurred while fetching the password")
+    finally:
+        # Close the connection
+        conn.close()
 
 
 @app.route('/team-manager/delete/<int:team_id>', methods=['POST'])

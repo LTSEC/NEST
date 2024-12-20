@@ -3,12 +3,35 @@ package main
 import (
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
 
 	"github.com/LTSEC/scoring-engine/cli"
 	"github.com/LTSEC/scoring-engine/database"
+	"github.com/LTSEC/scoring-engine/logging"
+	"github.com/LTSEC/scoring-engine/scoring"
 )
+
+const (
+	Red    = "\033[31m"
+	Green  = "\033[32m"
+	Yellow = "\033[33m"
+	Blue   = "\033[34m"
+	Reset  = "\033[0m"
+)
+
+// Implementing a REST API
+func RESTToggleScoring(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	engine_status := scoring.ToggleScoring()
+	fmt.Printf(Green+"[SUCCESS] "+Reset+"Scoring engine toggled "+Yellow+"%s"+Reset+".\n", engine_status)
+	logging.Nextline()
+}
 
 func main() {
 	// Get project root directory
@@ -41,6 +64,10 @@ func main() {
 
 	// Start the internal services
 	cli.Cli(cfg)
+
+	// TODO: secure this
+	http.HandleFunc("/toggle-scoring", RESTToggleScoring)
+	http.ListenAndServe(":8080", nil)
 }
 
 // getEnv fetches an environment variable or returns a default value

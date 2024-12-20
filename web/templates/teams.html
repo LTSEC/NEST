@@ -4,6 +4,28 @@
 
 {% block content %}
 <div class="manage-team-list">
+
+    <button class="floating-button" id="toggle-form-button" onclick="toggleTeamForm()">+</button>
+
+    <div id="create-team" class="create-announcement" style="display: none;">
+        <h2 class="form-title">Create a New Team</h2>
+        <form id="create-team-form" action="{{ url_for('manage_team') }}" class="form-container" method="POST">
+            <label class="form-label" for="team_name">Team name:</label>
+            <input class="form-input" id="team_name" name="team_name" placeholder="Enter team name..." required type="text" />
+
+            <label class="form-label" for="team_password">Team password:</label>
+            <input class="form-input" id="team_password" name="team_password" placeholder="Enter team password..." required type="text" />
+            
+            <label class="form-label" for="team_id">Team ID:</label>
+            <input class="form-input" id="team_id" name="team_id" placeholder="Enter team ID..." required type="number" />
+
+            <label class="form-label" for="team_color">Team color:</label>
+            <input class="form-input" id="team_color" name="team_color" placeholder="Enter team color..." required type="color" />
+
+            <button class="form-submit-button" type="submit">Add Team</button>
+        </form>
+    </div>
+
     {% for team in teams %}
     <div class="manage-team-card" id="team-card-{{ team.team_id }}">
         <div class="manage-team-info">
@@ -166,5 +188,33 @@ window.onclick = (event) => {
         modal.style.display = 'none';
     }
 };
+
+
+function toggleTeamForm() {
+        const formContainer = document.getElementById("create-team");
+        const button = document.getElementById("toggle-form-button");
+
+        if (formContainer.style.display === "none" || formContainer.style.display === "") {
+            formContainer.style.display = "block";
+            button.textContent = "×"; // Change "+" to "×"
+        } else {
+            formContainer.style.display = "none";
+            button.textContent = "+"; // Change back to "+"
+        }
+    }
+
+// Function to handle AJAX form submission for creating a team
+document.getElementById('create-team-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+    const id = formData.get("team_id")
+
+    fetch(`/team-manager/add/${id}`, {
+        method: "POST",
+        body: formData
+    }).then(response => response.text())
+        .then(() => location.reload());  // Refresh list without full page reload
+});
+
 </script>
 {% endblock %}

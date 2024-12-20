@@ -19,10 +19,10 @@ DATABASE = {
     'password': os.getenv('DATABASE_PASSWORD', 'root'),
     'host': os.getenv('DATABASE_HOST', 'localhost'),
     'port': os.getenv('DATABASE_PORT', 5432),
-    'scoring-host': os.getenv('SCORING_HOST', "localhost"),
-    'scoring-port': os.getenv('SCORING_PORT', 8080)
 }
 
+scoring_host = os.getenv('SCORING_HOST', "localhost"),
+scoring_port = os.getenv('SCORING_PORT', 8080)
 
 # Define allowed templates
 allowed_templates = {

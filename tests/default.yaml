@@ -1,5 +1,5 @@
 boxes:
-  test-ssh-newnetwork: # YOU CANNOT USE UNDERSCORES IN THE NAME
+  ssh-scoring: # YOU CANNOT USE UNDERSCORES IN THE NAME
     services:
       ssh:
         username: "root"
@@ -8,7 +8,7 @@ boxes:
         bt_password: "changeme"
         port: 2200
 
-  ftp-test-scoring:
+  ftpweb-scoring:
     services:
       ftp:
         username: "root"
@@ -16,6 +16,10 @@ boxes:
         bt_username: "greg"
         bt_password: "greg"
         port: 2100
+      web:
+        username: "root"
+        password: "changeme"
+        port: 8080
 
 teams:
   team0:

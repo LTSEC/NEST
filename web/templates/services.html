@@ -4,38 +4,55 @@
 
 {% block content %}
 <div class="services" id="services-container">
-    {% if current_user.privilege == 'admin'%}
-        <div class="no-view-as" style="text-align: center; margin-top: 50px;">
-            <h2>Placeholder for Admin users</h2>
+    {% if current_user.privilege == 'admin' %}
+        <div class="admin-service-list">
+            {% for service in services %}
+            <div class="admin-service-card">
+                <div class="admin-service-info">
+                    <h3>{{ service.service_name[:27] ~ ('...' if service.service_name|length > 30 else '') }}</h3>
+                    <p><strong>Service ID:</strong> {{ service.service_id }}</p>
+                    <p><strong>Box Name:</strong> {{ service.box_name }}</p>
+                    <p><strong>Disabled:</strong> {{ 'Yes' if service.disabled else 'No' }}</p>
+                </div>
+                <button 
+                    class="toggle-disabled-button" 
+                    data-service-id="{{ service.service_id }}" 
+                    data-current-status="{{ service.disabled }}">
+                    {{ 'Enable' if service.disabled else 'Disable' }}
+                </button>
+            </div>
+            {% endfor %}
         </div>
     {% else %}
         {% if services %}
             <div class="service-list">
                 {% for service in services %}
-                    <div class="service-card" data-service-id="{{ service.service_name }}">
-                        <div class="service-info">
-                            <h2>Name</h2>
-                            <p>{{ service.service_name }}</p>
-                        </div>
-                        <div class="service-uptime">
-                            <h2>Uptime</h2>
-                            <div class="progress-bar-container">
-                                <span class="progress-text">{{ service.uptime }}%</span>
-                                <div class="progress-bar {{ 'green' if service.uptime >= 75 else 'yellow' if service.uptime >= 45 else 'red' }}"style="width: {{ service.uptime }}%;"></div>
+                    {% if not service.disabled %}
+                        <div class="service-card" data-service-id="{{ service.service_name }}">
+                            <div class="service-info">
+                                <h2>Name</h2>
+                                <p>{{ service.service_name }}</p>
                             </div>
-                        </div>
+                            <div class="service-uptime">
+                                <h2>Uptime</h2>
+                                <div class="progress-bar-container">
+                                    <span class="progress-text">{{ service.uptime }}%</span>
+                                    <div class="progress-bar {{ 'green' if service.uptime >= 75 else 'yellow' if service.uptime >= 45 else 'red' }}"style="width: {{ service.uptime }}%;"></div>
+                                </div>
+                            </div>
 
-                        <div class="service-rounds">
-                            <h2>Last 10 Rounds</h2>
-                            <div class="round-icons">
-                                {% for i in range(10) %}
-                                    {% set check = service.last_10_checks[i] if i < service.last_10_checks|length else {'status': None, 'timestamp': 'N/A'} %}
-                                    <span class="round-icon {{ 'up' if check.status == True else 'down' if check.status == False else 'not-scored' }}" 
-                                          title="{{ check.timestamp }}">&#9679;</span>
-                                {% endfor %}
+                            <div class="service-rounds">
+                                <h2>Last 10 Rounds</h2>
+                                <div class="round-icons">
+                                    {% for i in range(10) %}
+                                        {% set check = service.last_10_checks[i] if i < service.last_10_checks|length else {'status': None, 'timestamp': 'N/A'} %}
+                                        <span class="round-icon {{ 'up' if check.status == True else 'down' if check.status == False else 'not-scored' }}" 
+                                            title="{{ check.timestamp }}">&#9679;</span>
+                                    {% endfor %}
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    {% endif %}
                 {% endfor %}
             </div>
         {% else %}
@@ -48,13 +65,55 @@
 document.addEventListener("DOMContentLoaded", () => {
     const refreshInterval = 10000; // Refresh every 10 seconds
 
+    // Admin privilege check
+    const userPrivilege = "{{ current_user.privilege }}";
+    const servicesContainer = document.getElementById('services-container');
+
+    if (userPrivilege === "admin") {
+        async function toggleDisabled(serviceId, currentStatus, button) {
+            try {
+                const newStatus = !currentStatus; // Toggle the current status
+                const response = await fetch(`/dashboard/services/disable/${serviceId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        disabled: newStatus,
+                    }),
+                });
+
+                if (response.ok) {
+                    button.textContent = newStatus ? "Enable" : "Disable";
+                    button.dataset.currentStatus = newStatus;
+                    button.closest('.admin-service-card')
+                        .querySelector('p:nth-of-type(3)').textContent = `Disabled: ${newStatus ? "Yes" : "No"}`;
+                } else {
+                    console.error("Failed to toggle disabled status.");
+                }
+            } catch (error) {
+                console.error("Error toggling disabled status:", error);
+            }
+        }
+
+        servicesContainer.addEventListener('click', (event) => {
+            if (event.target.classList.contains('toggle-disabled-button')) {
+                const button = event.target;
+                const serviceId = button.dataset.serviceId;
+                const currentStatus = button.dataset.currentStatus === "true";
+                toggleDisabled(serviceId, currentStatus, button);
+            }
+        });
+
+        return; // Stop further execution for admins
+    }
+
     async function fetchServicesData() {
         try {
             const response = await fetch('/api/services-data');
             if (!response.ok) throw new Error("Failed to fetch services data");
             const data = await response.json();
 
-            const servicesContainer = document.getElementById('services-container');
             servicesContainer.innerHTML = ""; // Clear the existing services content
 
             if (data.services && data.services.length > 0) {

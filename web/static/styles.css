@@ -22,7 +22,7 @@ body.night-mode {
     --container-bg: #4a4a48;
     --input-bg: #2b2b28;
     --input-text-color: #ebebe3;
-    --button-bg: #c19898;
+    --button-bg: #d7a23a;
     --button-hover-bg: #f2f2ed;
 }
 
@@ -133,7 +133,7 @@ button {
 
 button:hover {
     background-color: var(--button-hover-bg);
-    color: var(--text-color);
+    color: #000000;
 }
 
 /* Day/Night Mode Toggle */
@@ -183,7 +183,7 @@ button:hover {
 }
 
 input:checked + .slider {
-    background-color: #c19898;
+    background-color: #d7a23a;
 }
 
 input:checked + .slider:before {
@@ -327,7 +327,7 @@ a:hover {
 
 /* Optional hover style */
 .mode-dropdown:hover::after {
-    color: #c19898;
+    color: #d7a23a;
 }
 
 .nav-links {
@@ -415,7 +415,7 @@ a:hover {
 }
 
 input:checked + .slider {
-    background-color: #c19898;
+    background-color: #d7a23a;
 }
 
 input:checked + .slider:before {
@@ -949,4 +949,209 @@ body.night-mode .progress-text {
 .floating-button:hover {
     transform: scale(1.1); /* Slight zoom effect */
     box-shadow: 0 6px 10px rgba(0, 0, 0, 0.3);
+}
+
+/* Admin team panel */
+.manage-team-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    padding: 20px;
+    width: 100%;
+    padding-top: 100px;
+}
+
+.manage-team-card {
+    display: flex;
+    align-items: center; /* Ensures all elements are vertically aligned */
+    justify-content: space-between;
+    background-color: var(--container-bg);
+    border-radius: 12px;
+    padding: 10px 20px;
+    width: 100%;
+    max-width: 800px;
+    margin: 0 auto;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s;
+    gap: 10px;
+}
+
+.manage-team-info {
+    display: flex; /* Proper flex alignment */
+    align-items: center; /* Vertically aligns the circle and text */
+    gap: 60px; /* Space between circle and text */
+    flex-grow: 1;
+    overflow: hidden;
+}
+
+.manage-team-circle {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.manage-team-text {
+    display: flex;
+    flex-direction: column;
+    justify-content: center; /* Vertically centers the name and ID */
+    align-items: flex-start; /* Left-aligns all text */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.manage-team-name {
+    font-weight: bold;
+    color: var(--text-color);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 300px; /* Ensure the name doesn't exceed the boundary */
+}
+
+.manage-team-id {
+    font-size: 0.9em;
+    color: var(--text-color);
+    text-align: left; /* Explicit left alignment */
+    margin-top: 2px; /* Slight spacing between name and ID */
+    line-height: 1.2; /* Improves readability */
+}
+
+.manage-team-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.edit-button, .delete-button {
+    padding: 8px 16px;
+    background-color: var(--button-bg);
+    color: var(--text-color);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+    font-size: 0.9em;
+}
+
+.edit-button:hover, .delete-button:hover {
+    background-color: var(--button-hover-bg);
+}
+
+
+/* Team Modal Background */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 10%;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.4); /* Dim background */
+    align-items: center;
+    justify-content: center;
+}
+
+/* Modal Content */
+.modal-content {
+    background-color: var(--container-bg);
+    color: var(--text-color);
+    margin: auto;
+    padding: 20px;
+    border-radius: 12px;
+    width: 80%;
+    max-width: 400px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    text-align: center;
+}
+
+/* Close Button */
+.close-button {
+    color: var(--text-color);
+    float: right;
+    font-size: 1.5rem;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.close-button:hover {
+    color: red;
+}
+
+/* Input Fields */
+.modal-content input {
+    width: 100%;
+    padding: 10px;
+    margin: 10px 0;
+    border-radius: 8px;
+    border: 1px solid var(--text-color);
+    background-color: var(--input-bg);
+    color: var(--input-text-color);
+}
+
+/* Save Button */
+.save-button {
+    padding: 10px 20px;
+    background-color: var(--button-bg);
+    color: var(--text-color);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.save-button:hover {
+    background-color: var(--button-hover-bg);
+}
+
+/* Admin services */
+
+.admin-service-list {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr); /* 5 columns */
+    gap: 20px; /* Spacing between grid items */
+    padding: 20px;
+}
+
+.admin-service-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    padding: 15px;
+    background-color: var(--container-bg);
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    height: 250px; /* Set a fixed height */
+    width: 250px; /* Set a fixed width */
+    text-align: center;
+}
+
+.admin-service-info h3 {
+    font-size: 1.2em;
+    margin-bottom: 10px;
+    word-wrap: break-word;
+}
+
+.admin-service-info p {
+    font-size: 0.9em;
+    margin: 5px 0;
+    word-wrap: break-word;
+}
+
+.toggle-disabled-button {
+    padding: 5px 10px;
+    font-size: 0.8em;
+    background-color: var(--button-bg);
+    color: var(--text-color);
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.toggle-disabled-button:hover {
+    background-color: var(--button-hover-bg);
 }

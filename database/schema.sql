@@ -13,6 +13,7 @@ CREATE TABLE services (
     service_id SERIAL PRIMARY KEY,
     service_name VARCHAR(50) NOT NULL,
     box_name VARCHAR(50) NOT NULL,
+    disabled BOOLEAN DEFAULT FALSE,
     UNIQUE (service_name, box_name) -- Ensures unique service-box combinations
 );
 

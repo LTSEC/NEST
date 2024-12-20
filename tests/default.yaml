@@ -1,5 +1,5 @@
 boxes:
-  test-ssh-newnetwork: # YOU CANNOT USE UNDERSCORES IN THE NAM
+  test-ssh-newnetwork: # YOU CANNOT USE UNDERSCORES IN THE NAME
     services:
       ssh:
         username: "root"

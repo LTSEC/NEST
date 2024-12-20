@@ -32,9 +32,10 @@ type Team struct {
 }
 
 type Service struct {
-	ID      int    // Corresponds to service_id in the database
-	Name    string // Corresponds to service_name in the database
-	BoxName string // Corresponds to box_name in the database
+	ID       int    // Corresponds to service_id in the database
+	Name     string // Corresponds to service_name in the database
+	BoxName  string // Corresponds to box_name in the database
+	Disabled bool   // Corresponds to disabled in the database
 }
 
 // Starts the whole scoring process by connecting to the local database and
@@ -199,6 +200,11 @@ func RunScoring(db *sql.DB, yamlConfig *config.Yaml) error {
 
 		// Iterate over each service for the team
 		for _, service := range services {
+			// Skip this service if it is disabled
+			if service.Disabled {
+				continue
+			}
+
 			// Locate the correct box configuration using box name
 			boxConfig, boxExists := yamlConfig.Boxes[service.BoxName]
 			if !boxExists {
@@ -271,7 +277,7 @@ func getAllTeams(db *sql.DB) ([]Team, error) {
 // Gets a team's services from the SQL database
 func getTeamServices(db *sql.DB, teamID int) ([]Service, error) {
 	query := `
-		SELECT s.service_id, s.service_name, s.box_name
+		SELECT s.service_id, s.service_name, s.box_name, s.disabled
 		FROM services s
 		JOIN team_services ts ON s.service_id = ts.service_id
 		WHERE ts.team_id = $1
@@ -285,7 +291,7 @@ func getTeamServices(db *sql.DB, teamID int) ([]Service, error) {
 	var services []Service
 	for rows.Next() {
 		var service Service
-		if err := rows.Scan(&service.ID, &service.Name, &service.BoxName); err != nil {
+		if err := rows.Scan(&service.ID, &service.Name, &service.BoxName, &service.Disabled); err != nil {
 			return nil, err
 		}
 		services = append(services, service)
@@ -305,7 +311,7 @@ func applyScoringFunction(teamID int, serviceName, baseIP string, port int, user
 	case "ftp":
 		return ScoreFTP(address, port, username, password)
 	case "web":
-		return ScoreWeb("", address, port)
+		return ScoreWeb("/tests/site_infos/site_info.html", address, port)
 	case "ssh":
 		return ScoreSSH(address, port, username, password)
 	// Add cases for other services like web, dns, etc.

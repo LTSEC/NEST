@@ -12,9 +12,15 @@
     <nav class="navbar">
         <div class="left-section">
             <div class="logo">
+                {% if current_user.privilege == 'admin' %}
+                <a href="{{ url_for('admin_landing') }}">
+                    <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo">
+                </a>
+                {% else %}
                 <a href="{{ url_for('render_page', page='') }}">
                     <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo">
                 </a>
+                {% endif %}
             </div>
             <div class="team-info">
                 <div class="team-circle"style="background-color: {{ current_user.color }};"></div>

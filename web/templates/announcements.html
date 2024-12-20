@@ -20,7 +20,7 @@
             <input class="form-input" id="title" name="title" placeholder="Enter the announcement title..." required type="text" />
 
             <label class="form-label" for="description">Description:</label>
-            <textarea class="textarea-input" id="description" name="description" placeholder="Enter the announcement content..." required rows="3"></textarea>
+            <textarea class="textarea-input" id="description" name="description" placeholder="Enter the announcement content..." required rows="15"></textarea>
 
             <button class="form-submit-button" type="submit">Post Announcement</button>
         </form>
@@ -41,13 +41,13 @@
                     {% if current_user.privilege == 'admin' %}
                     <div class="admin-actions">
                         <!-- Edit -->
-                        <button class="admin-edit-button" onclick="editAnnouncement({{ announcement.announcement_id }})">Edit</button>
+                        <button class="admin-edit-button"onclick="editAnnouncement({{ announcement.announcement_id }})">Edit</button>
                         <!-- Hide/Unhide -->
-                        <button class="admin-toggle-button" onclick="toggleAnnouncement({{ announcement.announcement_id }})">
+                        <button class="admin-toggle-button"onclick="toggleAnnouncement({{ announcement.announcement_id }})">
                             {{ 'Hide' if announcement.is_visible else 'Unhide' }}
                         </button>
                         <!-- Delete -->
-                        <button class="admin-delete-button" onclick="deleteAnnouncement({{ announcement.announcement_id }})">Delete</button>
+                        <button class="admin-delete-button"onclick="deleteAnnouncement({{ announcement.announcement_id }})">Delete</button>
                     </div>
                     {% endif %}
                 </div>

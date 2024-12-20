@@ -1,4 +1,4 @@
-from flask import Flask, render_template, redirect, url_for, request, flash, abort, jsonify
+from flask import Flask, render_template, redirect, url_for, request, flash, abort, jsonify, Response
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from datetime import datetime
 import psycopg2
@@ -142,6 +142,8 @@ def login():
 @login_required
 def render_page(page):
     # Check if the page is in the allowed templates dictionary
+    if current_user.privilege == 'admin':
+        return redirect(url_for('admin_landing'))
     template = allowed_templates.get(page)
     if template:
         return render_template(template)
@@ -276,32 +278,39 @@ def services():
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
 
-        if type(current_user.id) != int:
-            return render_template('services.html', services=services_data)
+        if current_user.privilege == "admin":
+            query = """
+            SELECT s.service_id, s.service_name, s.box_name, s.disabled
+            FROM services s
+            """
 
-        # Query to fetch services and their last 10 checks for the current user's team
-        query = """
-        SELECT s.service_name, s.box_name, ts.points, ts.is_up, ts.total_checks, ts.successful_checks,
-               ARRAY(
-                   SELECT json_build_object('status', sc.status, 'timestamp', sc.timestamp)
-                   FROM service_checks sc
-                   WHERE sc.team_service_id = ts.team_service_id
-                   ORDER BY sc.timestamp DESC
-                   LIMIT 10
-               ) AS last_10_checks
-        FROM team_services ts
-        JOIN services s ON ts.service_id = s.service_id
-        WHERE ts.team_id = %s
-        """
-        cursor.execute(query, (current_user.id,))
-        services_data = cursor.fetchall()
+            cursor.execute(query, (current_user.id,))
+            services_data = cursor.fetchall()
+            
+        else:
+            # Query to fetch services and their last 10 checks for the current user's team
+            query = """
+            SELECT s.service_name, s.box_name, s.disabled, ts.points, ts.is_up, ts.total_checks, ts.successful_checks,
+                ARRAY(
+                    SELECT json_build_object('status', sc.status, 'timestamp', sc.timestamp)
+                    FROM service_checks sc
+                    WHERE sc.team_service_id = ts.team_service_id
+                    ORDER BY sc.timestamp DESC
+                    LIMIT 10
+                ) AS last_10_checks
+            FROM team_services ts
+            JOIN services s ON ts.service_id = s.service_id
+            WHERE ts.team_id = %s
+            """
+            cursor.execute(query, (current_user.id,))
+            services_data = cursor.fetchall()
 
-        # Example calculation for uptime percentage
-        for service in services_data:
-            if service['total_checks'] > 0:
-                service['uptime'] = int(int(service['successful_checks']) / int(service['total_checks']) * 100)
-            else:
-                service['uptime'] = 0
+            # Example calculation for uptime percentage
+            for service in services_data:
+                if service['total_checks'] > 0:
+                    service['uptime'] = int(int(service['successful_checks']) / int(service['total_checks']) * 100)
+                else:
+                    service['uptime'] = 0
     except Exception as e:
         print(f"Error fetching services: {e}")
     finally:
@@ -419,6 +428,7 @@ def admin_landing():
     
     return render_template('admin.html', username=current_user.username)
 
+### ANNOUNCEMENTS
 
 @app.route('/announcements/edit/<int:announcement_id>', methods=['POST'])
 @login_required
@@ -483,6 +493,158 @@ def delete_announcement(announcement_id):
     finally:
         conn.close()
     return "Success"
+
+### TEAMS
+
+@app.route('/team-manager')
+@login_required
+def manage_team():
+    if current_user.privilege != 'admin':
+        abort(403)
+
+    conn = None
+    teams = []
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+        # Fetch all teams
+        cursor.execute("""
+            SELECT team_id, team_name, team_color
+            FROM teams
+            ORDER BY team_id
+        """)
+        teams = cursor.fetchall()
+
+    except Exception as e:
+        print(f"Error managing teams: {e}")
+    finally:
+        if conn:
+            conn.close()
+
+    return render_template('teams.html', teams=teams)
+
+@app.route('/team-manager/edit/<int:team_id>', methods=['POST'])
+@login_required
+def edit_team(team_id):
+    if current_user.privilege != 'admin':
+        abort(403)
+
+    data = request.get_json()
+    team_name = data.get('team_name')[:50]
+    password = data.get('team_password')
+
+    if team_name or password:
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            if team_name:
+                cursor.execute("UPDATE teams SET team_name = %s WHERE team_id = %s", (team_name, team_id))
+            if password:
+                cursor.execute("UPDATE teams SET team_password = %s WHERE team_id = %s", (password, team_id))
+            conn.commit()
+        except Exception as e:
+            print(f"Error editing team: {e}")
+        finally:
+            conn.close()
+    
+    return "Success"
+
+
+@app.route('/team-manager/add/<int:team_id>', methods=['POST'])
+@login_required
+def add_team(team_id):
+    if current_user.privilege != 'admin':
+        abort(403)
+
+    print(team_id)
+
+
+@app.route('/team-manager/delete/<int:team_id>', methods=['POST'])
+@login_required
+def delete_team(team_id):
+    if current_user.privilege != 'admin':
+        abort(403)
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM teams WHERE team_id = %s", (team_id,))
+        conn.commit()
+    except Exception as e:
+        print(f"Error deleting team_id: {e}")
+    finally:
+        conn.close()
+    return "Success"
+
+@app.route('/team-manager/get-pass/<int:team_id>', methods=['POST'])
+@login_required
+def get_pass(team_id):
+    # Check if the user is authorized
+    if current_user.privilege != 'admin':
+        abort(403)
+
+    try:
+        # Connect to the database
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Query the password for the given team_id
+        cursor.execute("SELECT team_password FROM teams WHERE team_id = %s", (team_id,))
+        result = cursor.fetchone()
+
+        # If the team_id doesn't exist, return an error
+        if not result:
+            abort(404, description="Team not found")
+
+        team_password = result[0]  # Extract the password from the result
+
+    except Exception as e:
+        print(f"Error getting password: {e}")
+        abort(500, description="An error occurred while fetching the password")
+    finally:
+        # Close the connection
+        conn.close()
+
+    # Return the password in a JSON response
+    return jsonify({"password": team_password})
+
+### SERVICES
+
+@app.route('/dashboard/services/disable/<int:service_id>', methods=['POST'])
+@login_required
+def disable_service(service_id):
+    if current_user.privilege != 'admin':
+        abort(403)
+
+    # Safely get the JSON payload
+    data = request.get_json()
+    if not data or "disabled" not in data:
+        return Response("Invalid input", status=400)
+
+    disabled_state = data["disabled"]
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Update the `disabled` status of the service
+        cursor.execute(
+            "UPDATE services SET disabled = %s WHERE service_id = %s",
+            (disabled_state, service_id)
+        )
+        conn.commit()
+    except Exception as e:
+        print(f"Error toggling function of the service: {e}")
+        return Response("Failed to update service status", status=500)
+    finally:
+        if 'conn' in locals():
+            conn.close()
+
+    # Return a successful response
+    return Response("OK", status=200)
+
 
 
 @app.route('/logout')

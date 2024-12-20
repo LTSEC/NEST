@@ -41,7 +41,7 @@ func Cli(cfg database.Config) {
 		if err != nil {
 			fmt.Println("directory error")
 		}
-		fmt.Print(currDirectory + "$ ")
+		fmt.Print("SCORING-ENGINE " + currDirectory + "$ ")
 		userInput = inputParser()
 
 		// Skip empty input
@@ -78,12 +78,21 @@ func tokenizer(userInput string) []string {
 func commandSelector(tokenizedInput []string) {
 
 	HelpOutput := `Available commands:
-	help (Outputs some helpful information)
-	config (Recieves a path and parses the yaml config given)
-	defaultconfig (Just loads test_yaml.yaml)
-	checkconfig (Outputs the currently parsed yaml config)
-	startup (Starts the scoring engine)
-	toggle (Toggles the activity of the scoring engine)
+	help
+		- Outputs some helpful information
+	config
+		- Recieves a path and parses the yaml config given
+	defaultconfig / dc
+		- Loads the default configuration
+	checkconfig / cc
+		- Outputs the currently parsed yaml config
+	startup / start / up
+		- Starts the scoring engine in an off state (scoring not activated)
+	toggle / score
+		- Toggles the activity of the scoring engine
+	quickstart / qs
+		- Loads the default configuration and starts the scoring engine in an off state (scoring not activated)
+
 	exit (exits the CLI)
 	`
 
@@ -99,12 +108,12 @@ func commandSelector(tokenizedInput []string) {
 			yamlConfig = config.Parse(tokenizedInput[1])
 			fmt.Println(Green + "[SUCCESS] " + Reset + "Added config.")
 		}
-	case "defaultconfig":
+	case "defaultconfig", "dc":
 		yamlConfig = config.Parse("tests/default.yaml")
 		fmt.Println(Green + "[SUCCESS] " + Reset + "Added config.")
-	case "checkconfig":
+	case "checkconfig", "cc":
 		fmt.Printf("%+v\n", yamlConfig)
-	case "startup":
+	case "startup", "start", "up":
 		if ScoringStarted == false && yamlConfig != nil {
 			ScoringStarted = true
 			fmt.Println(Green + "[SUCCESS] " + Reset + "Run toggle to start scoring.")
@@ -114,12 +123,22 @@ func commandSelector(tokenizedInput []string) {
 		} else {
 			fmt.Println(Red + "[FAILURE] " + Reset + "The scoring engine has already been started.")
 		}
-	case "toggle":
+	case "toggle", "score":
 		if ScoringStarted == false {
 			fmt.Println(Red + "[FAILURE] " + Reset + "Initalize the scoring engine first")
 		} else {
 			engine_status := scoring.ToggleScoring()
 			fmt.Printf(Green+"[SUCCESS] "+Reset+"Scoring engine toggled "+Yellow+"%s"+Reset+".\n", engine_status)
+		}
+	case "quickstart", "qs":
+		if ScoringStarted == false {
+			ScoringStarted = true
+			yamlConfig = config.Parse("tests/default.yaml")
+			fmt.Println(Green + "[SUCCESS] " + Reset + "Added config.")
+			fmt.Println(Green + "[SUCCESS] " + Reset + "Started. Run toggle to start scoring.")
+			go scoring.ScoringStartup(dbConfig, yamlConfig)
+		} else {
+			fmt.Println(Red + "[FAILURE] " + Reset + "The scoring engine has already been started.")
 		}
 	case "exit":
 		fmt.Println(Red + "[SHUTDOWN]")

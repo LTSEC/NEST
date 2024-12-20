@@ -70,7 +70,16 @@ func (l *Logger) initialize() error {
 	return nil
 }
 
-// for creating a "Logs" folder in the directory. arguments are '\\' for windows and '/' for linux
+// Function for when a message is printed to the console by any package other than the CLI
+func Nextline() {
+	var currDirectory, err = os.Getwd()
+	if err != nil {
+		fmt.Println("directory error")
+	}
+	fmt.Print("SCORING-ENGINE " + currDirectory + "$ ")
+}
+
+// For creating a "Logs" folder in the directory. arguments are '\\' for windows and '/' for linux
 // currently it is set for Windows. if you want to change it, go to initialize and change it there.
 func getLogPath(fileSeparator byte) string {
 	var lastIndex int
@@ -90,8 +99,9 @@ func getLogPath(fileSeparator byte) string {
 	// truncates everything until that index. this gives us the base path
 	dirPath = dirPath[:lastIndex+1]
 	// joins "Logs" with the base path which is where we will store our Log files
-	newPath := fmt.Sprintf("%sscoring-engine\\Logs", dirPath)
-	fmt.Println("\n" + Green + "[LOGGER INITALIZED] " + Reset + newPath)
+	newPath := fmt.Sprintf("%sLogs", dirPath)
+	fmt.Println("\n" + Green + "[LOGGER INITALIZED] " + Reset + "Directory: " + newPath)
+	Nextline()
 	// if the path doesn't exist, it creates one. may need to change the permissions later
 	if _, err := os.Stat(newPath); err != nil {
 		if os.IsNotExist(err) {

@@ -80,7 +80,7 @@ func ScoreWeb(dir, ip string, portNum int) (int, bool, error) {
 	}
 
 	if match {
-		return 1, true, nil
+		return successPoints, true, nil
 	}
 
 	return 0, false, nil

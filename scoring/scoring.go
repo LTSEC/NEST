@@ -234,10 +234,12 @@ func RunScoring(db *sql.DB, yamlConfig *config.Yaml) error {
 			points, isUp, err := applyScoringFunction(
 				team.ID,
 				originalServiceName,
-				yamlConfig.AccessIP,
+				boxConfig.Ip,
 				serviceConfig.Port,
 				serviceConfig.BtUsername,
 				serviceConfig.BtPassword,
+				serviceConfig.DBName,
+				serviceConfig.DBPath,
 			)
 			if err != nil {
 				logger.LogMessage(fmt.Sprintf("Error scoring team %d for service %s: %v", team.ID, service.Name, err), "INFO")
@@ -300,7 +302,7 @@ func getTeamServices(db *sql.DB, teamID int) ([]Service, error) {
 }
 
 // Applies scoring of each service
-func applyScoringFunction(teamID int, serviceName, baseIP string, port int, username, password string) (int, bool, error) {
+func applyScoringFunction(teamID int, serviceName string, baseIP string, port int, username string, password string, dbname string, dbpath string) (int, bool, error) {
 	address, err := constructIPAddress(baseIP, teamID)
 	if err != nil {
 		return 0, false, fmt.Errorf("failed to construct IP address: %w", err)
@@ -314,6 +316,8 @@ func applyScoringFunction(teamID int, serviceName, baseIP string, port int, user
 		return ScoreWeb("/tests/site_infos/site_info.html", address, port)
 	case "ssh":
 		return ScoreSSH(address, port, username, password)
+	case "db":
+		return ScoreDB(address, port, username, password, dbname, dbpath)
 	// Add cases for other services like web, dns, etc.
 	default:
 		return 0, false, fmt.Errorf("unknown service %s", serviceName)
@@ -396,15 +400,15 @@ func updateServiceScore(db *sql.DB, teamID, serviceID, points int, isUp bool) er
 
 // Utility function that builds the IP address from the base IP, team ID, and fourth octet
 func constructIPAddress(baseIP string, teamID int) (string, error) {
-	// Split the base IP into quartets
+	// Split the base IP into quartets and check
 	ipParts := strings.Split(baseIP, ".")
 	if len(ipParts) != 4 {
 		return "", fmt.Errorf("invalid base IP format: %s", baseIP)
 	}
 
-	ipParts[3] = fmt.Sprintf("%d", teamID)
+	finalIp := strings.Replace(baseIP, "t", fmt.Sprintf("%d", teamID), 1) // Replace 192.168.t.5 --> 192.168.1.5
 
-	return strings.Join(ipParts, "."), nil
+	return finalIp, nil
 }
 
 // Utility function to toggle scoring on and off

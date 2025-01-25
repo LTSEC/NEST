@@ -10,14 +10,14 @@ import (
 // The Yaml type is meant to store the data from a configuration yaml.
 // Root struct for the YAML configuration
 type Yaml struct {
-	AccessIP string           `yaml:"access_ip"`
-	Boxes    map[string]Box   `yaml:"boxes"`
-	Teams    map[string]Team  `yaml:"teams"`
-	Admin    map[string]Admin `yaml:"admins"`
+	Boxes map[string]Box   `yaml:"boxes"`
+	Teams map[string]Team  `yaml:"teams"`
+	Admin map[string]Admin `yaml:"admins"`
 }
 
 // Box struct represents each individual box configuration
 type Box struct {
+	Ip       string             `yaml:"ip"`
 	Services map[string]Service `yaml:"services"`
 }
 
@@ -27,6 +27,8 @@ type Service struct {
 	Password   string `yaml:"password,omitempty"`
 	BtUsername string `yaml:"bt_username,omitempty"`
 	BtPassword string `yaml:"bt_password,omitempty"`
+	DBName     string `yaml:"db_name,omitempty"`
+	DBPath     string `yaml:"db_path,omitempty"`
 	Port       int    `yaml:"port"`
 }
 

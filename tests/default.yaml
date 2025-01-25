@@ -1,34 +1,33 @@
 boxes:
-  ssh-scoring: # YOU CANNOT USE UNDERSCORES IN THE NAME
+  webserver: # YOU CANNOT USE UNDERSCORES IN THE NAME
+    ip: "192.168.t.5"
     services:
       ssh:
         username: "root"
         password: "changeme"
         bt_username: "greg" # i think this stands for bot test
         bt_password: "changeme"
-        port: 2200
-
-  ftpweb-scoring:
-    services:
-      ftp:
-        username: "root"
-        password: "changeme"
-        bt_username: "greg"
-        bt_password: "greg"
-        port: 2100
+        port: 22
       web:
-        username: "root"
-        password: "changeme"
-        port: 8080
+        port: 80
+  database:
+    ip: "192.168.t.11"
+    services:
+      db:
+        bt_username: "blackteam"
+        bt_password: "5XG7p#!c.vx4o+)%"
+        db_name: "MemeUsers"
+        db_path: "tests/schemas/default.sql"
+        port: 80
 
 teams:
   team0:
-    id: 12
+    id: 1
     name: "team0"
     password: "team0"
     color: "#ccd3e9"
   team1:
-    id: 13
+    id: 2
     name: "team1"
     password: "team1"
     color: "#e09e44"
@@ -37,5 +36,3 @@ admins:
   admin:
     login: "admin"
     password: "admin"
-
-access_ip: "172.31.255.0"

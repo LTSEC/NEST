@@ -17,7 +17,7 @@ boxes:
         bt_username: "blackteam"
         bt_password: "G^H&J*K(LA@S#D$F%0987f"
         db_name: "MemeUsers"
-        db_path: "tests/schemas/default.sql"
+        db_path: "tests/schemas/requests.sql"
         port: 3306
 
 teams:

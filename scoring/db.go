@@ -92,8 +92,8 @@ func DBverify(address string, portNum int, username string, password string, DBN
 
 	// Step 3: Retrieve the existing schema from the database
 	existingSchema, err := getExistingSchema(db)
-	if err != nil {
-		return false, fmt.Errorf("failed to retrieve existing schema: %w", err)
+	if err != nil || existingSchema == nil {
+		return false, fmt.Errorf("failed to retrieve schema: %w", err)
 	}
 
 	// Step 4: Compare the schemas
@@ -102,8 +102,8 @@ func DBverify(address string, portNum int, username string, password string, DBN
 		case *sqlparser.DDL:
 			if s.Action == "create" {
 				tableName := s.NewName.Name.String()
-				if _, exists := existingSchema[tableName]; !exists {
-					return false, fmt.Errorf("missing table: %s", tableName)
+				if _, exists := existingSchema[tableName]; !exists || existingSchema[tableName] == nil {
+					return false, fmt.Errorf("table %s not found or schema is nil", tableName)
 				}
 
 				// Check columns in the table
@@ -115,6 +115,9 @@ func DBverify(address string, portNum int, username string, password string, DBN
 					}
 				}
 			}
+		case *sqlparser.DBDDL, *sqlparser.Use:
+			log.Printf("Unsupported statement type: %T\n", s)
+			continue
 		default:
 			log.Printf("Ignoring unsupported statement type: %T\n", stmt)
 		}

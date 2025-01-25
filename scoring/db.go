@@ -76,7 +76,6 @@ func DBverify(addr string, portNum int, username string, password string, DBName
 	// Pick a random line
 	rand.Seed(time.Now().UnixNano())
 	query := validLines[rand.Intn(len(validLines))]
-	fmt.Printf("Executing query: %s\n", query)
 
 	// Create a connection string
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", username, password, addr, portNum, DBName)
@@ -100,7 +99,6 @@ func DBverify(addr string, portNum int, username string, password string, DBName
 		return false, fmt.Errorf("Failed to execute query: %v\n", err)
 	}
 
-	fmt.Println("Query executed successfully.")
 	return true, nil
 }
 

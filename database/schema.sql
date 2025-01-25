@@ -25,7 +25,8 @@ CREATE TABLE team_services (
     points INT DEFAULT 0,
     is_up BOOLEAN DEFAULT FALSE,
     total_checks INT DEFAULT 0,         -- Tracks total checks performed
-    successful_checks INT DEFAULT 0    -- Tracks successful (up) checks
+    successful_checks INT DEFAULT 0,    -- Tracks successful (up) checks
+    UNIQUE (team_id, service_id)        -- Ensures no duplicate team-service pairs
 );
 
 -- A table that stores all updates for each team-service combination for reference on frontend

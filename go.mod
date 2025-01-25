@@ -8,7 +8,6 @@ require (
 	github.com/jlaffaye/ftp v0.2.0
 	github.com/lib/pq v1.10.9
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1
-	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2
 	golang.org/x/crypto v0.31.0
 )
 

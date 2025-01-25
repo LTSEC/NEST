@@ -3,6 +3,7 @@ module github.com/LTSEC/scoring-engine
 go 1.23.5
 
 require (
+	github.com/go-sql-driver/mysql v1.8.1
 	github.com/go-yaml/yaml v2.1.0+incompatible
 	github.com/jlaffaye/ftp v0.2.0
 	github.com/lib/pq v1.10.9
@@ -12,6 +13,7 @@ require (
 )
 
 require (
+	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect

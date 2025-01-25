@@ -15,7 +15,7 @@ boxes:
     services:
       db:
         bt_username: "blackteam"
-        bt_password: "5XG7p#!c.vx4o+)%"
+        bt_password: "G^H&J*K(LA@S#D$F%0987f"
         db_name: "MemeUsers"
         db_path: "tests/schemas/default.sql"
         port: 80

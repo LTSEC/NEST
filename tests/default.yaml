@@ -22,12 +22,12 @@ boxes:
 
 teams:
   team0:
-    id: 1
+    id: 0
     name: "team0"
     password: "team0"
     color: "#ccd3e9"
   team1:
-    id: 2
+    id: 1
     name: "team1"
     password: "team1"
     color: "#e09e44"

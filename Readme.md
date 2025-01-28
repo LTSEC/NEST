@@ -8,6 +8,8 @@ The purpose of this scoring engine is to emulate a competition's scoring system
 - [websocket](https://pkg.go.dev/github.com/gorilla/websocket)
 - [PostgreSQL](https://pkg.go.dev/github.com/lib/pq)
 - [smetrics](https://github.com/xrash/smetrics)
+- [chromedp](https://github.com/chromedp/chromedp)
+- [pq](https://pkg.go.dev/github.com/lib/pq)
 
 ### Python
 - flask, flask-login

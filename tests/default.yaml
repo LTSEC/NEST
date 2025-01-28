@@ -1,12 +1,8 @@
 boxes:
   webserver: # YOU CANNOT USE UNDERSCORES IN THE NAME
-    ip: "192.168.t.5"
+    ip: "172.31.255.5"
     services:
       ssh:
-        username: "root"
-        password: "changeme"
-        bt_username: "greg" # i think this stands for bot test
-        bt_password: "changeme"
         port: 22
       web:
         port: 80
@@ -14,8 +10,8 @@ boxes:
     ip: "192.168.t.11"
     services:
       db:
-        bt_username: "blackteam"
-        bt_password: "G^H&J*K(LA@S#D$F%0987f"
+        bt_username: "maria"
+        bt_password: "S3cr3tDBP@ss!"
         db_name: "MemeUsers"
         db_path: "tests/schemas/requests.sql"
         port: 3306

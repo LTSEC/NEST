@@ -311,11 +311,11 @@ func applyScoringFunction(teamID int, serviceName string, baseIP string, port in
 	// Apply the scoring function based on service type
 	switch serviceName {
 	case "ftp":
-		return ScoreFTP(address, port, username, password)
+		return ScoreFTP("/tests/ftpfiles", address, port)
 	case "web":
 		return ScoreWeb("/tests/site_infos/site_info.html", address, port)
 	case "ssh":
-		return ScoreSSH(address, port, username, password)
+		return ScoreSSH(address, port, "/tests/sshusers/users.txt")
 	case "db":
 		return ScoreDB(address, port, username, password, dbname, dbpath)
 	// Add cases for other services like web, dns, etc.

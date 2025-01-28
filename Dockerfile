@@ -1,31 +1,56 @@
-# Use the official Golang image to build the program
+# -----------------------
+# 1) BUILD STAGE
+# -----------------------
 FROM golang:1.23.5 AS builder
 
-# Set the working directory inside the container
-WORKDIR /
+# Set the working directory
+WORKDIR /app
 
-# Copy the Go module files and download dependencies
+# Copy go.mod and go.sum, then download dependencies
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copy the source code
+# Copy the rest of the source code
 COPY . .
 
-# Build the Go program for Linux with static linking
+# Build the Go program (static binary)
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o scoring-engine ./cmd/main.go
 
-# Use a smaller base image for the final container
+# -----------------------
+# 2) FINAL STAGE
+# -----------------------
 FROM alpine:latest
-# to make sure that postgres is fully running before starting scoring engine
-RUN apk add --no-cache postgresql-client
 
-# Copy the compiled Go program from the builder stage
-COPY --from=builder /scoring-engine .
-COPY --from=builder /database /database
-COPY --from=builder /tests /tests
+# Install packages needed for your program + headless browser
+# - postgresql-client: per your original Dockerfile
+# - chromium: the main headless browser
+# - nss: often needed for SSL/TLS support in Alpine
+# - fonts-liberation (optional) if your site needs certain fonts
+RUN apk add --no-cache \
+    postgresql-client \
+    chromium \
+    nss \
+    # Optional VVV
+    ttf-liberation
+
+# (Optional) Create a non-root user if you want to keep the sandbox
+# RUN adduser -D appuser
+# USER appuser
+
+# Copy the compiled Go program and other resources from the builder stage
+COPY --from=builder /app/scoring-engine /scoring-engine
+COPY --from=builder /app/database /database
+COPY --from=builder /app/tests /tests
+
+# (Optional) If you keep running as root, you may need --no-sandbox in Chromedp
+# If you run as a non-root user, you can keep the sandbox.
+# Adjust your Go code or pass flags accordingly.
 
 # Ensure the binary is executable
-RUN chmod +x scoring-engine
+RUN chmod +x /scoring-engine
+
+# Set the working directory (optional, helps keep things tidy)
+WORKDIR /
 
 # Run the Go program
 CMD ["./scoring-engine"]

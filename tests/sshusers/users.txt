@@ -1,1 +1,10 @@
-root:changeme
+alice:CoffeeBean
+bob:CupCake
+charlie:SugarPlum
+david:PianoBench
+eve:WinterStorm
+frank:TacoBell
+greg:RainbowFish
+helen:CobraVenom
+irene:RainDrop
+john:CookieDough

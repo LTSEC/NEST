@@ -109,9 +109,9 @@ func ftpConnect(address string, portNum int, username string, password string) (
 }
 
 // ScoreFTP uses FTPConnect to check service availability and assigns points.
-func ScoreFTP(dir string, address string, portNum int) (int, bool, error) {
+func ScoreFTP(dir string, address string, portNum int, userfile string) (int, bool, error) {
 	ftp_startup(dir) // Load in files at startup
-	username, password, err := ChooseRandomUser(dir)
+	username, password, err := ChooseRandomUser(userfile)
 	if err != nil {
 		return 0, false, fmt.Errorf("FTP scoring failed: failed to choose random user: %v", err)
 	}

@@ -1,32 +1,55 @@
 boxes:
-  webserver: # YOU CANNOT USE UNDERSCORES IN THE NAME
-    ip: "172.31.255.5"
+  ncae-team0-web:
+    ip: 192.168.0.5
     services:
       ssh:
+        username: "root"
+        password: "changeme"
+        bt_username: "blackteam"
+        bt_password: "G^H&J*K(LA@S#D$F%0987f"
         port: 22
       web:
         port: 80
-  database:
-    ip: "192.168.t.11"
+  ncae-team1-web:
+    ip: 192.168.1.5
+    services:
+      ssh:
+        username: "root"
+        password: "changeme"
+        bt_username: "blackteam"
+        bt_password: "G^H&J*K(LA@S#D$F%0987f"
+        port: 22
+      web:
+        port: 80
+  ncae-team0-db:
+    ip: 192.168.0.5
     services:
       db:
-        bt_username: "maria"
-        bt_password: "S3cr3tDBP@ss!"
+        bt_username: "blackteam"
+        bt_password: "G^H&J*K(LA@S#D$F%0987f"
         db_name: "MemeUsers"
         db_path: "tests/schemas/requests.sql"
         port: 3306
-
+  ncae-team1-db:
+    ip: 192.168.1.5
+    services:
+      db:
+        bt_username: "blackteam"
+        bt_password: "G^H&J*K(LA@S#D$F%0987f"
+        db_name: "MemeUsers"
+        db_path: "tests/schemas/requests.sql"
+        port: 3306
 teams:
   team0:
     id: 0
     name: "team0"
     password: "team0"
-    color: "#ccd3e9"
+    color: "#02c21f"
   team1:
     id: 1
     name: "team1"
     password: "team1"
-    color: "#e09e44"
+    color: "#23c21f"
 
 admins:
   admin:

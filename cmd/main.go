@@ -3,14 +3,17 @@ package main
 import (
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"path/filepath"
 
-	"github.com/LTSEC/scoring-engine/cli"
-	"github.com/LTSEC/scoring-engine/database"
-	"github.com/LTSEC/scoring-engine/logging"
-	"github.com/LTSEC/scoring-engine/scoring"
+	"github.com/LTSEC/NEST/cli"
+	"github.com/LTSEC/NEST/config"
+	"github.com/LTSEC/NEST/database"
+	"github.com/LTSEC/NEST/logging"
+)
+
+var (
+	yamlConfig *config.Config
 )
 
 const (
@@ -19,19 +22,9 @@ const (
 	Yellow = "\033[33m"
 	Blue   = "\033[34m"
 	Reset  = "\033[0m"
+
+	Version = "1.0.0"
 )
-
-// Implementing a REST API
-func RESTToggleScoring(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
-		return
-	}
-
-	engine_status := scoring.ToggleScoring()
-	fmt.Printf(Green+"[SUCCESS] "+Reset+"Scoring engine toggled "+Yellow+"%s"+Reset+".\n", engine_status)
-	logging.Nextline()
-}
 
 func main() {
 	// Get project root directory
@@ -40,7 +33,11 @@ func main() {
 		log.Fatalf("Error getting the working directory: %v", err)
 	}
 
-	// Read database configuration from environment variables
+	// Initalizer the logger
+	logger := new(logging.Logger)
+	logger.StartLog()
+
+	// Get the database configuration to the local database
 	cfg := database.Config{
 		User:     getEnv("DATABASE_USER", "root"),
 		Password: getEnv("DATABASE_PASSWORD", "root"),
@@ -49,7 +46,7 @@ func main() {
 		DBName:   getEnv("DATABASE_NAME", "scoring"),
 	}
 
-	// Path to the schema file
+	// Get the database's schema
 	schemaFP := filepath.Join(projectRoot, "database", "schema.sql")
 
 	// Create the database
@@ -62,12 +59,18 @@ func main() {
 		log.Printf("Could not set up database schema: %s", err.Error())
 	}
 
-	// Start the internal services
-	cli.Cli(cfg)
+	// Automatically load the main in gameconfigs
+	gameconfigs := filepath.Join(projectRoot, "gameconfigs")
+	mainconfig := filepath.Join(gameconfigs, "main.yaml")
 
-	// TODO: secure this
-	http.HandleFunc("/toggle-scoring", RESTToggleScoring)
-	http.ListenAndServe(":8080", nil)
+	yamlConfig, err = config.Parse(gameconfigs, mainconfig)
+	if err != nil {
+		logging.ConsoleLogError(fmt.Sprintf("Error parsing configuration: %v\n", err))
+		logging.ConsoleLogError(fmt.Sprintf("Startup failed"))
+		os.Exit(1)
+	}
+
+	cli.RunCLI(cfg, Version)
 }
 
 // getEnv fetches an environment variable or returns a default value

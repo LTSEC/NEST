@@ -1,0 +1,2 @@
+ssh:            # Required, one service
+  port: 22      # Required, service needs at least a port

@@ -37,12 +37,6 @@ CREATE TABLE service_checks (
     timestamp TIMESTAMP DEFAULT now()  -- check time
 );
 
--- Admin User Table
-CREATE TABLE admin_users (
-    name TEXT PRIMARY KEY,
-    password TEXT NOT NULL
-);
-
 CREATE TABLE announcements (
     announcement_id SERIAL PRIMARY KEY,            -- Unique ID for each announcement
     title VARCHAR(255) NOT NULL,                   -- Title of the announcement

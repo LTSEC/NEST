@@ -13,7 +13,7 @@ services:
       timeout: 5s
       retries: 5
 
-  scoring-engine:
+  nest:
     build:
       context: .
     stdin_open: true

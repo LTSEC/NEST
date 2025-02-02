@@ -1,0 +1,16 @@
+virtual-machines:
+  vm-0:
+    ip-schema: 192.168.T.1
+    services:
+      ssh:
+        port: 22
+  vm-1:
+    ip-schema: 192.168.T.5
+    config: web.yaml
+
+teams:
+  team0:
+    id: 0
+    name: "team0"
+    password: "team0"
+    color: "#02c21f"

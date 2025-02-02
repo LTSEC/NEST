@@ -1,25 +1,19 @@
-# CSEC Club Scoring Engine
+# NEST - Network Enumeration and Scoring Tool
+## What is it?
+NEST is a network and scoring solution that combines terraform, ansible, and the old CSEC Scoring Engine project to enable the quick creation of networks with the ability to score various services. The purpose of this is to speed up and enable practice for cyber security competions like NCAE, CCDC, and CPTC.
+## Quick Start
+TBD
 
-## Purpose
-The purpose of this scoring engine is to emulate a competition's scoring system
+## Tools and Languages Used
+### Tools
+ansible
+docker
+terraform / opentofu
 
-## Tools
-### Go
-- [websocket](https://pkg.go.dev/github.com/gorilla/websocket)
-- [PostgreSQL](https://pkg.go.dev/github.com/lib/pq)
-- [smetrics](https://github.com/xrash/smetrics)
-- [chromedp](https://github.com/chromedp/chromedp)
-- [pq](https://pkg.go.dev/github.com/lib/pq)
+### Languages
+go
+python
+javascript
 
-### Python
-- flask, flask-login
-- psycopg2
-
-### General
-- Docker
-
-## Startup
-- Run docker compose up --build
-- docker ps
-- docker attach [scoring-engine container id]
-From there, you're free to interact with the CLI, use "help" if you don't know the commands
+## Important Information
+TBD

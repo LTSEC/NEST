@@ -11,6 +11,7 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1
 	golang.org/x/crypto v0.31.0
+	golang.org/x/exp v0.0.0-20250128182459-e0ece0dbea4c
 )
 
 require (

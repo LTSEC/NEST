@@ -16,6 +16,8 @@ services:
   nest:
     build:
       context: .
+    volumes:
+      - ./Logs:/Logs
     stdin_open: true
     tty: true
     environment:

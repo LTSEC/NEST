@@ -41,7 +41,7 @@ func (l *Logger) StartLog() error {
 		err = l.initialize()
 	})
 
-	l.LogMessage("Logging started", "[STATUS]")
+	l.LogMessage("Logging started", "STATUS")
 	return err
 }
 
@@ -50,11 +50,11 @@ Logs a message to the logging instance's logfile
 USAGE:
 logger.LogMessage(<message>, <status type>)
 <message> Can be any string
-<status type> Can be any string, should be in the format [ALLCAPS], examples are [ERROR] [STATUS] [INFO]
+<status type> Can be any string, should be in the format ALLCAPS, examples are ERROR STATUS INFO
 */
 func (l *Logger) LogMessage(msg string, status string) {
 	if l.initialized {
-		message := fmt.Sprintf(" %s: %s", status, msg)
+		message := fmt.Sprintf(" [%s]: %s", status, msg)
 		l.logger.Println(message)
 	}
 }

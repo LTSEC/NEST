@@ -1,10 +1,13 @@
 package main
 
 import (
+	"context"
+	"database/sql"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/LTSEC/NEST/cli"
 	"github.com/LTSEC/NEST/config"
@@ -13,7 +16,7 @@ import (
 )
 
 var (
-	yamlConfig *config.Config
+	yamlConfig *config.YamlConfig
 )
 
 const (
@@ -38,7 +41,7 @@ func main() {
 	logger.StartLog()
 
 	// Get the database configuration to the local database
-	cfg := database.Config{
+	cfg := config.DatabaseConfig{
 		User:     getEnv("DATABASE_USER", "root"),
 		Password: getEnv("DATABASE_PASSWORD", "root"),
 		Host:     getEnv("DATABASE_HOST", "localhost"),
@@ -50,13 +53,27 @@ func main() {
 	schemaFP := filepath.Join(projectRoot, "database", "schema.sql")
 
 	// Create the database
-	if err := database.CreateDatabase(cfg); err != nil {
-		log.Printf("Could not create database: %s", err.Error())
+	if err := database.CreateDatabase(cfg, logger); err != nil {
+		logger.LogMessage(fmt.Sprintf("Could not create database: %v", err), "ERROR")
+		logging.ConsoleLogError("Error creating database, see logs for details.")
+		logging.ConsoleLogError("Startup failed")
+		os.Exit(1)
 	}
 
 	// Set up the schema
 	if err := database.SetupSchema(cfg, schemaFP); err != nil {
-		log.Printf("Could not set up database schema: %s", err.Error())
+		logger.LogMessage(fmt.Sprintf("Could not set up database schema: %v", err), "ERROR")
+		logging.ConsoleLogError("Error setting up database, see logs for details.")
+		logging.ConsoleLogError("Startup failed")
+		os.Exit(1)
+	}
+
+	db, err := connectToDatabase(cfg)
+	if err != nil {
+		logger.LogMessage("Failed to connect to the NEST database: %e", "ERROR")
+		logging.ConsoleLogError("Failed to connect to the NEST database, see logs for details.")
+		logging.ConsoleLogError("Startup failed")
+		os.Exit(1)
 	}
 
 	// Automatically load the main in gameconfigs
@@ -65,12 +82,13 @@ func main() {
 
 	yamlConfig, err = config.Parse(gameconfigs, mainconfig)
 	if err != nil {
-		logging.ConsoleLogError(fmt.Sprintf("Error parsing configuration: %v\n", err))
-		logging.ConsoleLogError(fmt.Sprintf("Startup failed"))
+		logger.LogMessage(fmt.Sprintf("There was an error in startup when parsing the yaml configuration: %v", err), "ERROR")
+		logging.ConsoleLogError("Error parsing yaml, see logs for details.")
+		logging.ConsoleLogError("Startup failed")
 		os.Exit(1)
 	}
 
-	cli.RunCLI(cfg, Version)
+	cli.RunCLI(db, Version, logger)
 }
 
 // getEnv fetches an environment variable or returns a default value
@@ -90,4 +108,23 @@ func getEnvAsInt(key string, defaultValue int) int {
 		}
 	}
 	return defaultValue
+}
+
+// Establishes a connection to the PostgreSQL database.
+func connectToDatabase(cfg config.DatabaseConfig) (*sql.DB, error) {
+	connStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
+		cfg.Host, cfg.Port, cfg.User, cfg.Password, cfg.DBName)
+	db, err := sql.Open("postgres", connStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open connection to database: %w", err)
+	}
+
+	// Test the connection
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := db.PingContext(ctx); err != nil {
+		return nil, fmt.Errorf("failed to connect to database: %w", err)
+	}
+
+	return db, nil
 }

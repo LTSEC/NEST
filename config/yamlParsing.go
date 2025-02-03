@@ -11,53 +11,18 @@ import (
 	"github.com/go-yaml/yaml"
 )
 
-// Config is the root struct for the YAML configuration.
-type Config struct {
-	VirtualMachines map[string]VirtualMachine `yaml:"virtual-machines"`
-	Teams           map[string]Team           `yaml:"teams"`
-}
-
-// VirtualMachine represents a virtual machine configuration.
-type VirtualMachine struct {
-	IPSchema string             `yaml:"ip-schema"`
-	Services map[string]Service `yaml:"services,omitempty"`
-	Config   string             `yaml:"config,omitempty"`
-}
-
-// Service represents each service configuration for a virtual machine.
-type Service struct {
-	// REQUIRED
-	Port int `yaml:"port"`
-
-	// OPTIONALS
-	// // SERVICE DEPENDENT
-	DBName string `yaml:"db_name,omitempty"`
-	DBPath string `yaml:"db_path,omitempty"`
-
-	// // TRUE OPTIONAL
-	Award string `yaml:"points,omitempty"`
-}
-
-// Team represents each team's configuration.
-type Team struct {
-	ID       int    `yaml:"id"`
-	Name     string `yaml:"name"`
-	Password string `yaml:"password"`
-	Color    string `yaml:"color"`
-}
-
 // Parse loads and validates the configuration from the given YAML file path.
 // It enforces that the main YAML has "virtual-machines" and "teams" sections,
 // that there is at least one virtual machine, and that each virtual machine has a valid ip-schema
 // and at least one service with a defined port (either inline or in an external config file).
-func Parse(configsFolder, path string) (*Config, error) {
+func Parse(configsFolder, path string) (*YamlConfig, error) {
 	// Read main YAML file.
 	file, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open the file: %w", err)
 	}
 
-	var cfg Config
+	var cfg YamlConfig
 	if err := yaml.Unmarshal(file, &cfg); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal the YAML: %w", err)
 	}

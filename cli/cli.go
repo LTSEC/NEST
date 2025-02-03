@@ -10,10 +10,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/LTSEC/NEST/config"
 	"github.com/LTSEC/NEST/database"
 	"github.com/LTSEC/NEST/logging"
+	"github.com/LTSEC/NEST/scoring"
 	"github.com/chzyer/readline"
-	"github.com/go-yaml/yaml"
+	"golang.org/x/exp/rand"
 )
 
 const (
@@ -33,6 +35,8 @@ const (
 // Engine state variables
 var engineRunning bool = false
 var enginePaused bool = false
+var logger *logging.Logger
+var rl *readline.Instance
 
 // Dummy data structures for users and teams
 type User struct {
@@ -50,9 +54,10 @@ type Team struct {
 // RunCLI is the entry point for the CLI. It accepts the database configuration
 // (or any other required configuration) and then enters a loop that reads user
 // input, logs the command, and dispatches the command to the appropriate handler.
-func RunCLI(dbConfig database.Config, Version string) {
+func RunCLI(db *sql.DB, Version string, newlogger *logging.Logger) {
 	// Configure readline with an ANSI-colored prompt and input filter.
-	rl, err := readline.NewEx(&readline.Config{
+	var err error
+	rl, err = readline.NewEx(&readline.Config{
 		Prompt:          Blue + "[nest]" + Reset + " > ",
 		HistoryFile:     historyFile,
 		InterruptPrompt: "^C",
@@ -74,14 +79,17 @@ func RunCLI(dbConfig database.Config, Version string) {
 	for {
 		line, err := rl.Readline()
 		if err != nil {
-			// Handle Ctrl+C: if interrupted, simply continue to next prompt.
+			// Handle Ctrl+C: if interrupted, quit the CLI.
 			if err == readline.ErrInterrupt {
-				continue
+				logging.ConsoleLogMessage("Exiting CLI.")
+				os.Exit(0)
 			} else if err.Error() == "EOF" {
 				// Continue on EOF to keep the CLI running.
 				continue
 			}
-			log.Fatalf("error reading line: %v", err)
+			logging.ConsoleLogError(fmt.Sprintf("Error reading line: %v", err))
+			logger.LogMessage(fmt.Sprintf("Error reading line: %v", err), "ERROR")
+			os.Exit(2)
 		}
 
 		// Clean up the line input.
@@ -100,7 +108,7 @@ func RunCLI(dbConfig database.Config, Version string) {
 		auditLog(line)
 
 		// Process the command.
-		processCommand(line, dbConfig, Version)
+		processCommand(line, db, Version)
 	}
 }
 
@@ -126,7 +134,7 @@ func auditLog(action string) {
 }
 
 // processCommand tokenizes the input and calls the appropriate function.
-func processCommand(input string, dbConfig database.Config, Version string) {
+func processCommand(input string, db *sql.DB, Version string) {
 	tokens := strings.Fields(input)
 	if len(tokens) == 0 {
 		return
@@ -135,88 +143,108 @@ func processCommand(input string, dbConfig database.Config, Version string) {
 
 	switch cmd {
 	case "help":
-		printHelp()
+		printHelp() // Assuming printHelp() internally uses logging or fmt, update if necessary
 	case "exit":
-		fmt.Println("Exiting CLI.")
+		logging.ConsoleLogMessage("Exiting CLI.")
 		os.Exit(0)
 	case "version", "--version":
-		printVersion(Version)
+		printVersion(Version) // Assuming printVersion() internally uses logging or fmt, update if necessary
 	case "score":
 		// Expected: score check
 		if len(tokens) > 1 && tokens[1] == "check" {
-			checkTeamScores(dbConfig)
+			if err := database.CheckTeamScores(db); err != nil {
+				logging.ConsoleLogError("Error checking team scores: " + err.Error())
+			}
 		} else {
-			fmt.Println("Usage: score check")
+			logging.ConsoleLogMessage("Usage: score check")
 		}
 	case "uptime":
 		// Expected: uptime validate
 		if len(tokens) > 1 && tokens[1] == "validate" {
-			validateServiceUptime(dbConfig)
+			if err := database.ValidateServiceUptime(db); err != nil {
+				logging.ConsoleLogError("Error validating service uptime: " + err.Error())
+			}
 		} else {
-			fmt.Println("Usage: uptime validate")
+			logging.ConsoleLogMessage("Usage: uptime validate")
 		}
 	case "report":
 		// Expected: report generate
 		if len(tokens) > 1 && tokens[1] == "generate" {
-			generateReport(dbConfig)
+			if err := database.GenerateReport(db); err != nil {
+				logging.ConsoleLogError("Error generating report: " + err.Error())
+			}
 		} else {
-			fmt.Println("Usage: report generate")
+			logging.ConsoleLogMessage("Usage: report generate")
 		}
 	case "team":
 		if len(tokens) < 2 {
-			fmt.Println("Usage: team [create|edit|view]")
+			logging.ConsoleLogMessage("Usage: team [create|edit|view]")
 			return
 		}
 		subcmd := strings.ToLower(tokens[1])
 		switch subcmd {
 		case "create":
-			// Usage: team create <id> <name>
+			// Usage: team create <name>
 			if len(tokens) != 3 {
-				fmt.Println("Usage: team create<name>")
+				logging.ConsoleLogMessage("Usage: team create <name>")
 				return
 			}
-			createTeam(tokens[2], dbConfig)
+
+			newTeam := config.Team{
+				Name:  tokens[2],
+				Color: generateRandomColor(),
+			}
+
+			if err := database.AddTeamToDatabase(db, newTeam, rl); err != nil {
+				logging.ConsoleLogError("Error adding team to database: " + err.Error())
+			}
 		case "edit":
 			// Usage: team edit <id> <newname>
 			if len(tokens) != 4 {
-				fmt.Println("Usage: team edit <id> <newname>")
+				logging.ConsoleLogMessage("Usage: team edit <id> <newname>")
 				return
 			}
 			id, err := strconv.Atoi(tokens[2])
 			if err != nil {
-				fmt.Println("Invalid team ID. Must be an integer.")
+				logging.ConsoleLogError("Invalid team ID. Must be an integer.")
 				return
 			}
-			editTeam(id, tokens[3], dbConfig)
+			if err := database.EditTeam(id, tokens[3], db); err != nil {
+				logging.ConsoleLogError("Error editing team: " + err.Error())
+			}
 		case "view":
-			viewTeams(dbConfig)
+			if err := database.ViewTeams(db); err != nil {
+				logging.ConsoleLogError("Error viewing teams: " + err.Error())
+			}
 		default:
-			fmt.Println("Unknown team command. Use: team [create|edit|view]")
+			logging.ConsoleLogMessage("Unknown team command. Use: team [create|edit|view]")
 		}
 	case "logs":
 		// Expected: logs view <logtype>
 		if len(tokens) > 2 && tokens[1] == "view" {
-			if tokens[2] == "audit" {
-				viewAuditLogs()
-			} else if tokens[2] == "logs" {
-				viewLogs()
-			} else {
-				fmt.Println("Invalid log type.\nValid log types: 'audit' 'logs'")
+			switch tokens[2] {
+			case "audit":
+				viewAuditLogs() // Update if these use fmt internally
+			case "logs":
+				viewLogs() // Update if these use fmt internally
+			default:
+				logging.ConsoleLogError("Invalid log type.\nValid log types: 'audit' 'logs'")
 			}
-
 		} else {
-			fmt.Println("Usage: logs view <logtype>")
+			logging.ConsoleLogMessage("Usage: logs view <logtype>")
 		}
 	case "start":
-		startEngine()
+		scoring.StartEngine()
 	case "stop":
-		stopEngine()
+		scoring.StopEngine()
 	case "pause":
-		pauseEngine()
+		scoring.PauseEngine()
 	case "resume":
-		resumeEngine()
+		scoring.ResumeEngine()
+	case "state":
+		logging.ConsoleLogMessage(scoring.GetEngineState())
 	default:
-		fmt.Printf("Unknown command: %s. Type 'help' for available commands.\n", tokens[0])
+		logging.ConsoleLogError(fmt.Sprintf("Unknown command: %s. Type 'help' for available commands.", tokens[0]))
 	}
 }
 
@@ -242,260 +270,13 @@ Available commands:
   stop                             					- Stop the engine.
   pause                            					- Pause the engine.
   resume                           					- Resume the engine.
+  state											- Get the engine's status.
 `
 	fmt.Println(helpText)
 }
 
 func printVersion(Version string) {
 	fmt.Printf("NEST CLI Version %s\n", Version)
-}
-
-// buildConnStr builds the PostgreSQL connection string using the provided configuration.
-func buildConnStr(cfg database.Config) string {
-	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=scoring sslmode=disable",
-		cfg.Host, cfg.Port, cfg.User, cfg.Password)
-}
-
-// checkTeamScores queries the database for each team's total score and prints the results.
-func checkTeamScores(dbConfig database.Config) {
-	connStr := buildConnStr(dbConfig)
-	db, err := sql.Open("postgres", connStr)
-	if err != nil {
-		fmt.Printf("Error connecting to database: %v\n", err)
-		return
-	}
-	defer db.Close()
-
-	fmt.Println("Team Scores:")
-
-	query := `
-        SELECT t.team_id, t.team_name, COALESCE(SUM(ts.points), 0) AS total_points
-        FROM teams t
-        LEFT JOIN team_services ts ON t.team_id = ts.team_id
-        GROUP BY t.team_id, t.team_name
-        ORDER BY total_points DESC;
-    `
-	rows, err := db.Query(query)
-	if err != nil {
-		fmt.Printf("Error querying team scores: %v\n", err)
-		return
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var teamID int
-		var teamName string
-		var totalPoints int
-		if err := rows.Scan(&teamID, &teamName, &totalPoints); err != nil {
-			fmt.Printf("Error scanning row: %v\n", err)
-			continue
-		}
-		fmt.Printf("Team ID: %d, Name: %s, Score: %d\n", teamID, teamName, totalPoints)
-	}
-	if err = rows.Err(); err != nil {
-		fmt.Printf("Row error: %v\n", err)
-	}
-}
-
-// validateServiceUptime checks the current status of services associated with teams.
-func validateServiceUptime(dbConfig database.Config) {
-	connStr := buildConnStr(dbConfig)
-	db, err := sql.Open("postgres", connStr)
-	if err != nil {
-		fmt.Printf("Error connecting to database: %v\n", err)
-		return
-	}
-	defer db.Close()
-
-	fmt.Println("Validating service uptime...")
-
-	query := `
-        SELECT t.team_name, s.service_name, ts.is_up
-        FROM team_services ts
-        JOIN teams t ON ts.team_id = t.team_id
-        JOIN services s ON ts.service_id = s.service_id;
-    `
-	rows, err := db.Query(query)
-	if err != nil {
-		fmt.Printf("Error querying service uptime: %v\n", err)
-		return
-	}
-	defer rows.Close()
-
-	allUp := true
-	for rows.Next() {
-		var teamName, serviceName string
-		var isUp bool
-		if err := rows.Scan(&teamName, &serviceName, &isUp); err != nil {
-			fmt.Printf("Error scanning row: %v\n", err)
-			continue
-		}
-		if !isUp {
-			fmt.Printf("Service '%s' for team '%s' is DOWN.\n", serviceName, teamName)
-			allUp = false
-		}
-	}
-	if err = rows.Err(); err != nil {
-		fmt.Printf("Row error: %v\n", err)
-	}
-
-	if allUp {
-		fmt.Println("All services are up and running.")
-	}
-}
-
-// generateReport connects to the database using the provided configuration,
-// queries the team scores, builds a report struct, and outputs it in YAML format.
-func generateReport(dbConfig database.Config) {
-	connStr := buildConnStr(dbConfig)
-	db, err := sql.Open("postgres", connStr)
-	if err != nil {
-		fmt.Printf("Error connecting to database: %v\n", err)
-		return
-	}
-	defer db.Close()
-
-	// Define the structure for each team's report.
-	type TeamReport struct {
-		TeamID      int    `yaml:"team_id"`
-		TeamName    string `yaml:"team_name"`
-		TotalPoints int    `yaml:"total_points"`
-	}
-
-	// Query to retrieve team scores.
-	query := `
-        SELECT t.team_id, t.team_name, COALESCE(SUM(ts.points), 0) AS total_points
-        FROM teams t
-        LEFT JOIN team_services ts ON t.team_id = ts.team_id
-        GROUP BY t.team_id, t.team_name
-        ORDER BY total_points DESC;
-    `
-	rows, err := db.Query(query)
-	if err != nil {
-		fmt.Printf("Error querying teams for report: %v\n", err)
-		return
-	}
-	defer rows.Close()
-
-	var teamsReport []TeamReport
-	for rows.Next() {
-		var tr TeamReport
-		if err := rows.Scan(&tr.TeamID, &tr.TeamName, &tr.TotalPoints); err != nil {
-			fmt.Printf("Error scanning team report row: %v\n", err)
-			continue
-		}
-		teamsReport = append(teamsReport, tr)
-	}
-	if err = rows.Err(); err != nil {
-		fmt.Printf("Row error: %v\n", err)
-		return
-	}
-
-	// Build the overall report structure.
-	report := struct {
-		Timestamp   string       `yaml:"timestamp"`
-		EngineState string       `yaml:"engine_state"`
-		Teams       []TeamReport `yaml:"teams"`
-	}{
-		Timestamp:   time.Now().Format(time.RFC3339),
-		EngineState: getEngineState(),
-		Teams:       teamsReport,
-	}
-
-	// Marshal the report struct to YAML.
-	data, err := yaml.Marshal(report)
-	if err != nil {
-		fmt.Printf("Error generating report: %v\n", err)
-		return
-	}
-
-	fmt.Println("Generated Report (YAML):")
-	fmt.Println(string(data))
-}
-
-// createTeam inserts a new team into the database.
-// Note: The provided id is ignored because team_id is generated automatically.
-func createTeam(name string, dbConfig database.Config) {
-	connStr := buildConnStr(dbConfig)
-	db, err := sql.Open("postgres", connStr)
-	if err != nil {
-		fmt.Printf("Error connecting to database: %v\n", err)
-		return
-	}
-	defer db.Close()
-
-	// Use default values for password and color.
-	defaultPassword := "default_password"
-	defaultColor := "#FFFFFF"
-
-	query := `INSERT INTO teams (team_name, team_password, team_color) VALUES ($1, $2, $3) RETURNING team_id`
-	var newID int
-	if err := db.QueryRow(query, name, defaultPassword, defaultColor).Scan(&newID); err != nil {
-		fmt.Printf("Error creating team: %v\n", err)
-		return
-	}
-	fmt.Printf("Team '%s' created successfully with ID %d.\n", name, newID)
-}
-
-// editTeam updates the team name for the specified team.
-func editTeam(id int, newName string, dbConfig database.Config) {
-	connStr := buildConnStr(dbConfig)
-	db, err := sql.Open("postgres", connStr)
-	if err != nil {
-		fmt.Printf("Error connecting to database: %v\n", err)
-		return
-	}
-	defer db.Close()
-
-	query := `UPDATE teams SET team_name = $1 WHERE team_id = $2`
-	res, err := db.Exec(query, newName, id)
-	if err != nil {
-		fmt.Printf("Error updating team: %v\n", err)
-		return
-	}
-	affected, err := res.RowsAffected()
-	if err != nil {
-		fmt.Printf("Error checking rows affected: %v\n", err)
-		return
-	}
-	if affected == 0 {
-		fmt.Println("Team not found.")
-		return
-	}
-	fmt.Printf("Team ID %d updated successfully to new name '%s'.\n", id, newName)
-}
-
-// viewTeams retrieves and prints all teams from the database.
-func viewTeams(dbConfig database.Config) {
-	connStr := buildConnStr(dbConfig)
-	db, err := sql.Open("postgres", connStr)
-	if err != nil {
-		fmt.Printf("Error connecting to database: %v\n", err)
-		return
-	}
-	defer db.Close()
-
-	fmt.Println("Teams:")
-	query := `SELECT team_id, team_name, team_password, team_color FROM teams ORDER BY team_id`
-	rows, err := db.Query(query)
-	if err != nil {
-		fmt.Printf("Error querying teams: %v\n", err)
-		return
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var id int
-		var name, password, color string
-		if err := rows.Scan(&id, &name, &password, &color); err != nil {
-			fmt.Printf("Error scanning team row: %v\n", err)
-			continue
-		}
-		fmt.Printf("ID: %d, Name: %s, Color: %s\n", id, name, color)
-	}
-	if err = rows.Err(); err != nil {
-		fmt.Printf("Row error: %v\n", err)
-	}
 }
 
 func viewAuditLogs() {
@@ -518,58 +299,9 @@ func viewLogs() {
 	fmt.Println(string(data))
 }
 
-func startEngine() {
-	if engineRunning {
-		fmt.Println("Engine is already running.")
-		return
-	}
-	engineRunning = true
-	enginePaused = false
-	fmt.Println("Engine started.")
-}
-
-func stopEngine() {
-	if !engineRunning {
-		fmt.Println("Engine is not running.")
-		return
-	}
-	engineRunning = false
-	enginePaused = false
-	fmt.Println("Engine stopped.")
-}
-
-func pauseEngine() {
-	if !engineRunning {
-		fmt.Println("Engine is not running. Cannot pause.")
-		return
-	}
-	if enginePaused {
-		fmt.Println("Engine is already paused.")
-		return
-	}
-	enginePaused = true
-	fmt.Println("Engine paused.")
-}
-
-func resumeEngine() {
-	if !engineRunning {
-		fmt.Println("Engine is not running. Cannot resume.")
-		return
-	}
-	if !enginePaused {
-		fmt.Println("Engine is not paused.")
-		return
-	}
-	enginePaused = false
-	fmt.Println("Engine resumed.")
-}
-
-func getEngineState() string {
-	if engineRunning {
-		if enginePaused {
-			return "paused"
-		}
-		return "running"
-	}
-	return "stopped"
+// Simple helper function to generate a random color
+func generateRandomColor() string {
+	rand.Seed(uint64(time.Now().Unix()))
+	colorVal := rand.Intn(0xFFFFFF + 1)
+	return fmt.Sprintf("#%06X", colorVal)
 }

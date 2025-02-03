@@ -35,6 +35,13 @@ func Parse(configsFolder, path string) (*YamlConfig, error) {
 		return nil, errors.New(`configuration missing required "teams" section`)
 	}
 
+	// Don't allow a team ID of 0 or less
+	for _, team := range cfg.Teams {
+		if team.ID <= 0 {
+			return nil, errors.New(`configuration cannot have a team with id of "0" or less`)
+		}
+	}
+
 	// Ensure there is at least one virtual machine.
 	if len(cfg.VirtualMachines) == 0 {
 		return nil, errors.New("there must be at least one virtual machine defined")

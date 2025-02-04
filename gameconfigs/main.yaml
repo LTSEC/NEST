@@ -9,8 +9,8 @@ virtual-machines:
     config: web.yaml
 
 teams:
-  team0:
-    id: 0
-    name: "team0"
-    password: "team0"
+  team1:
+    id: 1
+    name: "team1"
+    password: "team1"
     color: "#02c21f"

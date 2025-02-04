@@ -90,15 +90,17 @@ func AddTeamToDatabase(db *sql.DB, team config.Team, rl *readline.Instance) erro
 	var ctx context.Context
 	var cancel context.CancelFunc
 
+	// Check if a password is included in call
 	if team.Password != "" {
 		query = `INSERT INTO teams (team_name, team_password, team_color) VALUES ($1, $2, $3) ON CONFLICT (team_name) DO NOTHING;`
 		ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 	} else {
+		// Get the password
 		logging.ConsoleLogMessage("Enter a password: ")
 		line, err := rl.Readline()
 		if err != nil {
-			// Handle Ctrl+C: if interrupted, quit the CLI.
+			// Handle Ctrl+C: if interrupted, quit the CLI
 			if err == readline.ErrInterrupt {
 				logging.ConsoleLogMessage("Exiting CLI.")
 				os.Exit(0)
@@ -108,11 +110,19 @@ func AddTeamToDatabase(db *sql.DB, team config.Team, rl *readline.Instance) erro
 			os.Exit(2)
 		}
 
-		// Clean up the line input.
+		// Clean up the line input
 		line = strings.TrimSpace(line)
 		if line == "" {
 			return fmt.Errorf("Error: No input")
 		}
+
+		// Set the password to the line input
+		team.Password = line
+
+		// Add to database
+		query = `INSERT INTO teams (team_name, team_password, team_color) VALUES ($1, $2, $3) ON CONFLICT (team_name) DO NOTHING;`
+		ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
 	}
 
 	_, err := db.ExecContext(ctx, query, team.Name, team.Password, team.Color)

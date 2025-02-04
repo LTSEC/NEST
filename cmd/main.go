@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"time"
@@ -13,6 +12,7 @@ import (
 	"github.com/LTSEC/NEST/config"
 	"github.com/LTSEC/NEST/database"
 	"github.com/LTSEC/NEST/logging"
+	"github.com/LTSEC/NEST/scoring"
 )
 
 var (
@@ -30,15 +30,18 @@ const (
 )
 
 func main() {
-	// Get project root directory
-	projectRoot, err := filepath.Abs("./")
-	if err != nil {
-		log.Fatalf("Error getting the working directory: %v", err)
-	}
-
 	// Initalizer the logger
 	logger := new(logging.Logger)
 	logger.StartLog()
+
+	// Get project root directory
+	projectRoot, err := filepath.Abs("./")
+	if err != nil {
+		logger.LogMessage(fmt.Sprintf("There was an error in startup when getting the working directory: %v", err), "ERROR")
+		logging.ConsoleLogError("Error getting working directory, see logs for details.")
+		logging.ConsoleLogError("Startup failed")
+		os.Exit(1)
+	}
 
 	// Get the database configuration to the local database
 	cfg := config.DatabaseConfig{
@@ -54,7 +57,7 @@ func main() {
 
 	// Create the database
 	if err := database.CreateDatabase(cfg, logger); err != nil {
-		logger.LogMessage(fmt.Sprintf("Could not create database: %v", err), "ERROR")
+		logger.LogMessage(fmt.Sprintf("There was an error in startup when creating the NEST database: %v", err), "ERROR")
 		logging.ConsoleLogError("Error creating database, see logs for details.")
 		logging.ConsoleLogError("Startup failed")
 		os.Exit(1)
@@ -62,7 +65,7 @@ func main() {
 
 	// Set up the schema
 	if err := database.SetupSchema(cfg, schemaFP); err != nil {
-		logger.LogMessage(fmt.Sprintf("Could not set up database schema: %v", err), "ERROR")
+		logger.LogMessage(fmt.Sprintf("There was an error in startup when setting up the NEST database schema: %v", err), "ERROR")
 		logging.ConsoleLogError("Error setting up database, see logs for details.")
 		logging.ConsoleLogError("Startup failed")
 		os.Exit(1)
@@ -70,13 +73,13 @@ func main() {
 
 	db, err := connectToDatabase(cfg)
 	if err != nil {
-		logger.LogMessage("Failed to connect to the NEST database: %e", "ERROR")
+		logger.LogMessage("There was an error in startup when connecting to the NEST database: %e", "ERROR")
 		logging.ConsoleLogError("Failed to connect to the NEST database, see logs for details.")
 		logging.ConsoleLogError("Startup failed")
 		os.Exit(1)
 	}
 
-	// Automatically load the main in gameconfigs
+	// Automatically load the main yaml in gameconfigs
 	gameconfigs := filepath.Join(projectRoot, "gameconfigs")
 	mainconfig := filepath.Join(gameconfigs, "main.yaml")
 
@@ -88,6 +91,19 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Run the initalizer for the scoring component so its prepped when ready to start on CLI
+	err = scoring.Initalize(db, yamlConfig, logger)
+	if err != nil {
+		logger.LogMessage(fmt.Sprintf("There was an error in startup when initalizing the scoring engine: %v", err), "ERROR")
+		logging.ConsoleLogError("Error initalizing the scoring engine, see logs for details.")
+		logging.ConsoleLogError("Startup failed")
+		os.Exit(1)
+	}
+
+	// Clear the console before CLI runs
+	fmt.Print("\033[H\033[2J")
+
+	// Finish by running the CLI
 	cli.RunCLI(db, Version, logger)
 }
 

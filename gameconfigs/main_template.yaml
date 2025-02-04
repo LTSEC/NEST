@@ -2,15 +2,15 @@ virtual-machines:           # Required
   vm-0:                     # Required, must have at least 1 VM
     ip-schema: 192.168.T.1  # Required, must have a valid ip-schema (first two octets numbers, second two octets can have T instead of number, exclusive or)
     services:               # Required, need one per VM
-      ssh:                  
+      ssh:                  # Service can be defined in the main yaml file
         port: 22            # Required, service needs at least a port
   vm-1:
     ip-schema: 192.168.T.5
     config: web.yaml        # Alternative, service configurations can be in other yaml files (see web_template.yaml)
 
 teams:                      # Required
-  team0:                    # Required, must have at least 1 team
-    id: 0                   # Required, must have an ID
-    name: "team0"           # Required, must have a name
-    password: "team0"       # Required, must have a password
+  team1:                    # Required, must have at least 1 team
+    id: 1                   # Required, must have an ID and must be more than 0
+    name: "team1"           # Required, must have a name
+    password: "team1"       # Required, must have a password
     color: "#02c21f"        # Required, must have a color

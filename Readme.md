@@ -8,14 +8,14 @@ TBD
 
 ## Tools and Languages Used
 ### Tools
-ansible
-docker
-terraform / opentofu
+- ansible
+- docker
+- terraform / opentofu
 
 ### Languages
-go
-python
-javascript
+- go
+- python
+- javascript
 
 ## Important Information
 TBD

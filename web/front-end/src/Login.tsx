@@ -7,6 +7,7 @@ const Login = () => {
     const [message, setMessage] = useState("");
     const [errorMessage, setErrorMessage] = useState("");
     const [inputError, setInputError] = useState(false);
+    const [canLogIn, setCanLogIn] = useState(true);
 
     const handleInput = (event: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = event.target;
@@ -20,6 +21,10 @@ const Login = () => {
         setErrorMessage("");
         setInputError(false);
         event.preventDefault();
+
+        if (canLogIn) {
+            // go to home page
+        }
 
         if (credentials.username != "" && credentials.password != "") {
             axios.post("https://localhost:3001/signin", {

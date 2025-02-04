@@ -15,6 +15,8 @@ const Login = () => {
 
     // Sends the uesrname and password to backend to login
     const submitCredentials = (event: React.FormEvent) => {
+        // resest message
+        setMessage("");
         event.preventDefault();
         if (credentials.username != "" && credentials.password != "") {
             // throw credentials to backend
@@ -23,6 +25,9 @@ const Login = () => {
         else {
             // throw error
         }
+        // resets username and password so user doesn't have to 
+        // (in case they mess up their login)
+        setCredentials({username:"", password:""})
     }
 
     return (

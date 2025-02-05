@@ -1,2 +1,2 @@
-ssh:
-  port: 22
+web:
+  port: 80

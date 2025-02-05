@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/LTSEC/NEST/config"
 	"github.com/LTSEC/NEST/database"
+	"github.com/LTSEC/NEST/enum"
 	"github.com/LTSEC/NEST/logging"
 	"github.com/LTSEC/NEST/scoring"
 	"github.com/chzyer/readline"
@@ -190,7 +190,7 @@ func processCommand(input string, db *sql.DB, Version string) {
 				return
 			}
 
-			newTeam := config.Team{
+			newTeam := enum.Team{
 				Name:  tokens[2],
 				Color: generateRandomColor(),
 			}

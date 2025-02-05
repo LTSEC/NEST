@@ -9,14 +9,15 @@ import (
 	"time"
 
 	"github.com/LTSEC/NEST/cli"
-	"github.com/LTSEC/NEST/config"
 	"github.com/LTSEC/NEST/database"
+	"github.com/LTSEC/NEST/enum"
 	"github.com/LTSEC/NEST/logging"
+	"github.com/LTSEC/NEST/parser"
 	"github.com/LTSEC/NEST/scoring"
 )
 
 var (
-	yamlConfig *config.YamlConfig
+	yamlConfig *enum.YamlConfig
 )
 
 const (
@@ -44,7 +45,7 @@ func main() {
 	}
 
 	// Get the database configuration to the local database
-	cfg := config.DatabaseConfig{
+	cfg := enum.DatabaseConfig{
 		User:     getEnv("DATABASE_USER", "root"),
 		Password: getEnv("DATABASE_PASSWORD", "root"),
 		Host:     getEnv("DATABASE_HOST", "localhost"),
@@ -83,7 +84,7 @@ func main() {
 	gameconfigs := filepath.Join(projectRoot, "gameconfigs")
 	mainconfig := filepath.Join(gameconfigs, "main.yaml")
 
-	yamlConfig, err = config.Parse(gameconfigs, mainconfig)
+	yamlConfig, err = parser.ParseYAML(gameconfigs, mainconfig)
 	if err != nil {
 		logger.LogMessage(fmt.Sprintf("There was an error in startup when parsing the yaml configuration: %v", err), "ERROR")
 		logging.ConsoleLogError("Error parsing yaml, see logs for details.")
@@ -127,7 +128,7 @@ func getEnvAsInt(key string, defaultValue int) int {
 }
 
 // Establishes a connection to the PostgreSQL database.
-func connectToDatabase(cfg config.DatabaseConfig) (*sql.DB, error) {
+func connectToDatabase(cfg enum.DatabaseConfig) (*sql.DB, error) {
 	connStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
 		cfg.Host, cfg.Port, cfg.User, cfg.Password, cfg.DBName)
 	db, err := sql.Open("postgres", connStr)

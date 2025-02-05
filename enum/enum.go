@@ -1,4 +1,4 @@
-package config
+package enum
 
 // Config structure for database configuration parameters
 type DatabaseConfig struct {
@@ -25,15 +25,17 @@ type VirtualMachine struct {
 // Service represents each service configuration for a virtual machine.
 type Service struct {
 	// REQUIRED
-	Port int `yaml:"port"`
+	Port int `yaml:"port"` // The port the service is running on
 
 	// OPTIONALS
 	// // SERVICE DEPENDENT
-	DBName string `yaml:"db_name,omitempty"`
-	DBPath string `yaml:"db_path,omitempty"`
-
+	User     string `yaml:"user,omitempty"`       // The username of a user for a service
+	Password string `yaml:"password,omitempty"`   // The password of a user for a service
+	QFile    string `yaml:"query_file,omitempty"` // The query file for a service
+	QDir     string `yaml:"query_dir,omitempty"`  // The query directory for a service
 	// // TRUE OPTIONAL
-	Award string `yaml:"points,omitempty"`
+	Award   int  `yaml:"award,omitempty"`   // The awarded points for having a service up at scoring time
+	Partial bool `yaml:"partial,omitempty"` // Whether or not partial points should be awarded
 }
 
 // Team represents each team's configuration.
@@ -48,7 +50,7 @@ type Team struct {
 type ScoringService struct {
 	ID       int    // Corresponds to service_id in the database
 	Name     string // Corresponds to service_name in the database
-	BoxName  string // Corresponds to box_name in the database
+	VMName   string // Corresponds to box_name in the database
 	Disabled bool   // Corresponds to disabled in the database
 }
 

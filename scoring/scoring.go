@@ -50,32 +50,43 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
-	"github.com/LTSEC/NEST/config"
 	"github.com/LTSEC/NEST/database"
+	"github.com/LTSEC/NEST/enum"
 	"github.com/LTSEC/NEST/logging"
+	"github.com/LTSEC/NEST/services"
 )
 
 var (
-	ScoringEnabled bool
-	ScoringPaused  bool
-	logger         *logging.Logger
-	RefreshTime    int
+	// Vars
+	ScoringEnabled   bool
+	ScoringPaused    bool
+	ScoringIteration int // The current iteration of scoring, i.e. the 50th round of scoring
+	RefreshTime      int // How long to wait between scoring rounds
+	// Pointers
+	logger     *logging.Logger
+	db         *sql.DB
+	yamlConfig *enum.YamlConfig
 )
 
 /*
-Initalize begins the first processeses to make scoring work, including teams their services and creating links between the services and their team in order to facilitate scoring.
+Initalize begins the first processeses to make scoring work, importing teams and services into the database,
+and creating links between them, to facilitate scoring.
 The function takes in the following values:
 
 	cfg:			A database configuration, the one that is used in the CLI and database packages
 	yamlConfig:		The main yaml configuration file that is loaded at startup of the program
 	newlogger:		The logger that is responsible for logging all message in the program
 */
-func Initalize(db *sql.DB, yamlConfig *config.YamlConfig, newlogger *logging.Logger) error {
+func Initalize(newdb *sql.DB, newyamlConfig *enum.YamlConfig, newlogger *logging.Logger) error {
 	// First step in initalizing the scoring of services is connecting to the database
 	logger = newlogger
 	logger.LogMessage("Scoring initalization started.", "STATUS")
+
+	db = newdb
+	yamlConfig = newyamlConfig
 
 	logging.ConsoleLogMessage("Loading teams...")
 	// The second step is to add all the teams from the yaml configuration to the database
@@ -101,7 +112,7 @@ func Initalize(db *sql.DB, yamlConfig *config.YamlConfig, newlogger *logging.Log
 }
 
 // addServicesToTeam does as its name implies, by taking in a teamID, vmName, and vm object it is able to map each service to a team for scoring.
-func addServicesToTeam(db *sql.DB, teamID int, vmName string, vm config.VirtualMachine) error {
+func addServicesToTeam(db *sql.DB, teamID int, vmName string, vm enum.VirtualMachine) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -137,6 +148,106 @@ func addServicesToTeam(db *sql.DB, teamID int, vmName string, vm config.VirtualM
 	}
 
 	return nil
+}
+
+// The function called to score all included services.
+func score() error {
+	// First retrieve all teams in the database to account for created/deleted teams
+	teams, err := database.GetAllTeams(db)
+	if err != nil {
+		logger.LogMessage(fmt.Sprintf("Error occured while getting teams from the database: %v", err), "ERROR")
+		return fmt.Errorf("failed to retrieve teams from the database: %w", err)
+	}
+
+	// Get the services for each team and score them
+	for _, team := range teams {
+		// Retrieve all services associated with the team
+		services, err := database.GetTeamServices(db, team.ID)
+		if err != nil {
+			return fmt.Errorf("failed to retrieve services for team %d: %w", team.ID, err)
+		}
+
+		// Loop over services
+		for _, service := range services {
+			if service.Disabled {
+				continue
+			}
+
+			// Locate the correct virtual machine
+			vmConfig, vmExists := yamlConfig.VirtualMachines[service.VMName]
+			if !vmExists {
+				logger.LogMessage(fmt.Sprintf("Error getting VM configuration for VM %s: configuration not found in YAML", service.VMName), "ERROR")
+				continue // don't attempt to score it
+			}
+
+			// Get the actual service name and it's configuration
+			// Convert VMname_ServiceName to ServiceName
+			parts := strings.SplitN(service.Name, "_", 2)
+			if len(parts) != 2 {
+				logger.LogMessage(fmt.Sprintf("Error getting service %s's service name: too many or too few parts, check formatting for extra underscores.", service.Name), "ERROR")
+				continue // don't attempt to score it
+			}
+			serviceName := parts[1]
+			serviceConfig, serviceExists := vmConfig.Services[serviceName]
+			if !serviceExists {
+				logger.LogMessage(fmt.Sprintf("Error getting service %s's configuration: configuration not found in YAML", service.Name), "ERROR")
+				continue // don't attempt to score it
+			}
+
+			// Once the services configuration, virtual machine configuration, and team are all acquired we can score the service
+			award, status, err := serviceSelector(team, serviceName, serviceConfig, vmConfig)
+			if err != nil {
+				logger.LogMessage(fmt.Sprintf("Error occured when scoring service %s for team %d: %v", service.Name, team.ID, err), "ERROR")
+				continue // don't attempt to score it
+			}
+
+			if err = database.UpdateServiceScore(db, team.ID, service.ID, award, status); err != nil {
+				logger.LogMessage(fmt.Sprintf("Error occured while updating the score for service %s for team %d: %v", service.Name, team.ID, err), "ERROR")
+				// at this point we already tried, whatever
+			}
+
+		}
+	}
+
+	return nil
+}
+
+// Service selector selects the correct service and scores it, returning the amount of points
+// that need to be added to a team. Any new services need to be included here.
+func serviceSelector(scoredTeam enum.ScoringTeam, serviceName string, scoredService enum.Service, scoredVM enum.VirtualMachine) (int, bool, error) {
+	address, err := constructIPAddress(scoredVM.IPSchema, scoredTeam.ID)
+	if err != nil {
+		return 0, false, fmt.Errorf("failed to construct IP address: %w", err)
+	}
+
+	scoringFunc, ok := services.ScoringDispatch[serviceName]
+	if !ok {
+		// unknown service
+		return 0, false, fmt.Errorf("unknown service %s", serviceName)
+	}
+	// Now call the scoring function
+	return scoringFunc(scoredService, address)
+
+}
+
+// Utility function that builds the IP address from the base IP, team ID, and fourth octet.
+//
+// Given a schema "192.168.T.5"
+//
+// Given a team ID "1"
+//
+// Would convert an ip schema "192.168.T.5" --> 192.168.1.5 if the team ID
+func constructIPAddress(schema string, teamID int) (string, error) {
+	// Split the base IP into quartets and check
+	ipParts := strings.Split(schema, ".")
+	if len(ipParts) != 4 {
+		return "", fmt.Errorf("invalid IP schema format: %s", schema)
+	}
+
+	finalIp := strings.Replace(schema, "t", fmt.Sprintf("%d", teamID), 1)
+	finalIp = strings.Replace(finalIp, "T", fmt.Sprintf("%d", teamID), 1)
+
+	return finalIp, nil
 }
 
 // // // START ENGINE CONTROLS SECTION

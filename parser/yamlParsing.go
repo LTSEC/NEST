@@ -1,4 +1,4 @@
-package config
+package parser
 
 import (
 	"errors"
@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/LTSEC/NEST/enum"
+	"github.com/LTSEC/NEST/services"
 	"github.com/go-yaml/yaml"
 )
 
@@ -15,14 +17,14 @@ import (
 // It enforces that the main YAML has "virtual-machines" and "teams" sections,
 // that there is at least one virtual machine, and that each virtual machine has a valid ip-schema
 // and at least one service with a defined port (either inline or in an external config file).
-func Parse(configsFolder, path string) (*YamlConfig, error) {
+func ParseYAML(configsFolder, path string) (*enum.YamlConfig, error) {
 	// Read main YAML file.
 	file, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open the file: %w", err)
 	}
 
-	var cfg YamlConfig
+	var cfg enum.YamlConfig
 	if err := yaml.Unmarshal(file, &cfg); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal the YAML: %w", err)
 	}
@@ -79,12 +81,12 @@ func Parse(configsFolder, path string) (*YamlConfig, error) {
 
 // loadServicesFromConfig attempts to read an external YAML file specified by configPath,
 // unmarshals it into a map of services, and validates that at least one service defines a port.
-func loadServicesFromConfig(configPath, vmName string) (map[string]Service, error) {
+func loadServicesFromConfig(configPath, vmName string) (map[string]enum.Service, error) {
 	serviceFile, err := os.ReadFile(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open config file %s for virtual machine %s: %w", configPath, vmName, err)
 	}
-	var services map[string]Service
+	var services map[string]enum.Service
 	if err := yaml.Unmarshal(serviceFile, &services); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal services from config file %s for virtual machine %s: %w", configPath, vmName, err)
 	}
@@ -95,17 +97,24 @@ func loadServicesFromConfig(configPath, vmName string) (map[string]Service, erro
 }
 
 // validateServices ensures that the provided services map contains at least one service with a nonzero port.
-func validateServices(services map[string]Service, vmName string) error {
-	if len(services) == 0 {
+func validateServices(yamlservices map[string]enum.Service, vmName string) error {
+	if len(yamlservices) == 0 {
 		return fmt.Errorf("virtual machine %s must have at least one service defined", vmName)
 	}
 	valid := false
-	for svcName, svc := range services {
-		if svc.Port != 0 {
-			valid = true
-		} else {
+	for svcName, svc := range yamlservices {
+		// Check is its a valid service
+		if _, ok := services.ScoringDispatch[svcName]; !ok {
+			return fmt.Errorf("unknown service type '%s' in virtual machine %s", svcName, vmName)
+		}
+
+		// Check if there is a port
+		if svc.Port == 0 {
 			return fmt.Errorf("service %s in virtual machine %s does not define a port", svcName, vmName)
 		}
+
+		// If everything is valid, we're good
+		valid = true
 	}
 	if !valid {
 		return fmt.Errorf("virtual machine %s must have at least one service with a defined port", vmName)

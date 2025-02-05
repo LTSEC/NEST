@@ -4,13 +4,20 @@ virtual-machines:           # Required
     services:               # Required, need one per VM
       ssh:                  # Service can be defined in the main yaml file
         port: 22            # Required, service needs at least a port
+        # Services might also include the following optional fields
+        award: 15             # The amount of points awarded for success
+        partial: true         # Whether to award partial points (only valid for some services)
+        user: henry           # A user
+        password: pass        # A password
+        query_file: ./x.txt   # A file that is used for querying, for example if you wanted to use multiple users for SSH
+        query_dir: ./y        # A directory filled with files to be used for scoring, for example if you wanted to check for multiple files with FTP
   vm-1:
-    ip-schema: 192.168.T.5
+    ip-schema: 192.168.t.5  # T can be lowercase
     config: web.yaml        # Alternative, service configurations can be in other yaml files (see web_template.yaml)
 
 teams:                      # Required
   team1:                    # Required, must have at least 1 team
     id: 1                   # Required, must have an ID and must be more than 0
-    name: "team1"           # Required, must have a name
-    password: "team1"       # Required, must have a password
+    name: team1             # Required, must have a name
+    password: team1         # Required, must have a password
     color: "#02c21f"        # Required, must have a color

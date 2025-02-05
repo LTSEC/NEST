@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/LTSEC/NEST/config"
+	"github.com/LTSEC/NEST/enum"
 	"github.com/LTSEC/NEST/logging"
 	"github.com/chzyer/readline"
 	"github.com/go-yaml/yaml"
@@ -22,7 +22,7 @@ var (
 )
 
 // CreateDatabase checks for and creates the "scoring" database if it doesn't exist.
-func CreateDatabase(cfg config.DatabaseConfig, newlogger *logging.Logger) error {
+func CreateDatabase(cfg enum.DatabaseConfig, newlogger *logging.Logger) error {
 	logger = newlogger
 	logger.LogMessage("Database initalization started", "STATUS")
 	// Connect to the default "postgres" database
@@ -55,7 +55,7 @@ func CreateDatabase(cfg config.DatabaseConfig, newlogger *logging.Logger) error 
 }
 
 // SetupSchema connects to the "scoring" database and sets up the tables.
-func SetupSchema(cfg config.DatabaseConfig, schemaFilePath string) error {
+func SetupSchema(cfg enum.DatabaseConfig, schemaFilePath string) error {
 	logger.LogMessage("Database schema setup initalized", "STATUS")
 	// Connect to the "scoring" database
 	connStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=scoring sslmode=disable", cfg.Host, cfg.Port, cfg.User, cfg.Password)
@@ -85,7 +85,7 @@ func SetupSchema(cfg config.DatabaseConfig, schemaFilePath string) error {
 }
 
 // Adds a team to the database, returns any errors
-func AddTeamToDatabase(db *sql.DB, team config.Team, rl *readline.Instance) error {
+func AddTeamToDatabase(db *sql.DB, team enum.Team, rl *readline.Instance) error {
 	var query string
 	var ctx context.Context
 	var cancel context.CancelFunc
@@ -186,6 +186,80 @@ func CheckTeamScores(db *sql.DB) error {
 		}
 		logging.ConsoleLogMessage(fmt.Sprintf("Team ID: %d, Name: %s, Score: %d\n", teamID, teamName, totalPoints))
 	}
+	if err = rows.Err(); err != nil {
+		logger.LogMessage(fmt.Sprintf("Row error: %v", err), "ERROR")
+	}
+
+	return nil
+}
+
+// Gets every team in the database and returns it as an array of teams
+func GetAllTeams(db *sql.DB) ([]enum.ScoringTeam, error) {
+	query := "SELECT team_id, team_name, team_color FROM teams"
+	rows, err := db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var teams []enum.ScoringTeam
+	for rows.Next() {
+		var team enum.ScoringTeam
+		if err := rows.Scan(&team.ID, &team.Name, &team.Color); err != nil {
+			return nil, err
+		}
+		teams = append(teams, team)
+	}
+	return teams, nil
+}
+
+// Gets a team's services from the SQL database
+func GetTeamServices(db *sql.DB, teamID int) ([]enum.ScoringService, error) {
+	query := `
+		SELECT s.service_id, s.service_name, s.box_name, s.disabled
+		FROM services s
+		JOIN team_services ts ON s.service_id = ts.service_id
+		WHERE ts.team_id = $1
+	`
+	rows, err := db.Query(query, teamID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var services []enum.ScoringService
+	for rows.Next() {
+		var service enum.ScoringService
+		if err := rows.Scan(&service.ID, &service.Name, &service.VMName, &service.Disabled); err != nil {
+			return nil, err
+		}
+		services = append(services, service)
+	}
+	return services, nil
+}
+
+// ViewTeams retrieves and prints all teams from the database.
+func ViewTeams(db *sql.DB) error {
+	logging.ConsoleLogMessage("Teams:")
+
+	query := `SELECT team_id, team_name, team_password, team_color FROM teams ORDER BY team_id`
+	rows, err := db.Query(query)
+	if err != nil {
+		logger.LogMessage(fmt.Sprintf("Error querying teams: %v", err), "ERROR")
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var id int
+		var name, password, color string
+		if err := rows.Scan(&id, &name, &password, &color); err != nil {
+			logger.LogMessage(fmt.Sprintf("Error scanning team row: %v", err), "ERROR")
+			continue
+		}
+		logging.ConsoleLogMessage(fmt.Sprintf("ID: %d, Name: %s, Color: %s\n", id, name, color))
+	}
+
 	if err = rows.Err(); err != nil {
 		logger.LogMessage(fmt.Sprintf("Row error: %v", err), "ERROR")
 	}
@@ -308,30 +382,74 @@ func GenerateReport(db *sql.DB) error {
 	return nil
 }
 
-// ViewTeams retrieves and prints all teams from the database.
-func ViewTeams(db *sql.DB) error {
-	logging.ConsoleLogMessage("Teams:")
+// UpdateServiceScore updates the score a team has for a certain service, as well as its status (up/down)
+func UpdateServiceScore(db *sql.DB, teamID int, serviceID int, award int, status bool) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
 
-	query := `SELECT team_id, team_name, team_password, team_color FROM teams ORDER BY team_id`
-	rows, err := db.Query(query)
+	// Start a transaction to ensure atomic operations
+	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
-		logger.LogMessage(fmt.Sprintf("Error querying teams: %v", err), "ERROR")
-		return err
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var id int
-		var name, password, color string
-		if err := rows.Scan(&id, &name, &password, &color); err != nil {
-			logger.LogMessage(fmt.Sprintf("Error scanning team row: %v", err), "ERROR")
-			continue
-		}
-		logging.ConsoleLogMessage(fmt.Sprintf("ID: %d, Name: %s, Color: %s\n", id, name, color))
+		return fmt.Errorf("failed to start transaction: %w", err)
 	}
 
-	if err = rows.Err(); err != nil {
-		logger.LogMessage(fmt.Sprintf("Row error: %v", err), "ERROR")
+	// Update points and status in team_services
+	queryUpdate := `
+	 UPDATE team_services
+	 SET 
+		 points = points + $1, 
+		 is_up = $2,
+		 total_checks = total_checks + 1,
+		 successful_checks = successful_checks + CASE WHEN $2 THEN 1 ELSE 0 END
+	 WHERE team_id = $3 AND service_id = $4
+ `
+	_, err = tx.ExecContext(ctx, queryUpdate, award, status, teamID, serviceID)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to update team_services: %w", err)
+	}
+
+	queryInsert := `
+		INSERT INTO service_checks (team_service_id, status)
+		SELECT team_service_id, $1
+		FROM team_services
+		WHERE team_id = $2 AND service_id = $3
+	`
+	_, err = tx.ExecContext(ctx, queryInsert, status, teamID, serviceID)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to insert into service_checks: %w", err)
+	}
+
+	// Trim to keep only the last 10 checks
+	queryTrim := `
+		DELETE FROM service_checks
+		WHERE team_service_id = (
+			SELECT team_service_id
+			FROM team_services
+			WHERE team_id = $1 AND service_id = $2
+		)
+		AND check_id NOT IN (
+			SELECT check_id
+			FROM service_checks
+			WHERE team_service_id = (
+				SELECT team_service_id
+				FROM team_services
+				WHERE team_id = $1 AND service_id = $2
+			)
+			ORDER BY timestamp DESC
+			LIMIT 10
+		)
+	`
+	_, err = tx.ExecContext(ctx, queryTrim, teamID, serviceID)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to trim service_checks: %w", err)
+	}
+
+	// Commit the transaction
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	return nil

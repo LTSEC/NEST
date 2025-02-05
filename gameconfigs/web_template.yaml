@@ -1,2 +1,10 @@
-ssh:            # Required, one service
-  port: 22      # Required, service needs at least a port
+web:              # Required, one service
+  port: 80        # Required, service needs at least a port
+  # Services might also include the following optional fields
+  award: 15             # The amount of points awarded for success
+  partial: true         # Whether to award partial points (only valid for some services)
+  user: henry           # A user
+  password: pass        # A password
+  query_file: ./x.txt   # A file that is used for querying, for example if you wanted to use multiple users for SSH
+  query_dir: ./y        # A directory filled with files to be used for scoring, for example if you wanted to check for multiple files with FTP
+  

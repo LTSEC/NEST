@@ -5,12 +5,12 @@ virtual-machines:
       ssh:
         port: 22
   vm-1:
-    ip-schema: 192.168.T.5
+    ip-schema: 192.168.t.5
     config: web.yaml
 
 teams:
   team1:
     id: 1
-    name: "team1"
-    password: "team1"
+    name: team1
+    password: team1
     color: "#02c21f"

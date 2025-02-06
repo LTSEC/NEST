@@ -1,6 +1,14 @@
 package services
 
-import "github.com/LTSEC/NEST/enum"
+import (
+	"fmt"
+	"os"
+	"strings"
+	"time"
+
+	"github.com/LTSEC/NEST/enum"
+	"golang.org/x/exp/rand"
+)
 
 const (
 	// Timeouts, miliseconds
@@ -12,8 +20,54 @@ const (
 	web_timeout    = 15000
 )
 
+var (
+	// Get the random seed for any random operations
+	randseed int
+)
+
 var ScoringDispatch = map[string]func(service enum.Service, address string) (int, bool, error){
 	//"ftp": ScoreFTP,.
 	// add more as needed
 	"ftp": ScoreFTP,
+}
+
+func Initalize() {
+	// Set the random seed for any random operations
+	rand.Seed((uint64)(time.Now().Unix()))
+}
+
+// ChooseRandomUser reads the file at `dir`, which contains lines
+// formatted as "username:password", picks one user at random, and
+// returns the parsed username and password.
+func ChooseRandomUser(dir string) (string, string, error) {
+	data, err := os.ReadFile(dir)
+	if err != nil {
+		return "", "", fmt.Errorf("could not read users file: %v", err)
+	}
+
+	lines := strings.Split(string(data), "\n")
+	var validLines []string
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			validLines = append(validLines, line)
+		}
+	}
+
+	if len(validLines) == 0 {
+		return "", "", fmt.Errorf("no valid 'username:password' lines in %s", dir)
+	}
+
+	randomIndex := rand.Intn(len(validLines))
+	userLine := validLines[randomIndex]
+
+	// Parse username and password
+	parts := strings.SplitN(userLine, ":", 2)
+	if len(parts) != 2 {
+		return "", "", fmt.Errorf("invalid user format: %s", userLine)
+	}
+	username := parts[0]
+	password := parts[1]
+
+	return username, password, nil
 }

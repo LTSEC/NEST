@@ -14,6 +14,7 @@ import (
 	"github.com/LTSEC/NEST/logging"
 	"github.com/LTSEC/NEST/parser"
 	"github.com/LTSEC/NEST/scoring"
+	"github.com/LTSEC/NEST/services"
 )
 
 var (
@@ -103,6 +104,9 @@ func main() {
 
 	// Clear the console before CLI runs
 	fmt.Print("\033[H\033[2J")
+
+	// Initalize the services
+	services.Initalize()
 
 	// Finish by running the CLI
 	cli.RunCLI(db, Version, logger)

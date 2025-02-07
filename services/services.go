@@ -36,6 +36,7 @@ var ScoringDispatch = map[string]func(service enum.Service, address string) (int
 	"web80":      ScoreWeb80,      // Insecure connections
 	"webssl":     ScoreWebSSLTLS,  // Secure connections
 	"webcontent": ScoreWebContent, // Check content against prepared content
+	"routericmp": ScoreRouterICMP, // Check if the router can be pinged via ICMP and the engine can hear back
 }
 
 func Initalize() {

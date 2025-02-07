@@ -12,12 +12,12 @@ import (
 
 const (
 	// Timeouts, miliseconds
-	router_timeout = 250
+	router_timeout = 750
 	ftp_timeout    = 250
 	ssh_timeout    = 250
 	sql_timeout    = 250
 	dns_timeout    = 500
-	web_timeout    = 15000
+	web_timeout    = 1500
 )
 
 var (
@@ -28,7 +28,14 @@ var (
 var ScoringDispatch = map[string]func(service enum.Service, address string) (int, bool, error){
 	//"ftp": ScoreFTP,.
 	// add more as needed
-	"ftp": ScoreFTP,
+	"ftp":        ScoreFTP,        // General FTP (if the connection exists)
+	"ftplogin":   ScoreFTPLogin,   // Login
+	"ftpread":    ScoreFTPRead,    // Reading files
+	"ftpwrite":   ScoreFTPWrite,   // Writing files
+	"ssh":        ScoreSSHLogin,   // Logging in with SSH
+	"web80":      ScoreWeb80,      // Insecure connections
+	"webssl":     ScoreWebSSLTLS,  // Secure connections
+	"webcontent": ScoreWebContent, // Check content against prepared content
 }
 
 func Initalize() {

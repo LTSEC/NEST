@@ -113,6 +113,11 @@ func validateServices(yamlservices map[string]enum.Service, vmName string) error
 			return fmt.Errorf("service %s in virtual machine %s does not define a port", svcName, vmName)
 		}
 
+		// Define a default award
+		if svc.Award == 0 {
+			svc.Award = 1
+		}
+
 		// If everything is valid, we're good
 		valid = true
 	}

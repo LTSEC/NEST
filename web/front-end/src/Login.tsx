@@ -1,13 +1,17 @@
 import React, { useState } from "react";
 import axios from 'axios';
+import { useNavigate } from "react-router-dom";
 import './login.css';
+// for testing purposes (testing login without querying)
+// might make it a functionality later
+const canLogIn = true;
 
 const Login = () => {
     const [credentials, setCredentials] = useState({username: "", password: ""});
     const [message, setMessage] = useState("");
     const [errorMessage, setErrorMessage] = useState("");
     const [inputError, setInputError] = useState(false);
-    const [canLogIn, setCanLogIn] = useState(true);
+    const navigate = useNavigate();
 
     const handleInput = (event: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = event.target;
@@ -23,7 +27,8 @@ const Login = () => {
         event.preventDefault();
 
         if (canLogIn) {
-            // go to home page
+            navigate("/graphs");
+            return;
         }
 
         if (credentials.username != "" && credentials.password != "") {
@@ -34,6 +39,7 @@ const Login = () => {
             .then(response => {
                 console.log(response);
                 setMessage("Login Successfull");
+                navigate("/graphs");
             })
             .catch(error => {
                 let errorMsg = "An error occurred";

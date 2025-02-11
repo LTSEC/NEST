@@ -11,7 +11,7 @@ require (
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1
 	golang.org/x/crypto v0.33.0
 	golang.org/x/exp v0.0.0-20250128182459-e0ece0dbea4c
-	golang.org/x/net v0.21.0
+	golang.org/x/net v0.34.0
 )
 
 require (
@@ -24,7 +24,11 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/mailru/easyjson v0.9.0 // indirect
+	github.com/miekg/dns v1.1.63 // indirect
+	golang.org/x/mod v0.22.0 // indirect
+	golang.org/x/sync v0.10.0 // indirect
 	golang.org/x/sys v0.30.0 // indirect
+	golang.org/x/tools v0.29.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )

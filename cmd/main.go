@@ -47,6 +47,18 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Automatically load the main yaml in gameconfigs
+	gameconfigs := filepath.Join(projectRoot, "gameconfigs")
+	mainconfig := filepath.Join(gameconfigs, "main.yaml")
+
+	yamlConfig, err = parser.ParseYAML(gameconfigs, mainconfig)
+	if err != nil {
+		logger.LogMessage(fmt.Sprintf("There was an error in startup when parsing the yaml configuration: %v", err), "ERROR")
+		logging.ConsoleLogError("Error parsing yaml, see logs for details.")
+		logging.ConsoleLogError("Startup failed")
+		os.Exit(1)
+	}
+
 	// Get the database configuration to the local database
 	cfg := enum.DatabaseConfig{
 		User:     getEnv("DATABASE_USER", "root"),
@@ -83,26 +95,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Automatically load the main yaml in gameconfigs
-	gameconfigs := filepath.Join(projectRoot, "gameconfigs")
-	mainconfig := filepath.Join(gameconfigs, "main.yaml")
-
-	yamlConfig, err = parser.ParseYAML(gameconfigs, mainconfig)
-	if err != nil {
-		logger.LogMessage(fmt.Sprintf("There was an error in startup when parsing the yaml configuration: %v", err), "ERROR")
-		logging.ConsoleLogError("Error parsing yaml, see logs for details.")
-		logging.ConsoleLogError("Startup failed")
-		os.Exit(1)
-	}
-
 	// Run the initalizer for the scoring component so its prepped when ready to start on CLI
-	err = scoring.Initalize(db, yamlConfig, logger)
-	if err != nil {
-		logger.LogMessage(fmt.Sprintf("There was an error in startup when initalizing the scoring engine: %v", err), "ERROR")
-		logging.ConsoleLogError("Error initalizing the scoring engine, see logs for details.")
-		logging.ConsoleLogError("Startup failed")
-		os.Exit(1)
-	}
+	go scoring.Initalize(db, yamlConfig, logger)
 
 	// Set up RESTful API
 	router := api.SetupRouter(db)

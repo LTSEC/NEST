@@ -128,20 +128,23 @@ func validateServices(yamlservices map[string]enum.Service, vmName string) error
 	}
 	valid := false
 	for svcName, svc := range yamlservices {
+
 		// Check is its a valid service
 		if _, ok := services.ScoringDispatch[svcName]; !ok {
-			return fmt.Errorf("unknown service type '%s' in virtual machine %s", svcName, vmName)
+			return fmt.Errorf("unknown service type '%s' in virtual machine '%s'", svcName, vmName)
 		}
 
 		// Check if there is a port
 		if svc.Port == 0 {
-			return fmt.Errorf("service %s in virtual machine %s does not define a port", svcName, vmName)
+			return fmt.Errorf("service '%s' in virtual machine '%s' does not define a port", svcName, vmName)
 		}
 
 		// Define a default award
-		if svc.Award == 0 {
+		if svc.Award <= 0 {
 			svc.Award = 1
 		}
+
+		yamlservices[svcName] = svc // svc is a copy, assign as original
 
 		// If everything is valid, we're good
 		valid = true

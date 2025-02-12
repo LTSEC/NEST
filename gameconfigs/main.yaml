@@ -1,12 +1,16 @@
 virtual-machines:
-  vm-0:
-    ip-schema: 192.168.T.1
+  webserver:
+    ip-schema: 192.168.T.5
     services:
-      ssh:
-        port: 22
-  vm-1:
-    ip-schema: 192.168.t.5
-    config: web.yaml
+      web80:
+        port: 80
+        query_file: queries/site_infos/site_info.html
+  router:
+    ip-schema: 10.20.1.T
+    services:
+      routericmp:
+        port: 1
+  
 
 official-virtual-machines: 
   router:                 

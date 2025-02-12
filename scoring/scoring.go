@@ -1,51 +1,5 @@
 package scoring
 
-/*
-TODO:
-	When implementing the new scoring system, consider this:
-		- Some services need to be segmented into new forms. For instance, instead of just "web" being a scoring type we can have options
-			- WebHTTP (Port 80)
-			- WebContent (The actual content of the website)
-			- WebSSL (Port 443)
-		- Some services should have the option to be partially scored, for instance the database
-			- SQL Login
-				- Partial points would be awarded for being able to log into the database but not having the correct RW permissions
-
-	Full list of new services:
-		WEB NEW
-			- WebHTTP			(Score based on if something is accessible on port 80)
-				- No partial awarded
-			- WebContent		(Score based on if the website's content matches the expected content)
-				- Toggle for Advanced	(Score based on if a user can be created on the website)
-			- WebSSL			(Score based on if something is accessible on port 443)
-				- No partial awarded
-		ROUTER NEW
-			- RouterICMP		(Score based on if the router can be pinged via ICMP)
-				- No partial awarded
-		SSH NEW
-			- SSHLogin			(Score based on if the SSH user can log into the server)
-				- No partial awarded
-		FTP NEW
-			- FTPLogin			(Score based on if the FTP user can log into the server)
-				- No partial awarded
-			- FTPWrite			(Score based on if the FTP user can write to the files expected)
-				- No partial awarded
-			- FTPRead			(Score based on if the FTP user can read the files expected)
-				- No partial awarded
-		DATABASE NEW
-			- SQLLogin			(Score based on if the SQL user can log into the database and execute read commands)
-				- Partial awarded if the user can access but not read/write
-		DNS NEW
-			- DNSInternalFWD	(Score based on if the DNS forward zone is working for all required machines in the internal network)
-				- Partial awarded for each domain that works as a portion of the total score
-			- DNSInternalREV	(Score based on if the DNS reverse zone is working for all required machines in the internal network)
-				- Partial awarded for each domain that works as a portion of the total score
-			- DNSExternalFWD	(Score based on if the DNS forward zone is working for all required machines in the external network)
-				- Partial awarded for each domain that works as a portion of the total score
-			- DNSExternalREV	(Score based on if the DNS reverse zone is working for all required machines in the external network)
-				- Partial awarded for each domain that works as a portion of the total score
-*/
-
 import (
 	"context"
 	"database/sql"
@@ -61,14 +15,18 @@ import (
 
 var (
 	// Vars
-	ScoringEnabled   bool
-	ScoringPaused    bool
-	ScoringIteration int // The current iteration of scoring, i.e. the 50th round of scoring
-	RefreshTime      int // How long to wait between scoring rounds
+
+	ScoringEnabled   bool      // Whether scoring has been enabled yet
+	ScoringKilled    bool      // Represents when an order to cease scoring comes through
+	ScoringPaused    bool      // Represents when scoring has been paused
+	ScoringIteration int       // The current iteration of scoring, i.e. the 50th round of scoring
+	RefreshTime      int  = 15 // How long to wait (in seconds) between scoring rounds
+	ScoringRound     int       // The current round of scoring
 	// Pointers
-	logger     *logging.Logger
-	db         *sql.DB
-	yamlConfig *enum.YamlConfig
+
+	logger     *logging.Logger  // Pointer to the active logger
+	db         *sql.DB          // Pointer to the active DB connection
+	yamlConfig *enum.YamlConfig // Pointer to the loaded yaml configuration
 )
 
 /*
@@ -88,6 +46,8 @@ func Initalize(newdb *sql.DB, newyamlConfig *enum.YamlConfig, newlogger *logging
 	db = newdb
 	yamlConfig = newyamlConfig
 
+	ScoringRound = 0 // Set the scoring round to 0
+
 	logging.ConsoleLogMessage("Loading teams...")
 	// The second step is to add all the teams from the yaml configuration to the database
 	for _, team := range yamlConfig.Teams {
@@ -106,6 +66,16 @@ func Initalize(newdb *sql.DB, newyamlConfig *enum.YamlConfig, newlogger *logging
 			}
 		}
 		logging.ConsoleLogSuccess(fmt.Sprintf("Team %s services loaded.", team.Name))
+	}
+
+	// Scoring loop
+	for {
+		if ScoringEnabled || ScoringPaused {
+			score()
+			time.Sleep(time.Second * time.Duration(RefreshTime))
+		} else if ScoringKilled {
+			break
+		}
 	}
 
 	return nil
@@ -153,6 +123,7 @@ func addServicesToTeam(db *sql.DB, teamID int, vmName string, vm enum.VirtualMac
 // The function called to score all included services.
 func score() error {
 	// First retrieve all teams in the database to account for created/deleted teams
+	ScoringRound += 1
 	teams, err := database.GetAllTeams(db)
 	if err != nil {
 		logger.LogMessage(fmt.Sprintf("Error occured while getting teams from the database: %v", err), "ERROR")
@@ -206,8 +177,12 @@ func score() error {
 				// at this point we already tried, whatever
 			}
 
+			logger.LogMessage(fmt.Sprintf("Service %s was successfully scored UP: %b AWARD: %d", serviceName, status, award), "DEBUG")
+
 		}
 	}
+
+	logger.LogMessage(fmt.Sprintf("Finished scoring round %d", ScoringRound), "INFO")
 
 	return nil
 }
@@ -273,6 +248,7 @@ func StopEngine() {
 	}
 	ScoringEnabled = false
 	ScoringPaused = false
+	ScoringKilled = true
 	logging.ConsoleLogSuccess("Engine stopped.")
 }
 

@@ -1,4 +1,4 @@
-web:              # Required, one service
+web80:              # Required, one valid service
   port: 80        # Required, service needs at least a port
   # Services might also include the following optional fields
   award: 15             # The amount of points awarded for success

@@ -4,10 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"time"
 
+	"github.com/LTSEC/NEST/api"
 	"github.com/LTSEC/NEST/cli"
 	"github.com/LTSEC/NEST/database"
 	"github.com/LTSEC/NEST/enum"
@@ -102,14 +104,25 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Set up RESTful API
+	router := api.SetupRouter(db)
+
 	// Clear the console before CLI runs
 	fmt.Print("\033[H\033[2J")
 
 	// Initalize the services
 	services.Initalize()
 
-	// Finish by running the CLI
-	cli.RunCLI(db, Version, logger)
+	// Run the CLI
+	go cli.RunCLI(db, Version, logger)
+
+	// Finish by hosting the RESTful API
+	if err := http.ListenAndServe(":8080", router); err != nil {
+		logger.LogMessage(fmt.Sprintf("There was an error starting the REST API: %v", err), "ERROR")
+		logging.ConsoleLogError("Error starting the REST API, see logs for details.")
+		logging.ConsoleLogError("Startup failed")
+		os.Exit(1)
+	}
 }
 
 // getEnv fetches an environment variable or returns a default value

@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import useTeamHandler from "../TeamHandler";
 import { MantineProvider } from "@mantine/core";
 import '@mantine/core/styles.css';
 import { BarChart } from '@mantine/charts';
@@ -12,12 +11,6 @@ const data = [
     {name: "team4", score: 4386, color: "#89CFF0"},
 
 ]
-
-interface Team {
-    name: string;
-    score: number;
-    color: string;
-  }
 
 const ScoreGraph = () => {
     //const teamData = useTeamHandler("/api/getallteamdata");

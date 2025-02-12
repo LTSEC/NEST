@@ -11,7 +11,7 @@ virtual-machines:
 official-virtual-machines: 
   router:                 
     ip: 10.20.0.1
-  scoring-engine:
+  scorer:
     ip: 10.20.0.5
   dns:
     ip: 10.20.0.10

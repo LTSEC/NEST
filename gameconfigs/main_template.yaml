@@ -18,7 +18,7 @@ virtual-machines:           # Required
 official-virtual-machines: # Required
   router:                  # You have to include three virtual machines here: router, scorer, dns
     ip: 10.20.0.1
-  scoring-engine:
+  scorer:
     ip: 10.20.0.5
   dns:
     ip: 10.20.0.10

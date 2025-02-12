@@ -8,6 +8,14 @@ virtual-machines:
     ip-schema: 192.168.t.5
     config: web.yaml
 
+official-virtual-machines: 
+  router:                 
+    ip: 10.20.0.1
+  scoring-engine:
+    ip: 10.20.0.5
+  dns:
+    ip: 10.20.0.10
+
 teams:
   team1:
     id: 1

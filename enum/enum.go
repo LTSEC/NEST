@@ -11,8 +11,9 @@ type DatabaseConfig struct {
 
 // YamlConfig is the root struct for the YAML configuration.
 type YamlConfig struct {
-	VirtualMachines map[string]VirtualMachine `yaml:"virtual-machines"`
-	Teams           map[string]Team           `yaml:"teams"`
+	VirtualMachines         map[string]VirtualMachine         `yaml:"virtual-machines"`
+	OfficialVirtualMachines map[string]OfficialVirtualMachine `yaml:"official-virtual-machines"`
+	Teams                   map[string]Team                   `yaml:"teams"`
 }
 
 // VirtualMachine represents a virtual machine configuration.
@@ -59,4 +60,9 @@ type ScoringTeam struct {
 	ID    int    // Corresponds to team_id in the database
 	Name  string // Corresponds to team_name in the database
 	Color string // Corresponds to team_color in the database
+}
+
+// Official competition virtual machines
+type OfficialVirtualMachine struct {
+	IP string
 }

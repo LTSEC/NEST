@@ -90,8 +90,9 @@ func queryDNS(resolver, domain string, qtype uint16) ([]string, error) {
 
 // ScoreDNSExternalFwd checks that for each line in the query file,
 // a forward DNS query (A record) for the external domain returns the expected external IP.
-// The team number is derived from the resolver’s last octet.
+// The team number is derived from the resolver’s last octet (but the actual DNS server is now 10.20.0.10).
 func ScoreDNSExternalFwd(service enum.Service, address string) (int, bool, error) {
+	// If you still need the team number for domain/IP token replacements:
 	team, err := getTeamNumberFromAddress(address, "external")
 	if err != nil {
 		return 0, false, err
@@ -106,7 +107,7 @@ func ScoreDNSExternalFwd(service enum.Service, address string) (int, bool, error
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		line := scanner.Text()
-		// Skip empty lines.
+		// Skip empty lines
 		if strings.TrimSpace(line) == "" {
 			continue
 		}
@@ -116,17 +117,20 @@ func ScoreDNSExternalFwd(service enum.Service, address string) (int, bool, error
 			return 0, false, fmt.Errorf("invalid query file format: %s", line)
 		}
 
-		// Replace "<t>" with team number.
+		// Replace "<t>" with team number
 		expectedIP := replaceTeamToken(fields[0], team)
 		domain := replaceTeamToken(fields[1], team)
 
-		// Query for an A record.
-		results, err := queryDNS(address, domain, dns.TypeA)
+		// Use the config's official DNS as the DNS for external scoring
+		dnsServer := cfg.OfficialVirtualMachines["dns"].IP
+
+		// Query for an A record
+		results, err := queryDNS(dnsServer, domain, dns.TypeA)
 		if err != nil {
 			return 0, false, fmt.Errorf("DNS A query for %s failed: %v", domain, err)
 		}
 
-		// Check that the expected IP is present.
+		// Check that the expected IP is present
 		found := false
 		for _, ip := range results {
 			if ip == expectedIP {
@@ -135,7 +139,8 @@ func ScoreDNSExternalFwd(service enum.Service, address string) (int, bool, error
 			}
 		}
 		if !found {
-			return 0, false, fmt.Errorf("external forward lookup mismatch for %s: got %v, expected %s", domain, results, expectedIP)
+			return 0, false, fmt.Errorf("external forward lookup mismatch for %s: got %v, expected %s",
+				domain, results, expectedIP)
 		}
 	}
 	if err := scanner.Err(); err != nil {
@@ -147,8 +152,9 @@ func ScoreDNSExternalFwd(service enum.Service, address string) (int, bool, error
 
 // ScoreDNSExternalRev checks that for each line in the query file,
 // a reverse DNS (PTR) query for the external IP returns the expected external domain.
-// The team number is derived from the resolver’s last octet.
+// The team number is derived from the resolver’s last octet (but the actual DNS server is now 10.20.0.10).
 func ScoreDNSExternalRev(service enum.Service, address string) (int, bool, error) {
+	// If you still need the team number for domain/IP token replacements:
 	team, err := getTeamNumberFromAddress(address, "external")
 	if err != nil {
 		return 0, false, err
@@ -175,19 +181,22 @@ func ScoreDNSExternalRev(service enum.Service, address string) (int, bool, error
 		expectedIP := replaceTeamToken(fields[0], team)
 		expectedDomain := replaceTeamToken(fields[1], team)
 
-		// Compute the reverse lookup (PTR) domain.
+		// Compute the reverse lookup (PTR) domain
 		ptrDomain, err := reverseIP(expectedIP)
 		if err != nil {
 			return 0, false, fmt.Errorf("failed to compute PTR domain for %s: %v", expectedIP, err)
 		}
 
-		// Query for a PTR record.
-		results, err := queryDNS(address, ptrDomain, dns.TypePTR)
+		// Use the config's official DNS as the DNS for external scoring
+		dnsServer := cfg.OfficialVirtualMachines["dns"].IP
+
+		// Query for a PTR record
+		results, err := queryDNS(dnsServer, ptrDomain, dns.TypePTR)
 		if err != nil {
 			return 0, false, fmt.Errorf("DNS PTR query for %s failed: %v", ptrDomain, err)
 		}
 
-		// Normalize the expected domain as an FQDN.
+		// Normalize the expected domain as an FQDN
 		fqdnExpected := dns.Fqdn(expectedDomain)
 		found := false
 		for _, ptr := range results {
@@ -197,7 +206,8 @@ func ScoreDNSExternalRev(service enum.Service, address string) (int, bool, error
 			}
 		}
 		if !found {
-			return 0, false, fmt.Errorf("external reverse lookup mismatch for %s: got %v, expected %s", expectedIP, results, fqdnExpected)
+			return 0, false, fmt.Errorf("external reverse lookup mismatch for %s: got %v, expected %s",
+				expectedIP, results, fqdnExpected)
 		}
 	}
 	if err := scanner.Err(); err != nil {

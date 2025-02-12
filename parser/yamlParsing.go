@@ -33,6 +33,9 @@ func ParseYAML(configsFolder, path string) (*enum.YamlConfig, error) {
 	if cfg.VirtualMachines == nil {
 		return nil, errors.New(`configuration missing required "virtual-machines" section`)
 	}
+	if cfg.OfficialVirtualMachines == nil {
+		return nil, errors.New(`configuration missing required "official-virtual-machines" section`)
+	}
 	if cfg.Teams == nil {
 		return nil, errors.New(`configuration missing required "teams" section`)
 	}
@@ -47,6 +50,28 @@ func ParseYAML(configsFolder, path string) (*enum.YamlConfig, error) {
 	// Ensure there is at least one virtual machine.
 	if len(cfg.VirtualMachines) == 0 {
 		return nil, errors.New("there must be at least one virtual machine defined")
+	}
+
+	if len(cfg.OfficialVirtualMachines) < 3 {
+		return nil, errors.New("there must be router, scorer, and dns official virtual machines defined")
+	}
+
+	// Check to make sure the three vms in OfficialVirtualMachines are named correctly
+	required := []string{"router", "scorer", "dns"}
+	var missing []string
+
+	for _, key := range required {
+		if _, ok := cfg.OfficialVirtualMachines[key]; !ok {
+			missing = append(missing, key)
+		}
+	}
+
+	if len(missing) > 0 {
+		var quoted []string
+		for _, m := range missing {
+			quoted = append(quoted, "'"+m+"'")
+		}
+		return nil, fmt.Errorf("missing official VMs %s in config", strings.Join(quoted, ", "))
 	}
 
 	// Process each virtual machine.

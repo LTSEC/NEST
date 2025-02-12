@@ -15,6 +15,14 @@ virtual-machines:           # Required
     ip-schema: 192.168.t.5  # T can be lowercase
     config: web.yaml        # Alternative, service configurations can be in other yaml files (see web_template.yaml)
 
+official-virtual-machines: # Required
+  router:                  # You have to include three virtual machines here: router, scorer, dns
+    ip: 10.20.0.1
+  scoring-engine:
+    ip: 10.20.0.5
+  dns:
+    ip: 10.20.0.10
+
 teams:                      # Required
   team1:                    # Required, must have at least 1 team
     id: 1                   # Required, must have an ID and must be more than 0

@@ -111,7 +111,7 @@ func main() {
 	fmt.Print("\033[H\033[2J")
 
 	// Initalize the services
-	services.Initalize()
+	services.Initalize(yamlConfig)
 
 	// Run the CLI
 	go cli.RunCLI(db, Version, logger)

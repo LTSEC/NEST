@@ -7,8 +7,6 @@ FROM golang:1.23.5 AS builder
 WORKDIR /app
 
 # Copy go.mod and go.sum, then download dependencies
-ENV GOPROXY=direct
-
 COPY go.mod go.sum ./
 RUN go mod download
 

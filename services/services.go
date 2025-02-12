@@ -23,6 +23,8 @@ const (
 var (
 	// Get the random seed for any random operations
 	randseed int
+	// Get official virtual machines
+	cfg *enum.YamlConfig
 )
 
 var ScoringDispatch = map[string]func(service enum.Service, address string) (int, bool, error){
@@ -39,9 +41,10 @@ var ScoringDispatch = map[string]func(service enum.Service, address string) (int
 	"routericmp": ScoreRouterICMP, // Check if the router can be pinged via ICMP and the engine can hear back
 }
 
-func Initalize() {
+func Initalize(gameConfig *enum.YamlConfig) {
 	// Set the random seed for any random operations
 	rand.Seed((uint64)(time.Now().Unix()))
+	cfg = gameConfig
 }
 
 // ChooseRandomUser reads the file at `dir`, which contains lines

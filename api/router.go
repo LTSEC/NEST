@@ -15,7 +15,13 @@ func SetupRouter(db *sql.DB) *chi.Mux {
 
 	// Team routes
 	r.Route("/teams", func(r chi.Router) {
-		r.Get("/", ListTeams(db))
+		r.Get("/", ListTeams(db))               // Basic list of every team and their data (except passwords)
+		r.Get("/scores", ListAllTeamScores(db)) // List of every team and their data and scores for each service
+		// List a specific team's scores
+		r.Route("/{teamID}", func(r chi.Router) {
+			r.Get("/scores", ListTeamScore(db))
+		})
+
 	})
 
 	return r

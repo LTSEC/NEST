@@ -11,7 +11,7 @@ import (
 // Returns all teams in the database as JSON
 func ListTeams(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		rows, err := db.Query("SELECT id, name, color FROM teams")
+		rows, err := db.Query("SELECT team_id, team_name, team_color FROM teams")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

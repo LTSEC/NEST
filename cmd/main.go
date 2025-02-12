@@ -117,12 +117,16 @@ func main() {
 	go cli.RunCLI(db, Version, logger)
 
 	// Finish by hosting the RESTful API
+	logger.LogMessage("RESTful API started.", "INFO")
+	logging.ConsoleLogSuccess("RESTful API started on port :8080.")
+
 	if err := http.ListenAndServe(":8080", router); err != nil {
 		logger.LogMessage(fmt.Sprintf("There was an error starting the REST API: %v", err), "ERROR")
 		logging.ConsoleLogError("Error starting the REST API, see logs for details.")
 		logging.ConsoleLogError("Startup failed")
 		os.Exit(1)
 	}
+
 }
 
 // getEnv fetches an environment variable or returns a default value

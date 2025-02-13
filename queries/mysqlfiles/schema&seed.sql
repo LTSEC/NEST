@@ -51,11 +51,3 @@ INSERT INTO locations (player_id, world_name, x_coord, y_coord, z_coord) VALUES
     (2, 'world', -200, 70, 300),
     (3, 'nether', 50, 40, -50),
     (4, 'end', 0, 100, 0);
-
--- Grant permissions
-GRANT ALL PRIVILEGES ON minecraft.* TO 'trump'@'localhost';
-GRANT SELECT, INSERT, UPDATE ON minecraft.* TO 'biden'@'localhost';
-GRANT SELECT ON minecraft.* TO 'obama'@'localhost';
-GRANT SELECT, INSERT ON minecraft.* TO 'bush'@'localhost';
-
-FLUSH PRIVILEGES;

@@ -1,8 +1,8 @@
 -- Create users with '%' to allow connections from any host
-CREATE USER 'trump'@'%' IDENTIFIED BY 'password123';
-CREATE USER 'biden'@'%' IDENTIFIED BY 'abc12345';
-CREATE USER 'obama'@'%' IDENTIFIED BY 'qwerty123';
-CREATE USER 'bush'@'%' IDENTIFIED BY '12345678';
+CREATE USER 'trump'@'%' IDENTIFIED BY 'skibidigronk';
+CREATE USER 'biden'@'%' IDENTIFIED BY 'sigmagamer';
+CREATE USER 'obama'@'%' IDENTIFIED BY 'ohiorizz';
+CREATE USER 'bush'@'%' IDENTIFIED BY 'fortnitebattlepass';
 
 -- Grant privileges
 GRANT ALL PRIVILEGES ON *.* TO 'trump'@'%';

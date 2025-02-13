@@ -31,16 +31,13 @@ func SetupRouter(db *sql.DB) *chi.Mux {
 	// TODO: create middlewares package
 	// e.g., r.Use(middleware.Logger)
 
-	// All routes
-	r.Route("/api", func(r chi.Router) {
-		// Team routes
-		r.Route("/teams", func(r chi.Router) {
-			r.Get("/", ListTeams(db))               // Basic list of every team and their data (except passwords)
-			r.Get("/scores", ListAllTeamScores(db)) // List of every team and their data and scores for each service
-			// List a specific team's scores
-			r.Route("/{teamID}", func(r chi.Router) {
-				r.Get("/scores", ListTeamScore(db))
-			})
+	// Team routes
+	r.Route("/teams", func(r chi.Router) {
+		r.Get("/", ListTeams(db))               // Basic list of every team and their data (except passwords)
+		r.Get("/scores", ListAllTeamScores(db)) // List of every team and their data and scores for each service
+		// List a specific team's scores
+		r.Route("/{teamID}", func(r chi.Router) {
+			r.Get("/scores", ListTeamScore(db))
 		})
 	})
 

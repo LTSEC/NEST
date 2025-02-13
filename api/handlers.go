@@ -5,9 +5,24 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/LTSEC/NEST/enum"
 	"github.com/go-chi/chi"
 )
+
+// ServiceInfo holds additional details for a service.
+type ServiceInfo struct {
+	Points           int  `json:"points"`
+	IsUp             bool `json:"is_up"`
+	SuccessfulChecks int  `json:"successful_checks"`
+	TotalChecks      int  `json:"total_checks"`
+}
+
+// TeamInfo aggregates team details and their associated services.
+type TeamInfo struct {
+	ID       int                    `json:"ID"`
+	Name     string                 `json:"Name"`
+	Color    string                 `json:"Color"`
+	Services map[string]ServiceInfo `json:"Services"`
+}
 
 // Returns all teams in the database as JSON
 func ListTeams(db *sql.DB) http.HandlerFunc {
@@ -19,10 +34,10 @@ func ListTeams(db *sql.DB) http.HandlerFunc {
 		}
 		defer rows.Close()
 
-		var teams []enum.Team
+		var teams []TeamInfo
 
 		for rows.Next() {
-			var t enum.Team
+			var t TeamInfo
 			if err := rows.Scan(&t.ID, &t.Name, &t.Color); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
@@ -51,22 +66,6 @@ func ListAllTeamScores(db *sql.DB) http.HandlerFunc {
 			return
 		}
 		defer rows.Close()
-
-		// ServiceInfo holds additional details for a service.
-		type ServiceInfo struct {
-			Points           int  `json:"points"`
-			IsUp             bool `json:"is_up"`
-			SuccessfulChecks int  `json:"successful_checks"`
-			TotalChecks      int  `json:"total_checks"`
-		}
-
-		// TeamInfo aggregates team details and their associated services.
-		type TeamInfo struct {
-			ID       int                    `json:"ID"`
-			Name     string                 `json:"Name"`
-			Color    string                 `json:"Color"`
-			Services map[string]ServiceInfo `json:"Services"`
-		}
 
 		// Map to aggregate team data: teamID -> TeamInfo
 		teamMap := make(map[int]*TeamInfo)

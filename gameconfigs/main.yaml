@@ -26,3 +26,8 @@ teams:
     name: team1
     password: team1
     color: "#02c21f"
+  team2:
+    id: 2
+    name: team2
+    password: team2
+    color: "#89CFF0"

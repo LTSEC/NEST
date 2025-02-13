@@ -35,12 +35,13 @@ func ListTeams(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-// Returns all teams and their scores for each service
+// Returns all teams and their scores for each service, including is_up, successful_checks, and total_checks
 func ListAllTeamScores(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Query all teams, their services, and the points of each service
+		// Query all teams, their services, and the points of each service along with additional fields
 		rows, err := db.Query(`
-            SELECT t.team_id, t.team_name, t.team_color, s.service_name, ts.points
+            SELECT t.team_id, t.team_name, t.team_color, s.service_name, 
+                   ts.points, ts.is_up, ts.successful_checks, ts.total_checks
             FROM teams AS t
             JOIN team_services AS ts ON t.team_id = ts.team_id
             JOIN services AS s ON s.service_id = ts.service_id
@@ -51,40 +52,58 @@ func ListAllTeamScores(db *sql.DB) http.HandlerFunc {
 		}
 		defer rows.Close()
 
-		// We'll store data first in a map: teamID -> aggregated data
-		type TeamInfo struct {
-			ID       int            `json:"ID"`
-			Name     string         `json:"Name"`
-			Color    string         `json:"Color"`
-			Services map[string]int `json:"Services"`
+		// ServiceInfo holds additional details for a service.
+		type ServiceInfo struct {
+			Points           int  `json:"points"`
+			IsUp             bool `json:"is_up"`
+			SuccessfulChecks int  `json:"successful_checks"`
+			TotalChecks      int  `json:"total_checks"`
 		}
+
+		// TeamInfo aggregates team details and their associated services.
+		type TeamInfo struct {
+			ID       int                    `json:"ID"`
+			Name     string                 `json:"Name"`
+			Color    string                 `json:"Color"`
+			Services map[string]ServiceInfo `json:"Services"`
+		}
+
+		// Map to aggregate team data: teamID -> TeamInfo
 		teamMap := make(map[int]*TeamInfo)
 
-		// Read each row and add to our map
+		// Read each row and update the team map
 		for rows.Next() {
 			var (
-				teamID       int
-				teamName     string
-				teamColor    string
-				serviceName  string
-				serviceScore int
+				teamID           int
+				teamName         string
+				teamColor        string
+				serviceName      string
+				serviceScore     int
+				isUp             bool
+				successfulChecks int
+				totalChecks      int
 			)
-			if err := rows.Scan(&teamID, &teamName, &teamColor, &serviceName, &serviceScore); err != nil {
+			if err := rows.Scan(&teamID, &teamName, &teamColor, &serviceName, &serviceScore, &isUp, &successfulChecks, &totalChecks); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
 
-			// If we haven't seen this team yet, initialize its entry
+			// Initialize the team entry if it doesn't exist
 			if _, exists := teamMap[teamID]; !exists {
 				teamMap[teamID] = &TeamInfo{
 					ID:       teamID,
 					Name:     teamName,
 					Color:    teamColor,
-					Services: make(map[string]int),
+					Services: make(map[string]ServiceInfo),
 				}
 			}
-			// Add or update the service score for this team
-			teamMap[teamID].Services[serviceName] = serviceScore
+			// Set the service details for this team
+			teamMap[teamID].Services[serviceName] = ServiceInfo{
+				Points:           serviceScore,
+				IsUp:             isUp,
+				SuccessfulChecks: successfulChecks,
+				TotalChecks:      totalChecks,
+			}
 		}
 		// Check for iteration error
 		if err := rows.Err(); err != nil {
@@ -92,7 +111,7 @@ func ListAllTeamScores(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Convert map -> slice for JSON output
+		// Convert the map to a slice for JSON output
 		results := make([]TeamInfo, 0, len(teamMap))
 		for _, teamData := range teamMap {
 			results = append(results, *teamData)

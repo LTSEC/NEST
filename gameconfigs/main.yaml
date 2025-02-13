@@ -6,10 +6,10 @@ virtual-machines:
         port: 80
         query_file: queries/site_infos/site_info.html
   router:
-    ip-schema: 10.20.1.T
+    ip-schema: 10.20.1.t
     services:
       routericmp:
-        port: 1
+        port: -1
   
 
 official-virtual-machines: 

@@ -176,9 +176,6 @@ func score() error {
 				logger.LogMessage(fmt.Sprintf("Error occured while updating the score for service %s for team %d: %v", service.Name, team.ID, err), "ERROR")
 				// at this point we already tried, whatever
 			}
-
-			logger.LogMessage(fmt.Sprintf("Service %s was successfully scored UP: %b AWARD: %d", serviceName, status, award), "DEBUG")
-
 		}
 	}
 

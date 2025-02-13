@@ -6,8 +6,8 @@ const ShowGraphs = () => {
 
     return(
         <>
-            <div className="score"><ScoreGraph /></div>
-            <div className="status"><ServiceStatus /></div>
+            <div className="container"><ScoreGraph /></div>
+            <div className="container"><ServiceStatus /></div>
             
         </>
     );

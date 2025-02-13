@@ -25,7 +25,7 @@ const ScoreGraph = () => {
 
       return {
         label: team.Name,
-        value: totalScore + 10,
+        value: totalScore,
         color: team.Color || "#89CFF0",
       };
     });
@@ -41,18 +41,24 @@ const ScoreGraph = () => {
   return (
     <MantineProvider>
       <BarChart
-        w={600}
-        h={400}
+        style={{ width: "100%", height:"100%", }}
         withTooltip={false}
         withBarValueLabel={true}
-        valueLabelProps={{ fill: "black", fontSize: 12 }}
+        valueLabelProps={{ position: "inside", fill: "white", fontSize: 12 }}
         orientation="vertical"
         gridAxis="none"
-        maxBarWidth={7}
+        minBarSize={10}
+        maxBarWidth={15}
         data={chartData}
         dataKey="label"
         series={[{ name: "value", color: "color" }]}
-        title="Score Distribution by Teams"
+        xAxisProps={{
+          tick: { fill: "white", fontSize: 12 },
+        }}
+        yAxisProps={{
+          tick: { fill: "white", fontSize: 12 },
+        }}
+        title="Leaderboard"
       />
     </MantineProvider>
   );

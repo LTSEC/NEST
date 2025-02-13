@@ -14,7 +14,14 @@ const ServiceStatus = () => {
   return (
     <Card
       padding="sm"
-      style={{ display: "flex", justifyContent: "left", padding: 20 }}
+      style={{
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center", // Center vertically
+        padding: 20,
+        backgroundColor: "transparent",
+        width: "100%", // Ensure full width
+      }}
     >
       <div
         style={{
@@ -22,6 +29,8 @@ const ServiceStatus = () => {
           gridTemplateColumns: `auto repeat(${services.length}, 175px)`,
           gap: "2.5px",
           marginTop: "10px",
+          justifyContent: "center", // Center the grid horizontally
+          alignItems: "center", // Align grid items vertically
         }}
       >
         {/* Top-left corner empty cell */}
@@ -38,9 +47,10 @@ const ServiceStatus = () => {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
+              color: "white",
             }}
           >
-            {service}
+            {service.split("_")[1].toUpperCase()}
           </div>
         ))}
 
@@ -56,6 +66,7 @@ const ServiceStatus = () => {
                 alignItems: "center",
                 justifyContent: "right",
                 paddingRight: "15px",
+                color: "white",
               }}
             >
               {team.Name}

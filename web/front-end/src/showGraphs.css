@@ -1,0 +1,5 @@
+.score, .status {
+    display: inline-block; /* Aligns divs in a row */
+    vertical-align: top; /* Ensures they align properly */
+    text-align: center;
+}

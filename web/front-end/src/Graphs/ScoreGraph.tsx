@@ -27,6 +27,10 @@ const ScoreGraph = () => {
       };
     });
 
+    if (formattedTeams.length > 1) {
+        formattedTeams.sort((a,b) => b.value - a.value); // Sorts in descending order (so higher score will be on top)
+    }
+
     setChartData(formattedTeams);
   }, [teamData]);
 
@@ -35,9 +39,15 @@ const ScoreGraph = () => {
       <BarChart
         w={600}
         h={400}
+        withTooltip={false}
+        withBarValueLabel={true}
+        valueLabelProps={{fill: "black", fontSize: 12}}
+        orientation="vertical"
+        gridAxis="none"
+        maxBarWidth={7}
         data={chartData}
         dataKey="label"
-        series={[{ name: "Score", color: "#3498db" }]}
+        series={[{ name: "value", color: "color" }]}
         title="Score Distribution by Teams"
       />
     </MantineProvider>

@@ -12,12 +12,16 @@ RUN npm install
 
 # Copy the rest of the application files
 COPY . .
+COPY .env ./
 
 # Build the Vite app
 RUN npm run build
 
 # Stage 2: Serve the app with Nginx
 FROM nginx:alpine
+
+# Copy custom Nginx config
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Remove default nginx website
 RUN rm -rf /usr/share/nginx/html/*

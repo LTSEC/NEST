@@ -40,7 +40,7 @@ func ListAllTeamScores(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Query all teams, their services, and the points of each service
 		rows, err := db.Query(`
-            SELECT t.team_id, t.team_name, s.service_name, ts.points
+            SELECT t.team_id, t.team_name, t.team_color, s.service_name, ts.points
             FROM teams AS t
             JOIN team_services AS ts ON t.team_id = ts.team_id
             JOIN services AS s ON s.service_id = ts.service_id
@@ -55,6 +55,7 @@ func ListAllTeamScores(db *sql.DB) http.HandlerFunc {
 		type TeamInfo struct {
 			ID       int            `json:"ID"`
 			Name     string         `json:"Name"`
+			Color    string         `json:"Color"`
 			Services map[string]int `json:"Services"`
 		}
 		teamMap := make(map[int]*TeamInfo)
@@ -64,10 +65,11 @@ func ListAllTeamScores(db *sql.DB) http.HandlerFunc {
 			var (
 				teamID       int
 				teamName     string
+				teamColor    string
 				serviceName  string
 				serviceScore int
 			)
-			if err := rows.Scan(&teamID, &teamName, &serviceName, &serviceScore); err != nil {
+			if err := rows.Scan(&teamID, &teamName, &teamColor, &serviceName, &serviceScore); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
@@ -77,6 +79,7 @@ func ListAllTeamScores(db *sql.DB) http.HandlerFunc {
 				teamMap[teamID] = &TeamInfo{
 					ID:       teamID,
 					Name:     teamName,
+					Color:    teamColor,
 					Services: make(map[string]int),
 				}
 			}

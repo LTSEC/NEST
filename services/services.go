@@ -39,6 +39,10 @@ var ScoringDispatch = map[string]func(service enum.Service, address string) (int
 	"webssl":     ScoreWebSSLTLS,  // Secure connections
 	"webcontent": ScoreWebContent, // Check content against prepared content
 	"routericmp": ScoreRouterICMP, // Check if the router can be pinged via ICMP and the engine can hear back
+	"dnsexternalfwd": ScoreDNSExternalFwd,
+	"dnsexternalrev": ScoreDNSExternalRev,
+	"dnsinternalfwd": ScoreDNSInternalFwd,
+	"dnsinternalrev": ScoreDNSInternalRev,
 }
 
 func Initalize(gameConfig *enum.YamlConfig) {

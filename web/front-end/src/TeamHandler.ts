@@ -34,7 +34,13 @@ function useTeamHandler(apiUrl: string): Team[] {
       }
     };
 
+    // Fetch immediately and set interval to fetch every 5 seconds
     fetchTeams();
+    const intervalId = setInterval(fetchTeams, 5000);
+
+    // Cleanup function to clear interval when component unmounts (user goes to a different webpage)
+    //  or apiUrl changes
+    return () => clearInterval(intervalId);
   }, [apiUrl]);
 
   return teams;

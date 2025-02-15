@@ -10,7 +10,17 @@ virtual-machines:
     services:
       routericmp:
         port: -1
-  
+  dns:
+    ip-schema: 192.168.T.13
+    services:
+      dnsexternalfwd:
+        port: 53
+      dnsexternalrev:
+        port: 53
+      dnsinternalfwd:
+        port: 53
+      dnsinternalrev:
+        port: 53
 
 official-virtual-machines: 
   router:                 

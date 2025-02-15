@@ -34,7 +34,7 @@ func getTeamNumberFromAddress(address, mode string) (string, error) {
 	switch mode {
 	case "external":
 		// Last octet
-		return parts[3], nil
+		return parts[2], nil
 	case "internal":
 		// Third octet (0-indexed)
 		return parts[2], nil
@@ -125,7 +125,7 @@ func ScoreDNSExternalFwd(service enum.Service, address string) (int, bool, error
 		dnsServer := cfg.OfficialVirtualMachines["dns"].IP
 
 		// Query for an A record
-		results, err := queryDNS(dnsServer, domain, dns.TypeA)
+		results, err := queryDNS(dnsServer+":53", domain, dns.TypeA)
 		if err != nil {
 			return 0, false, fmt.Errorf("DNS A query for %s failed: %v", domain, err)
 		}
@@ -191,7 +191,7 @@ func ScoreDNSExternalRev(service enum.Service, address string) (int, bool, error
 		dnsServer := cfg.OfficialVirtualMachines["dns"].IP
 
 		// Query for a PTR record
-		results, err := queryDNS(dnsServer, ptrDomain, dns.TypePTR)
+		results, err := queryDNS(dnsServer+":53", ptrDomain, dns.TypePTR)
 		if err != nil {
 			return 0, false, fmt.Errorf("DNS PTR query for %s failed: %v", ptrDomain, err)
 		}
@@ -247,7 +247,7 @@ func ScoreDNSInternalFwd(service enum.Service, address string) (int, bool, error
 		expectedIP := replaceTeamToken(fields[2], team)
 		domain := replaceTeamToken(fields[3], team)
 
-		results, err := queryDNS(address, domain, dns.TypeA)
+		results, err := queryDNS(address+":53", domain, dns.TypeA)
 		if err != nil {
 			return 0, false, fmt.Errorf("DNS A query for %s failed: %v", domain, err)
 		}
@@ -305,7 +305,7 @@ func ScoreDNSInternalRev(service enum.Service, address string) (int, bool, error
 			return 0, false, fmt.Errorf("failed to compute PTR domain for %s: %v", expectedIP, err)
 		}
 
-		results, err := queryDNS(address, ptrDomain, dns.TypePTR)
+		results, err := queryDNS(address+":53", ptrDomain, dns.TypePTR)
 		if err != nil {
 			return 0, false, fmt.Errorf("DNS PTR query for %s failed: %v", ptrDomain, err)
 		}

@@ -1,5 +1,6 @@
 import ScoreGraph from "./Graphs/ScoreGraph";
 import ServiceStatus from "./Graphs/ServiceStatus";
+import ServiceUptime from "./Graphs/ServiceUptime";
 import './showGraphs.css'
 
 const ShowGraphs = () => {
@@ -8,7 +9,7 @@ const ShowGraphs = () => {
         <>
             <div className="container"><ScoreGraph /></div>
             <div className="container"><ServiceStatus /></div>
-            
+            <div className="container"><ServiceUptime /></div>            
         </>
     );
 }

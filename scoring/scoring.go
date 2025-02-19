@@ -7,139 +7,95 @@ import (
 	"strings"
 	"time"
 
-	"github.com/LTSEC/scoring-engine/config"
-	"github.com/LTSEC/scoring-engine/database"
-	"github.com/LTSEC/scoring-engine/logging"
+	"github.com/LTSEC/NEST/database"
+	"github.com/LTSEC/NEST/enum"
+	"github.com/LTSEC/NEST/logging"
+	"github.com/LTSEC/NEST/services"
 )
 
 var (
-	ScoringOn   bool
-	logger      *logging.Logger
-	TeamNames   []string
-	RefreshTime int
+	// Vars
+
+	ScoringEnabled   bool      // Whether scoring has been enabled yet
+	ScoringKilled    bool      // Represents when an order to cease scoring comes through
+	ScoringPaused    bool      // Represents when scoring has been paused
+	ScoringIteration int       // The current iteration of scoring, i.e. the 50th round of scoring
+	RefreshTime      int  = 15 // How long to wait (in seconds) between scoring rounds
+	ScoringRound     int       // The current round of scoring
+	// Pointers
+
+	logger     *logging.Logger  // Pointer to the active logger
+	db         *sql.DB          // Pointer to the active DB connection
+	yamlConfig *enum.YamlConfig // Pointer to the loaded yaml configuration
 )
 
-const (
-	ftpTimeout    = 250 * time.Millisecond
-	sshTimeout    = 250 * time.Millisecond
-	successPoints = 1 // Points awarded if a service is successful
-)
+/*
+Initalize begins the first processeses to make scoring work, importing teams and services into the database,
+and creating links between them, to facilitate scoring.
+The function takes in the following values:
 
-type Team struct {
-	ID    int    // Corresponds to team_id in the database
-	Name  string // Corresponds to team_name in the database
-	Color string // Corresponds to team_color in the database
-}
+	cfg:			A database configuration, the one that is used in the CLI and database packages
+	yamlConfig:		The main yaml configuration file that is loaded at startup of the program
+	newlogger:		The logger that is responsible for logging all message in the program
+*/
+func Initalize(newdb *sql.DB, newyamlConfig *enum.YamlConfig, newlogger *logging.Logger) error {
+	// First step in initalizing the scoring of services is connecting to the database
+	logger = newlogger
+	logger.LogMessage("Scoring initalization started.", "STATUS")
 
-type Service struct {
-	ID       int    // Corresponds to service_id in the database
-	Name     string // Corresponds to service_name in the database
-	BoxName  string // Corresponds to box_name in the database
-	Disabled bool   // Corresponds to disabled in the database
-}
+	db = newdb
+	yamlConfig = newyamlConfig
 
-// Starts the whole scoring process by connecting to the local database and
-// adding the teams and services to the local database
-func ScoringStartup(cfg database.Config, yamlConfig *config.Yaml) error {
-	logger = new(logging.Logger)
-	logger.StartLog()
-	logger.LogMessage("Scoring started up.", "INFO")
+	ScoringRound = 0 // Set the scoring round to 0
 
-	RefreshTime = 15
-	ScoringOn = false
-
-	db, err := connectToDatabase(cfg)
-	if err != nil {
-		logger.LogMessage("Failed to connect to PostgreSQL database.", "ERROR")
-		return fmt.Errorf("failed to connect to PostgreSQL: %w", err)
-	}
-	defer db.Close()
-	logger.LogMessage("Connected to PostgreSQL database.", "INFO")
-
-	// Add admins to the database
-	query := `INSERT INTO admin_users (name, password) VALUES ($1, $2) ON CONFLICT (name) DO NOTHING;`
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	_, err = db.ExecContext(ctx, query, "admin", "admin")
-	if err != nil {
-		// No logger initalized here yet
-	}
-
-	// Add teams from YAML config to the database
+	logging.ConsoleLogMessage("Loading teams...")
+	// The second step is to add all the teams from the yaml configuration to the database
 	for _, team := range yamlConfig.Teams {
-		// Add the team to the database
-		if err := addTeamToDatabase(db, team); err != nil {
-			logger.LogMessage(fmt.Sprintf("Failed to add team %s to the database: %v", team.Name, err), "ERROR")
-			return fmt.Errorf("failed to add team %s to the database: %w", team.Name, err)
+		// Add the team
+		if err := database.AddTeamToDatabase(db, team, nil); err != nil {
+			logger.LogMessage(fmt.Sprintf("Error occured while adding team %s to the database: %v", team.Name, err), "ERROR")
+			return err
 		}
-		logger.LogMessage(fmt.Sprintf("Team %s added to the database.", team.Name), "INFO")
+		logging.ConsoleLogSuccess(fmt.Sprintf("Team %s loaded, loading services...", team.Name))
 
-		// For each team, loop over boxes to add the box's services to the team
-		for boxName, box := range yamlConfig.Boxes {
-			if err := addServicesToTeam(db, team.ID, boxName, box); err != nil {
-				logger.LogMessage(fmt.Sprintf("Failed to add services for team %s from box %s: %v", team.Name, boxName, err), "ERROR")
-				return fmt.Errorf("failed to add services for team %s from box %s: %w", team.Name, boxName, err)
+		// If the team was added successfully, we add each virtual machine's services to the team
+		for vmName, vm := range yamlConfig.VirtualMachines {
+			if err := addServicesToTeam(db, team.ID, vmName, vm); err != nil {
+				logger.LogMessage(fmt.Sprintf("Error occured while adding service on box %s to team %s: %v", vmName, team.Name, err), "ERROR")
+				return fmt.Errorf("failed to add services for team %s from box %s: %w", team.Name, vmName, err)
 			}
-			logger.LogMessage(fmt.Sprintf("Services from box %s added to team %s.", boxName, team.Name), "INFO")
 		}
+		logging.ConsoleLogSuccess(fmt.Sprintf("Team %s services loaded.", team.Name))
 	}
 
-	ticker := time.NewTicker(time.Duration(RefreshTime) * time.Second)
-	defer ticker.Stop()
-	rounds := 0 // for tracking the amount of scoring rounds processed
-
-	// Every *RefreshTime* seconds, score every service
-	for range ticker.C {
-		if ScoringOn {
-			rounds++
-			err := RunScoring(db, yamlConfig)
-			start_time := time.Now()
-			if err != nil {
-				fmt.Printf("Error running scoring: %v\n", err)
-			}
-			elapsed := time.Since(start_time)
-			seconds := elapsed / time.Second
-			milliseconds := elapsed.Milliseconds() % 1000
-
-			logger.LogMessage(
-				fmt.Sprintf("Scoring round %d took %d seconds and %d milliseconds.", rounds, seconds, milliseconds),
-				"STATUS",
-			)
+	// Scoring loop
+	for {
+		if ScoringEnabled || ScoringPaused {
+			score()
+			time.Sleep(time.Second * time.Duration(RefreshTime))
+		} else if ScoringKilled {
+			break
 		}
 	}
 
 	return nil
 }
 
-// Inserts a team into the database
-func addTeamToDatabase(db *sql.DB, team config.Team) error {
-	query := `INSERT INTO teams (team_id, team_name, team_password, team_color) VALUES ($1, $2, $3, $4) ON CONFLICT (team_name) DO NOTHING;`
+// addServicesToTeam does as its name implies, by taking in a teamID, vmName, and vm object it is able to map each service to a team for scoring.
+func addServicesToTeam(db *sql.DB, teamID int, vmName string, vm enum.VirtualMachine) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	_, err := db.ExecContext(ctx, query, team.ID, team.Name, team.Password, team.Color)
-	if err != nil {
-		logger.LogMessage(fmt.Sprintf("Failed to insert team into database: %s", err.Error()), "ERROR")
-	}
-	return nil
-}
-
-// Inserts a services into a team in the database
-func addServicesToTeam(db *sql.DB, teamID int, boxName string, box config.Box) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	for serviceName := range box.Services {
+	for serviceName := range vm.Services {
 		// Concatenate the box name with the service name for a unique service name
-		fullServiceName := fmt.Sprintf("%s_%s", boxName, serviceName)
+		fullServiceName := fmt.Sprintf("%s_%s", vmName, serviceName)
 
 		// Ensure the service with the parent box name exists in the services table
 		_, err := db.ExecContext(ctx, `
 			INSERT INTO services (service_name, box_name) 
 			VALUES ($1, $2) 
 			ON CONFLICT (service_name, box_name) DO NOTHING;
-		`, fullServiceName, boxName)
+		`, fullServiceName, vmName)
 		if err != nil {
 			logger.LogMessage(fmt.Sprintf("Failed to insert service %s into services table: %s", fullServiceName, err.Error()), "ERROR")
 			continue // Skip to the next service if there was an error
@@ -164,271 +120,172 @@ func addServicesToTeam(db *sql.DB, teamID int, boxName string, box config.Box) e
 	return nil
 }
 
-// Establishes a connection to the PostgreSQL database.
-func connectToDatabase(cfg database.Config) (*sql.DB, error) {
-	connStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-		cfg.Host, cfg.Port, cfg.User, cfg.Password, cfg.DBName)
-	db, err := sql.Open("postgres", connStr)
+// The function called to score all included services.
+func score() error {
+	// First retrieve all teams in the database to account for created/deleted teams
+	ScoringRound += 1
+	teams, err := database.GetAllTeams(db)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open connection to database: %w", err)
+		logger.LogMessage(fmt.Sprintf("Error occured while getting teams from the database: %v", err), "ERROR")
+		return fmt.Errorf("failed to retrieve teams from the database: %w", err)
 	}
 
-	// Test the connection
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := db.PingContext(ctx); err != nil {
-		return nil, fmt.Errorf("failed to connect to database: %w", err)
-	}
-
-	return db, nil
-}
-
-// The main loop for scoring
-func RunScoring(db *sql.DB, yamlConfig *config.Yaml) error {
-	// Retrieve all teams from the database
-	teams, err := getAllTeams(db)
-	if err != nil {
-		return fmt.Errorf("failed to retrieve teams: %w", err)
-	}
-
+	// Get the services for each team and score them
 	for _, team := range teams {
 		// Retrieve all services associated with the team
-		services, err := getTeamServices(db, team.ID)
+		services, err := database.GetTeamServices(db, team.ID)
 		if err != nil {
 			return fmt.Errorf("failed to retrieve services for team %d: %w", team.ID, err)
 		}
 
-		// Iterate over each service for the team
+		// Loop over services
 		for _, service := range services {
-			// Skip this service if it is disabled
 			if service.Disabled {
 				continue
 			}
 
-			// Locate the correct box configuration using box name
-			boxConfig, boxExists := yamlConfig.Boxes[service.BoxName]
-			if !boxExists {
-				logger.LogMessage(fmt.Sprintf("Box configuration for box %s not found in YAML config\n", service.BoxName), "INFO")
-				continue
+			// Locate the correct virtual machine
+			vmConfig, vmExists := yamlConfig.VirtualMachines[service.VMName]
+			if !vmExists {
+				logger.LogMessage(fmt.Sprintf("Error getting VM configuration for VM %s: configuration not found in YAML", service.VMName), "ERROR")
+				continue // don't attempt to score it
 			}
 
-			// Extract the actual service name by removing the box name prefix
-			// Expected format of `service.Name` is "boxName_serviceName"
+			// Get the actual service name and it's configuration
+			// Convert VMname_ServiceName to ServiceName
 			parts := strings.SplitN(service.Name, "_", 2)
 			if len(parts) != 2 {
-				logger.LogMessage(fmt.Sprintf("Service name %s does not have the expected format (box_service)\n", service.Name), "INFO")
-				continue
+				logger.LogMessage(fmt.Sprintf("Error getting service %s's service name: too many or too few parts, check formatting for extra underscores.", service.Name), "ERROR")
+				continue // don't attempt to score it
 			}
-			originalServiceName := parts[1]
-
-			// Get the specific service configuration within the box using the original service name
-			serviceConfig, serviceExists := boxConfig.Services[originalServiceName]
+			serviceName := parts[1]
+			serviceConfig, serviceExists := vmConfig.Services[serviceName]
 			if !serviceExists {
-				logger.LogMessage(fmt.Sprintf("Service configuration for %s in box %s not found in YAML config\n", originalServiceName, service.BoxName), "INFO")
-				continue
+				logger.LogMessage(fmt.Sprintf("Error getting service %s's configuration: configuration not found in YAML", service.Name), "ERROR")
+				continue // don't attempt to score it
 			}
 
-			// Pass relevant details including fourth_octet, but not the full IP address
-			// TODO: Update this interiorip stuff, since going through a router would cause issues
-			// FIX: i dont know
-			points, isUp, err := applyScoringFunction(
-				team.ID,
-				originalServiceName,
-				boxConfig.Ip,
-				serviceConfig.Port,
-				serviceConfig.BtUsername,
-				serviceConfig.BtPassword,
-				serviceConfig.DBName,
-				serviceConfig.DBPath,
-			)
+			// Once the services configuration, virtual machine configuration, and team are all acquired we can score the service
+			award, status, err := serviceSelector(team, serviceName, serviceConfig, vmConfig)
 			if err != nil {
-				logger.LogMessage(fmt.Sprintf("Error scoring team %d for service %s: %v", team.ID, service.Name, err), "INFO")
+				logger.LogMessage(fmt.Sprintf("Error occured when scoring service %s for team %d: %v", service.Name, team.ID, err), "ERROR")
+				continue // don't attempt to score it
 			}
 
-			// Update the score and status in the team_services table
-			err = updateServiceScore(db, team.ID, service.ID, points, isUp)
-			if err != nil {
-				logger.LogMessage(fmt.Sprintf("Failed to update score for team %d, service %s: %v", team.ID, service.Name, err), "INFO")
+			if err = database.UpdateServiceScore(db, team.ID, service.ID, award, status); err != nil {
+				logger.LogMessage(fmt.Sprintf("Error occured while updating the score for service %s for team %d: %v", service.Name, team.ID, err), "ERROR")
+				// at this point we already tried, whatever
 			}
 		}
 	}
+
+	logger.LogMessage(fmt.Sprintf("Finished scoring round %d", ScoringRound), "INFO")
 
 	return nil
 }
 
-// Gets all the teams from the SQL database
-func getAllTeams(db *sql.DB) ([]Team, error) {
-	query := "SELECT team_id, team_name, team_color FROM teams"
-	rows, err := db.Query(query)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var teams []Team
-	for rows.Next() {
-		var team Team
-		if err := rows.Scan(&team.ID, &team.Name, &team.Color); err != nil {
-			return nil, err
-		}
-		teams = append(teams, team)
-	}
-	return teams, nil
-}
-
-// Gets a team's services from the SQL database
-func getTeamServices(db *sql.DB, teamID int) ([]Service, error) {
-	query := `
-		SELECT s.service_id, s.service_name, s.box_name, s.disabled
-		FROM services s
-		JOIN team_services ts ON s.service_id = ts.service_id
-		WHERE ts.team_id = $1
-	`
-	rows, err := db.Query(query, teamID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var services []Service
-	for rows.Next() {
-		var service Service
-		if err := rows.Scan(&service.ID, &service.Name, &service.BoxName, &service.Disabled); err != nil {
-			return nil, err
-		}
-		services = append(services, service)
-	}
-	return services, nil
-}
-
-// Applies scoring of each service
-func applyScoringFunction(teamID int, serviceName string, baseIP string, port int, username string, password string, dbname string, dbpath string) (int, bool, error) {
-	address, err := constructIPAddress(baseIP, teamID)
+// Service selector selects the correct service and scores it, returning the amount of points
+// that need to be added to a team. Any new services need to be included here.
+func serviceSelector(scoredTeam enum.ScoringTeam, serviceName string, scoredService enum.Service, scoredVM enum.VirtualMachine) (int, bool, error) {
+	address, err := constructIPAddress(scoredVM.IPSchema, scoredTeam.ID)
 	if err != nil {
 		return 0, false, fmt.Errorf("failed to construct IP address: %w", err)
 	}
 
-	// Apply the scoring function based on service type
-	switch serviceName {
-	case "ftp":
-		return ScoreFTP("/tests/ftpfiles", address, port, "tests/sshusers/users.txt")
-	case "web":
-		return ScoreWeb("/tests/site_infos/site_info.html", address, port)
-	case "ssh":
-		return ScoreSSH(address, port, "/tests/sshusers/users.txt")
-	case "db":
-		return ScoreDB(address, port, username, password, dbname, dbpath)
-	// Add cases for other services like web, dns, etc.
-	default:
+	scoringFunc, ok := services.ScoringDispatch[serviceName]
+	if !ok {
+		// unknown service
 		return 0, false, fmt.Errorf("unknown service %s", serviceName)
 	}
+	// Now call the scoring function
+	return scoringFunc(scoredService, address)
+
 }
 
-// Updates the points and status (is_up) of a team-service relationship in the database
-func updateServiceScore(db *sql.DB, teamID, serviceID, points int, isUp bool) error {
-	// Set up context with a timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-
-	// Start a transaction to ensure atomic operations
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("failed to start transaction: %w", err)
-	}
-
-	// Update points and status in team_services
-	queryUpdate := `
-	 UPDATE team_services
-	 SET 
-		 points = points + $1, 
-		 is_up = $2,
-		 total_checks = total_checks + 1,
-		 successful_checks = successful_checks + CASE WHEN $2 THEN 1 ELSE 0 END
-	 WHERE team_id = $3 AND service_id = $4
- `
-	_, err = tx.ExecContext(ctx, queryUpdate, points, isUp, teamID, serviceID)
-	if err != nil {
-		tx.Rollback()
-		return fmt.Errorf("failed to update team_services: %w", err)
-	}
-
-	queryInsert := `
-		INSERT INTO service_checks (team_service_id, status)
-		SELECT team_service_id, $1
-		FROM team_services
-		WHERE team_id = $2 AND service_id = $3
-	`
-	_, err = tx.ExecContext(ctx, queryInsert, isUp, teamID, serviceID)
-	if err != nil {
-		tx.Rollback()
-		return fmt.Errorf("failed to insert into service_checks: %w", err)
-	}
-
-	// Trim to keep only the last 10 checks
-	queryTrim := `
-		DELETE FROM service_checks
-		WHERE team_service_id = (
-			SELECT team_service_id
-			FROM team_services
-			WHERE team_id = $1 AND service_id = $2
-		)
-		AND check_id NOT IN (
-			SELECT check_id
-			FROM service_checks
-			WHERE team_service_id = (
-				SELECT team_service_id
-				FROM team_services
-				WHERE team_id = $1 AND service_id = $2
-			)
-			ORDER BY timestamp DESC
-			LIMIT 10
-		)
-	`
-	_, err = tx.ExecContext(ctx, queryTrim, teamID, serviceID)
-	if err != nil {
-		tx.Rollback()
-		return fmt.Errorf("failed to trim service_checks: %w", err)
-	}
-
-	// Commit the transaction
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
-	return nil
-}
-
-// Utility function that builds the IP address from the base IP, team ID, and fourth octet
-func constructIPAddress(baseIP string, teamID int) (string, error) {
+// Utility function that builds the IP address from the base IP, team ID, and fourth octet.
+//
+// Given a schema "192.168.T.5"
+//
+// Given a team ID "1"
+//
+// Would convert an ip schema "192.168.T.5" --> 192.168.1.5 if the team ID
+func constructIPAddress(schema string, teamID int) (string, error) {
 	// Split the base IP into quartets and check
-	ipParts := strings.Split(baseIP, ".")
+	ipParts := strings.Split(schema, ".")
 	if len(ipParts) != 4 {
-		return "", fmt.Errorf("invalid base IP format: %s", baseIP)
+		return "", fmt.Errorf("invalid IP schema format: %s", schema)
 	}
 
-	finalIp := strings.Replace(baseIP, "t", fmt.Sprintf("%d", teamID), 1) // Replace 192.168.t.5 --> 192.168.1.5
+	finalIp := strings.Replace(schema, "t", fmt.Sprintf("%d", teamID), 1)
+	finalIp = strings.Replace(finalIp, "T", fmt.Sprintf("%d", teamID), 1)
 
 	return finalIp, nil
 }
 
-// Utility function to toggle scoring on and off
-func ToggleScoring() string {
-	ScoringOn = !ScoringOn
-	state := "off"
-	if ScoringOn {
-		state = "on"
-	}
-	logger.LogMessage(fmt.Sprintf("Scoring is now %s", state), "INFO")
+// // // START ENGINE CONTROLS SECTION
 
-	return state
+// Enable the scoring engine by continuing the loop that checks services and scores them.
+// Scores immediately upon startup.
+func StartEngine() {
+	if ScoringEnabled {
+		logging.ConsoleLogError("Engine is already running.")
+		return
+	}
+	ScoringEnabled = true
+	ScoringPaused = false
+	logging.ConsoleLogSuccess("Engine started.")
 }
 
-// Utility function to get the scoring engine's scoring status (on/off)
-func ScoringStatus() string {
-	ScoringOn = !ScoringOn
-	state := "off"
-	if ScoringOn {
-		state = "on"
+// Disable the scoring engine by stopping the loop that checks services and scores them.
+// Exits the game, you cannot recontinue the game after stopping the scoring engine.
+func StopEngine() {
+	if !ScoringEnabled {
+		logging.ConsoleLogError("Engine is not running.")
+		return
 	}
-	return state
+	ScoringEnabled = false
+	ScoringPaused = false
+	ScoringKilled = true
+	logging.ConsoleLogSuccess("Engine stopped.")
+}
+
+// Pauses the scoring engine by temporarily stopping the loop that checks services and scores them.
+// The game can be resumed by resuming the engine afterwards.
+func PauseEngine() {
+	if !ScoringEnabled {
+		logging.ConsoleLogError("Engine is not running.")
+		return
+	}
+	if ScoringPaused {
+		logging.ConsoleLogError("Engine is already paused.")
+		return
+	}
+	ScoringPaused = true
+	logging.ConsoleLogSuccess("Engine paused.")
+}
+
+// Resumes the scoring engine by resuming in the loop that checks services and scores them.
+// This does not start scoring after stopping.
+func ResumeEngine() {
+	if !ScoringEnabled {
+		logging.ConsoleLogError("Engine is not running.")
+		return
+	}
+	if !ScoringPaused {
+		logging.ConsoleLogError("Engine is not paused.")
+		return
+	}
+	ScoringPaused = false
+	logging.ConsoleLogSuccess("Engine resumed.")
+}
+
+// Returns "paused", "running", or "stopped" depending on current engine state.
+func GetEngineState() string {
+	if ScoringEnabled {
+		if ScoringPaused {
+			return "paused"
+		}
+		return "running"
+	}
+	return "stopped"
 }

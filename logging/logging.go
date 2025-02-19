@@ -4,9 +4,12 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 )
+
+var fileName string
 
 type Logger struct {
 	logFile     *os.File
@@ -25,20 +28,50 @@ const (
 
 // create logger on the Main body and pass it to any routines. ensures the constructor is only called once
 // for the rest of its life time
+
+/*
+Starts logging for a specified logging instance. Automatically ensures that the constructore is only called once for its life time.
+USAGE:
+logger = new(logging.Logger)
+logger.StartLog()
+*/
 func (l *Logger) StartLog() error {
 	var err error
 	l.once.Do(func() {
 		err = l.initialize()
 	})
+
+	l.LogMessage("Logging started", "STATUS")
 	return err
 }
 
-// called in individual routines
+/*
+Logs a message to the logging instance's logfile
+USAGE:
+logger.LogMessage(<message>, <status type>)
+<message> Can be any string
+<status type> Can be any string, should be in the format ALLCAPS, examples are ERROR STATUS INFO
+*/
 func (l *Logger) LogMessage(msg string, status string) {
 	if l.initialized {
-		message := fmt.Sprintf(" %s: %s", status, msg)
+		message := fmt.Sprintf(" [%s]: %s", status, msg)
 		l.logger.Println(message)
 	}
+}
+
+// Logs a message to the user's active CLI with the nest prefix [Blue]
+func ConsoleLogMessage(msg string) {
+	log.Printf("| %s[nest]%s > %s", Blue, Reset, msg)
+}
+
+// Logs a message to the user's active CLI with the nest prefix [Green]
+func ConsoleLogSuccess(msg string) {
+	log.Printf("| %s[nest]%s > %s", Green, Reset, msg)
+}
+
+// Logs an error to the user's active CLI with the nest prefix [Red]
+func ConsoleLogError(msg string) {
+	log.Printf("| %s[nest]%s > %s", Red, Reset, msg)
 }
 
 // called whenever the Main code is finished as a cleanup
@@ -60,7 +93,7 @@ func (l *Logger) initialize() error {
 	var err error
 	filePath := getLogPath('/')
 	timeAndDate := time.Now().Format("2006-01-02 15-04-05")
-	fileName := fmt.Sprintf("%s%s.log", filePath, timeAndDate)
+	fileName = fmt.Sprintf("%s%s.log", filePath, timeAndDate)
 	l.logFile, err = os.Create(fileName)
 	if err != nil {
 		return err
@@ -70,38 +103,17 @@ func (l *Logger) initialize() error {
 	return nil
 }
 
-// Function for when a message is printed to the console by any package other than the CLI
-func Nextline() {
-	var currDirectory, err = os.Getwd()
-	if err != nil {
-		fmt.Println("directory error")
-	}
-	fmt.Print("SCORING-ENGINE " + currDirectory + "$ ")
-}
-
 // For creating a "Logs" folder in the directory. arguments are '\\' for windows and '/' for linux
 // currently it is set for Windows. if you want to change it, go to initialize and change it there.
 func getLogPath(fileSeparator byte) string {
-	var lastIndex int
-	// gets current directory
-	dirPath, err := os.Getwd()
+	// get current directory
+	dirPath, err := filepath.Abs("./")
 	if err != nil {
 		fmt.Println("Failed to get working directory")
 		return ""
 	}
-	// finds the index starting from right to left to find the delimiter's index
-	for i := len(dirPath) - 1; i >= 0; i-- {
-		if dirPath[i] == fileSeparator {
-			lastIndex = i
-			break
-		}
-	}
-	// truncates everything until that index. this gives us the base path
-	dirPath = dirPath[:lastIndex+1]
-	// joins "Logs" with the base path which is where we will store our Log files
-	newPath := fmt.Sprintf("%sLogs", dirPath)
-	fmt.Println("\n" + Green + "[LOGGER INITALIZED] " + Reset + "Directory: " + newPath)
-	Nextline()
+	newPath := filepath.Join(dirPath, "Logs")
+	ConsoleLogSuccess(fmt.Sprintf("Logger Initalized: %s", newPath))
 	// if the path doesn't exist, it creates one. may need to change the permissions later
 	if _, err := os.Stat(newPath); err != nil {
 		if os.IsNotExist(err) {
@@ -112,4 +124,8 @@ func getLogPath(fileSeparator byte) string {
 	// to create a file underneath this directory
 	newPath = fmt.Sprintf("%s%c", newPath, fileSeparator)
 	return newPath
+}
+
+func GetFilePath() string {
+	return fileName
 }

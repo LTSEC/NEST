@@ -2,7 +2,7 @@
 
 -- Teams Table
 CREATE TABLE teams (
-    team_id SERIAL PRIMARY KEY,
+    team_id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     team_name VARCHAR(50) UNIQUE NOT NULL,
     team_password TEXT NOT NULL,
     team_color TEXT NOT NULL
@@ -37,12 +37,6 @@ CREATE TABLE service_checks (
     timestamp TIMESTAMP DEFAULT now()  -- check time
 );
 
--- Admin User Table
-CREATE TABLE admin_users (
-    name TEXT PRIMARY KEY,
-    password TEXT NOT NULL
-);
-
 CREATE TABLE announcements (
     announcement_id SERIAL PRIMARY KEY,            -- Unique ID for each announcement
     title VARCHAR(255) NOT NULL,                   -- Title of the announcement
@@ -56,3 +50,4 @@ CREATE TABLE announcements (
 CREATE INDEX idx_team_services_team_id ON team_services(team_id);
 CREATE INDEX idx_team_services_service_id ON team_services(service_id);
 CREATE INDEX idx_service_checks_team_service ON service_checks(team_service_id, timestamp DESC);
+

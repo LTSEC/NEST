@@ -1,0 +1,43 @@
+virtual-machines:
+  webserver:
+    ip-schema: 192.168.T.5
+    services:
+      web80:
+        port: 80
+        query_file: queries/site_infos/site_info.html
+  router:
+    ip-schema: 10.20.1.t
+    services:
+      routericmp:
+        port: -1
+  dns:
+    ip-schema: 192.168.T.13
+    services:
+      dnsexternalfwd:
+        port: 53
+      dnsexternalrev:
+        port: 53
+      dnsinternalfwd:
+        port: 53
+      dnsinternalrev:
+        port: 53
+
+official-virtual-machines: 
+  router:                 
+    ip: 10.20.0.1
+  scorer:
+    ip: 10.20.0.5
+  dns:
+    ip: 10.20.0.10
+
+teams:
+  team1:
+    id: 1
+    name: team1
+    password: team1
+    color: "#02c21f"
+  team2:
+    id: 2
+    name: team2
+    password: team2
+    color: "#89CFF0"

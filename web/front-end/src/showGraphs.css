@@ -1,0 +1,10 @@
+.container {
+    background-color: #4c4c4c; 
+    border-radius: 8px;      
+    padding: 4px 8px;       
+    margin: 20px auto 0;       
+    display: block; /* Block instead of inline block, as we want graphs to sit one after another, vertically. */          
+    width: 80%;
+    height: 400px;
+}
+  

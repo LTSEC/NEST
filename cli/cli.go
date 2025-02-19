@@ -1,23 +1,28 @@
 package cli
 
 import (
-	"bufio"
+	"database/sql"
 	"fmt"
+	"io/ioutil"
+	"log"
 	"os"
-	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
-	"github.com/LTSEC/scoring-engine/config"
-	"github.com/LTSEC/scoring-engine/database"
-	"github.com/LTSEC/scoring-engine/scoring"
+	"github.com/LTSEC/NEST/database"
+	"github.com/LTSEC/NEST/enum"
+	"github.com/LTSEC/NEST/logging"
+	"github.com/LTSEC/NEST/scoring"
+	"github.com/chzyer/readline"
+	"golang.org/x/exp/rand"
 )
 
-var yamlConfig *config.Yaml
-var ScoringStarted = false
-var dbConfig database.Config
-var uptime int
-var lastUptimeCheck time.Time
+const (
+	auditLogFile  = "audit.log"
+	historyFile   = "cli_history.txt"
+	historyMaxLen = 100 // Maximum number of commands to keep in memory
+)
 
 const (
 	Red    = "\033[31m"
@@ -27,177 +32,276 @@ const (
 	Reset  = "\033[0m"
 )
 
-// The CLI takes in user input from stdin to execute predetermined commands.
-// This is intended to be the primary method of control for the scoring engine.
-//
-// Any input is tokenized into a slice, of which the first word is meant to act as the command.
-// The subsequent inputs are meant to be passed to a later function that is called by the command if applicable.
-//
-// If input does not match any commands for the engine, then the entire command is passed into bash for handling.
-func Cli(cfg database.Config) {
+// Engine state variables
+var engineRunning bool = false
+var enginePaused bool = false
+var logger *logging.Logger
+var rl *readline.Instance
 
-	dbConfig = cfg
-	var userInput string
+// Dummy data structures for users and teams
+type User struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Role     string `json:"role"`
+}
 
+type Team struct {
+	ID    int    `json:"id"`
+	Name  string `json:"name"`
+	Score int    `json:"score"`
+}
+
+// RunCLI is the entry point for the CLI. It accepts the database configuration
+// (or any other required configuration) and then enters a loop that reads user
+// input, logs the command, and dispatches the command to the appropriate handler.
+func RunCLI(db *sql.DB, Version string, newlogger *logging.Logger) {
+	// Configure readline with an ANSI-colored prompt and input filter.
+	var err error
+	rl, err = readline.NewEx(&readline.Config{
+		Prompt:          Blue + "[nest]" + Reset + " > ",
+		HistoryFile:     historyFile,
+		InterruptPrompt: "^C",
+		EOFPrompt:       "exit",
+		FuncFilterInputRune: func(r rune) (rune, bool) {
+			if r == readline.CharCtrlL { // Ctrl+L is intercepted.
+				clearTerminal()
+				return 0, false // Skip this rune.
+			}
+			return r, true
+		},
+	})
+	if err != nil {
+		log.Fatalf("failed to initialize readline: %v", err)
+	}
+	defer rl.Close()
+
+	// Main CLI loop.
 	for {
-		var currDirectory, err = os.Getwd()
+		line, err := rl.Readline()
 		if err != nil {
-			fmt.Println("directory error")
+			// Handle Ctrl+C: if interrupted, quit the CLI.
+			if err == readline.ErrInterrupt {
+				logging.ConsoleLogMessage("Exiting CLI.")
+				os.Exit(0)
+			} else if err.Error() == "EOF" {
+				// Continue on EOF to keep the CLI running.
+				continue
+			}
+			logging.ConsoleLogError(fmt.Sprintf("Error reading line: %v", err))
+			logger.LogMessage(fmt.Sprintf("Error reading line: %v", err), "ERROR")
+			os.Exit(2)
 		}
-		fmt.Print("SCORING-ENGINE " + currDirectory + "$ ")
-		userInput = inputParser()
 
-		// Skip empty input
-		if strings.TrimSpace(userInput) == "" {
+		// Clean up the line input.
+		line = strings.TrimSpace(line)
+		if line == "" {
 			continue
 		}
 
-		userInput = strings.TrimSuffix(userInput, "\r\n")
-		if userInput == "exit" {
-			break
+		// Check for the "clear" command.
+		if strings.ToLower(line) == "clear" {
+			clearTerminal()
+			continue
 		}
-		userArgs := tokenizer(userInput)
-		commandSelector(userArgs)
-	}
 
+		// Audit log the entered command.
+		auditLog(line)
+
+		// Process the command.
+		processCommand(line, db, Version)
+	}
 }
 
-func inputParser() string {
-	inputReader := bufio.NewReader(os.Stdin)
-	userInput, err := inputReader.ReadString('\n')
+// clearTerminal sends the ANSI escape sequence to clear the screen.
+func clearTerminal() {
+	// ANSI escape code to clear screen and move cursor to the home position.
+	fmt.Print("\033[H\033[2J")
+}
+
+// auditLog writes a timestamped log of each command to a file.
+func auditLog(action string) {
+	f, err := os.OpenFile(auditLogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		return ""
+		fmt.Printf("Error opening audit log file: %v\n", err)
+		return
 	}
-	return strings.TrimSpace(userInput)
-}
-
-func tokenizer(userInput string) []string {
-
-	return strings.Split(userInput, " ")
-
-}
-
-// Utility function that gets the current scoring engine uptime
-func getuptime() int {
-	if lastUptimeCheck.IsZero() {
-		lastUptimeCheck = time.Now()
+	defer f.Close()
+	timestamp := time.Now().Format(time.RFC3339)
+	logLine := fmt.Sprintf("%s: %s\n", timestamp, action)
+	if _, err := f.WriteString(logLine); err != nil {
+		fmt.Printf("Error writing to audit log file: %v\n", err)
 	}
-	elapsed := time.Since(lastUptimeCheck)
-	seconds := elapsed / time.Second
-	uptime += int(seconds)
-	lastUptimeCheck = time.Now()
-	return uptime
 }
 
-// switch statement for command selection
-func commandSelector(tokenizedInput []string) {
+// processCommand tokenizes the input and calls the appropriate function.
+func processCommand(input string, db *sql.DB, Version string) {
+	tokens := strings.Fields(input)
+	if len(tokens) == 0 {
+		return
+	}
+	cmd := strings.ToLower(tokens[0])
 
-	HelpOutput := `Available commands:
-	
-help
-	- Outputs some helpful information
-config / cf
-	- Recieves a path and parses the yaml config given
-defaultconfig / dc
-	- Loads the default configuration
-checkconfig / cc
-	- Outputs the currently parsed yaml config
-startup / start / up
-	- Starts the scoring engine in an off state (scoring not activated)
-toggle / score / tg
-	- Toggles the activity of the scoring engine
-status / stat
-	- Shows current state of the scoring engine
-quickstart / qs
-	- Loads the default configuration and starts the scoring engine in an off state (scoring not activated)
-
-exit (exits the CLI)
-`
-
-	// the switch acts on the first word of the command
-	// the idea is that you'd pass the remaining args to the requisit functions
-	switch tokenizedInput[0] {
+	switch cmd {
 	case "help":
-		fmt.Println(HelpOutput)
-	case "config", "cf":
-		if len(tokenizedInput) != 2 {
-			fmt.Println(Red + "[FAILURE] " + Reset + "The config requires a path")
-		} else {
-			yamlConfig = config.Parse(tokenizedInput[1])
-			fmt.Println(Green + "[SUCCESS] " + Reset + "Added config.")
-		}
-	case "defaultconfig", "dc":
-		yamlConfig = config.Parse("tests/default.yaml")
-		fmt.Println(Green + "[SUCCESS] " + Reset + "Added config.")
-	case "checkconfig", "cc":
-		fmt.Printf("%+v\n", yamlConfig)
-	case "startup", "start", "up":
-		if ScoringStarted == false && yamlConfig != nil {
-			uptime = 0
-			lastUptimeCheck = time.Now()
-			ScoringStarted = true
-			fmt.Println(Green + "[SUCCESS] " + Reset + "Run toggle to start scoring.")
-			go scoring.ScoringStartup(dbConfig, yamlConfig)
-		} else if yamlConfig == nil {
-			fmt.Println(Red + "[FAILURE] " + Reset + "Provide a config first.")
-		} else {
-			fmt.Println(Red + "[FAILURE] " + Reset + "The scoring engine has already been started.")
-		}
-	case "toggle", "score", "tg":
-		if ScoringStarted == false {
-			fmt.Println(Red + "[FAILURE] " + Reset + "Initalize the scoring engine first")
-		} else {
-			engine_status := scoring.ToggleScoring()
-			fmt.Printf(Green+"[SUCCESS] "+Reset+"Scoring engine toggled "+Yellow+"%s"+Reset+".\n", engine_status)
-		}
-	case "status", "stat":
-		fmt.Printf(Green+"[SUCCESS] "+Reset+"Scoring is currently "+Yellow+"%s"+Reset+".\n", scoring.ScoringStatus())
-	case "quickstart", "qs":
-		if ScoringStarted == false {
-			ScoringStarted = true
-			yamlConfig = config.Parse("tests/default.yaml")
-			fmt.Println(Green + "[SUCCESS] " + Reset + "Added config.")
-			fmt.Println(Green + "[SUCCESS] " + Reset + "Started. Run toggle to start scoring.")
-			go scoring.ScoringStartup(dbConfig, yamlConfig)
-		} else {
-			fmt.Println(Red + "[FAILURE] " + Reset + "The scoring engine has already been started.")
-		}
-	case "uptime", "ut":
-		fmt.Printf(Yellow+"[INFO] "+Reset+"Uptime: %ds\n", getuptime())
+		printHelp() // Assuming printHelp() internally uses logging or fmt, update if necessary
 	case "exit":
-		fmt.Println(Red + "[SHUTDOWN]")
+		logging.ConsoleLogMessage("Exiting CLI.")
 		os.Exit(0)
-
-	default:
-		if len(tokenizedInput[0]) > 0 {
-			bashInjection(tokenizedInput)
+	case "version", "--version":
+		printVersion(Version) // Assuming printVersion() internally uses logging or fmt, update if necessary
+	case "score":
+		// Expected: score check
+		if len(tokens) > 1 && tokens[1] == "check" {
+			if err := database.CheckTeamScores(db); err != nil {
+				logging.ConsoleLogError("Error checking team scores: " + err.Error())
+			}
 		} else {
-			fmt.Println("Invalid command.")
+			logging.ConsoleLogMessage("Usage: score check")
 		}
+	case "uptime":
+		// Expected: uptime validate
+		if len(tokens) > 1 && tokens[1] == "validate" {
+			if err := database.ValidateServiceUptime(db); err != nil {
+				logging.ConsoleLogError("Error validating service uptime: " + err.Error())
+			}
+		} else {
+			logging.ConsoleLogMessage("Usage: uptime validate")
+		}
+	case "report":
+		// Expected: report generate
+		if len(tokens) > 1 && tokens[1] == "generate" {
+			if err := database.GenerateReport(db); err != nil {
+				logging.ConsoleLogError("Error generating report: " + err.Error())
+			}
+		} else {
+			logging.ConsoleLogMessage("Usage: report generate")
+		}
+	case "team":
+		if len(tokens) < 2 {
+			logging.ConsoleLogMessage("Usage: team [create|edit|view]")
+			return
+		}
+		subcmd := strings.ToLower(tokens[1])
+		switch subcmd {
+		case "create":
+			// Usage: team create <name>
+			if len(tokens) != 3 {
+				logging.ConsoleLogMessage("Usage: team create <name>")
+				return
+			}
+
+			newTeam := enum.Team{
+				Name:  tokens[2],
+				Color: generateRandomColor(),
+			}
+
+			if err := database.AddTeamToDatabase(db, newTeam, rl); err != nil {
+				logging.ConsoleLogError("Error adding team to database: " + err.Error())
+			}
+		case "edit":
+			// Usage: team edit <id> <newname>
+			if len(tokens) != 4 {
+				logging.ConsoleLogMessage("Usage: team edit <id> <newname>")
+				return
+			}
+			id, err := strconv.Atoi(tokens[2])
+			if err != nil {
+				logging.ConsoleLogError("Invalid team ID. Must be an integer.")
+				return
+			}
+			if err := database.EditTeam(id, tokens[3], db); err != nil {
+				logging.ConsoleLogError("Error editing team: " + err.Error())
+			}
+		case "view":
+			if err := database.ViewTeams(db); err != nil {
+				logging.ConsoleLogError("Error viewing teams: " + err.Error())
+			}
+		default:
+			logging.ConsoleLogMessage("Unknown team command. Use: team [create|edit|view]")
+		}
+	case "logs":
+		// Expected: logs view <logtype>
+		if len(tokens) > 2 && tokens[1] == "view" {
+			switch tokens[2] {
+			case "audit":
+				viewAuditLogs() // Update if these use fmt internally
+			case "logs":
+				viewLogs() // Update if these use fmt internally
+			default:
+				logging.ConsoleLogError("Invalid log type.\nValid log types: 'audit' 'logs'")
+			}
+		} else {
+			logging.ConsoleLogMessage("Usage: logs view <logtype>")
+		}
+	case "start":
+		scoring.StartEngine()
+	case "stop":
+		scoring.StopEngine()
+	case "pause":
+		scoring.PauseEngine()
+	case "resume":
+		scoring.ResumeEngine()
+	case "state":
+		logging.ConsoleLogMessage(scoring.GetEngineState())
+	default:
+		logging.ConsoleLogError(fmt.Sprintf("Unknown command: %s. Type 'help' for available commands.", tokens[0]))
 	}
 }
 
-// function for injecting commands into bash
-func bashInjection(command []string) {
+func printHelp() {
+	helpText := `
+Available commands:
 
-	// run command guy with exec
-	// the .. thing lets you pass a slice as if it were a hard-coded , separated list
-	if command[0] != "cd" {
-		cmd := exec.Command(command[0], command[1:]...)
-		// force the output of cmd to be regular stdout
-		cmd.Stdout = os.Stdout
+  help                             					- Show this help message.
+  exit                             					- Exit the CLI.
+  version | --version              					- Show CLI version.
+  
+  score check                      					- Check team scores.
+  uptime validate                  					- Validate service uptime.
+  report generate                  					- Generate a YAML report.
 
-		// check for error and print
-		if err := cmd.Run(); err != nil {
-			fmt.Println("Couldn't run the guy", err)
-		}
-	} else {
-		if len(command) == 2 {
-			os.Chdir(command[1])
-		} else if len(command) < 2 {
-			fmt.Println("Please include dir")
-		} else {
-			fmt.Println("Too many arguments")
-		}
+  team create <name>           						- Create a new team.
+  team edit <id> <newname>           				- Edit an existing team.
+  team view                        					- View all teams.
+
+  logs view <logtype>              					- View logs.
+
+  start                            					- Start the engine.
+  stop                             					- Stop the engine.
+  pause                            					- Pause the engine.
+  resume                           					- Resume the engine.
+  state											- Get the engine's status.
+`
+	fmt.Println(helpText)
+}
+
+func printVersion(Version string) {
+	fmt.Printf("NEST CLI Version %s\n", Version)
+}
+
+func viewAuditLogs() {
+	data, err := ioutil.ReadFile(auditLogFile)
+	if err != nil {
+		fmt.Printf("Error reading audit logs: %v\n", err)
+		return
 	}
+	fmt.Println("Audit Logs:")
+	fmt.Println(string(data))
+}
+
+func viewLogs() {
+	data, err := ioutil.ReadFile(logging.GetFilePath())
+	if err != nil {
+		fmt.Printf("Error reading logs: %v\n", err)
+		return
+	}
+	fmt.Println("Logs:")
+	fmt.Println(string(data))
+}
+
+// Simple helper function to generate a random color
+func generateRandomColor() string {
+	rand.Seed(uint64(time.Now().Unix()))
+	colorVal := rand.Intn(0xFFFFFF + 1)
+	return fmt.Sprintf("#%06X", colorVal)
 }

@@ -7,6 +7,8 @@ FROM golang:1.23.5 AS builder
 WORKDIR /app
 
 # Copy go.mod and go.sum, then download dependencies
+ENV GOPROXY=goproxy.io,direct
+
 COPY go.mod go.sum ./
 RUN go mod download
 
@@ -40,7 +42,8 @@ RUN apk add --no-cache \
 # Copy the compiled Go program and other resources from the builder stage
 COPY --from=builder /app/scoring-engine /scoring-engine
 COPY --from=builder /app/database /database
-COPY --from=builder /app/tests /tests
+COPY --from=builder /app/gameconfigs /gameconfigs
+COPY --from=builder /app/queries /queries
 
 # (Optional) If you keep running as root, you may need --no-sandbox in Chromedp
 # If you run as a non-root user, you can keep the sandbox.

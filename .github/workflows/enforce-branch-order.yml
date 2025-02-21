@@ -1,0 +1,26 @@
+on:
+  pull_request:
+    types: [opened, edited, reopened]
+
+jobs:
+  check-merge-order:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate Merge Order
+        run: |
+          BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
+              HEAD_BRANCH="${{ github.event.pull_request.head.ref }}"
+    
+              if [ "$BASE_BRANCH" == "main" ]; then
+                if [ "$HEAD_BRANCH" != "staging" ]; then
+                  echo "Error: Pull requests to main must come from the staging branch."
+                  exit 1
+                fi
+              elif [ "$BASE_BRANCH" == "staging" ]; then
+                if [ "$HEAD_BRANCH" != "dev" ]; then
+                  echo "Error: Pull requests to staging must come from the dev branch."
+                  exit 1
+                fi
+              fi
+    
+              echo "Branch merge order validated: $HEAD_BRANCH -> $BASE_BRANCH"

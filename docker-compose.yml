@@ -13,11 +13,11 @@ services:
       timeout: 5s
       retries: 5
 
-  backend:
+  scorer:
     build:
-      context: .
+      context: ./scoring
     volumes:
-      - ./Logs:/Logs
+      - ./Logs/scoring:/Logs
     stdin_open: true
     tty: true
     environment:
@@ -32,14 +32,24 @@ services:
     ports:
       - "8080:8080"
 
-  webserver:
+  backend:
     build:
-      context: ./web/front-end
-    ports:
-      - "80:80"
+      context: ./nest_backend
+      dockerfile: Dockerfile
+    volumes:
+      - ./Logs/backend:/Logs
     environment:
-      BACKEND_HOST: backend
-      BACKEND_PORT: 8080
+      # Runtime DB config
+      DATABASE_HOST: postgres
+      DATABASE_PORT: "5432"
+      DATABASE_USER: root
+      DATABASE_PASSWORD: root
+      DATABASE_NAME: scoring
+      # Used at build-time by Diesel CLI
+      DATABASE_URL: postgres://root:root@postgres:5432/scoring
     depends_on:
       postgres:
         condition: service_healthy
+    ports:
+      - "8000:8000"
+    entrypoint: ["backend"]   # your compiled binary

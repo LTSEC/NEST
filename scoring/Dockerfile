@@ -1,7 +1,7 @@
 # -----------------------
 # 1) BUILD STAGE
 # -----------------------
-FROM golang:1.23.5 AS builder
+FROM golang:1.24.3 AS builder
 
 # Set the working directory
 WORKDIR /app

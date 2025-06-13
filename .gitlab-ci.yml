@@ -3,21 +3,23 @@ stages:
   - test
   - deploy
 
-nest-runner:
-  build:
-    stage: build
-    script:
-      - echo "Building the project..."
-      - echo "Testing the cron job execution"
-  
-  test:
-    stage: test
-    script:
-      - echo "Running tests..."
-  
-  
-  deploy:
-    stage: deploy
-    script:
-      - echo "Deploying to OpenNebula"
-      - echo "This is a test"
+build-job:
+  stage: build
+  script:
+    - echo "Building the project..."
+  tags:
+    - nest-runner
+
+test-job:
+  stage: test
+  script:
+    - echo "Running tests..."
+  tags:
+    - nest-runner
+
+deploy-job:
+  stage: deploy
+  script:
+    - echo "Deploying to OpenNebula"
+  tags:
+    - nest-runner

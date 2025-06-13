@@ -19,3 +19,4 @@ deploy:
   stage: deploy
   script:
     - echo "Deploying to OpenNebula"
+    - echo "This is a test"

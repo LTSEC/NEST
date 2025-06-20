@@ -1,9 +1,9 @@
 openapi: 3.0.3
 info:
-  title: Example API
+  title: NEST API
   version: 1.0.0
   description: >
-    User and Team management API.
+    API reference for LTSEC's NEST project.
 servers:
   - url: https://api.ltsec.lan
 components:

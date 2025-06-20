@@ -84,8 +84,6 @@ components:
           format: uuid
         name:
           type: string
-        description:
-          type: string
         ownerId:
           type: string
           format: uuid
@@ -376,40 +374,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TeamMember'
-  /api/teams/{teamId}/invitations:
-    post:
-      summary: Invite user to team
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: teamId
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [userId]
-              properties:
-                userId:
-                  type: string
-                  format: uuid
-                role:
-                  type: string
-                  enum: [Captain, Co-Captain, Coach, Member]
-                message:
-                  type: string
-      responses:
-        '201':
-          description: Invitation created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Invitation'
   /api/teams/{teamId}/members/{userId}:
     patch:
       summary: Update member role
@@ -466,6 +430,60 @@ paths:
       responses:
         '204':
           description: No Content
+  /api/users/{userId}/invitations:
+    get:
+      summary: View user invitations
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List of invitations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Invitation'
+    post:
+      summary: Invite user to team
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: teamId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId]
+              properties:
+                userId:
+                  type: string
+                  format: uuid
+                role:
+                  type: string
+                  enum: [Captain, Co-Captain, Coach, Member]
+                message:
+                  type: string
+      responses:
+        '201':
+          description: Invitation created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invitation'
   /api/teams/{teamId}/invitations/{inviteId}/accept:
     post:
       summary: Accept invitation
@@ -516,24 +534,3 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Invitation'
-  /api/users/{userId}/invitations:
-    get:
-      summary: View user invitations
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: userId
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        '200':
-          description: List of invitations
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Invitation'

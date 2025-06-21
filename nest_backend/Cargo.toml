@@ -4,6 +4,11 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-rocket = { version = "0.5.0-rc.2", features = ["json"] } # RESTful API
-diesel = { version = "2.0.0", features = ["postgres","r2d2","chrono"] } # Database interaction
+axum = { version = "0.7", features = ["macros"] } # Axum for API 
+tokio = { version = "1", features = ["full"] } # used for async
+sqlx = { version = "0.7", features = ["postgres", "runtime-tokio", "macros"] } # Database interaction (works better with async and uses direct sql)
+serde = { version = "1.0", features = ["derive"] }
 dotenvy = "0.15"
+argon2 = "0.4"
+rand_core = "0.6" # generates salts
+anyhow = "1.0"

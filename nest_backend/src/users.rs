@@ -1,11 +1,12 @@
 // This file contains handlers for all user functions
 // (creating, logging in, etc.)
-use axum::{extract::{Json, State},http::StatusCode};
+use axum::{extract::{Path, State},Json, http::StatusCode, response::IntoResponse};
 use serde::{Deserialize, Serialize}; // converts JSON to rust struct and vise versa
-use sqlx::{PgPool, FromRow}; // used for Database interaction
+use sqlx::{PgPool, Error, FromRow}; // used for Database interaction
 use argon2::{Argon2, PasswordHasher};
 use rand_core::OsRng;
 use argon2::password_hash::{SaltString, PasswordHash, PasswordVerifier};
+use uuid::Uuid;
 
 // User that will be returned from GET requests
 #[derive(Debug, Serialize, FromRow)]
@@ -56,6 +57,7 @@ fn verify_password(hash: &str, password: &str) -> Result<bool, argon2::password_
         Err(_) => Ok(false),
     }
 }
+
 // handler for creating a new user
 #[axum::debug_handler]
 pub async fn new_user(State(pool): State<PgPool>, Json(payload): Json<NewUser>) -> Result<StatusCode, (StatusCode, String)>  {
@@ -83,6 +85,24 @@ pub async fn new_user(State(pool): State<PgPool>, Json(payload): Json<NewUser>) 
             Err((StatusCode::INTERNAL_SERVER_ERROR, "Failed to create user".into()))
         }
     }
-
 }
 
+// handler for getting a user
+#[axum::debug_handler]
+pub async fn get_user(State(pool): State<PgPool>, Path(user_id): Path<Uuid>) -> impl IntoResponse {
+    let query = "SELECT username, email FROM users WHERE id = $1";
+
+    let result = sqlx::query_as::<_, User>(query)
+        .bind(user_id)
+        .fetch_one(&pool)
+        .await;
+
+    match result {
+        Ok(user) => (StatusCode::OK, Json(user)).into_response(),
+        Err(Error::RowNotFound) => (StatusCode::NOT_FOUND, "User not found").into_response(),
+        Err(e) => {
+            eprintln!("DB error: {:?}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error").into_response()
+        }
+    }
+}

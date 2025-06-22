@@ -60,15 +60,17 @@ fn verify_password(hash: &str, password: &str) -> Result<bool, argon2::password_
 
 // handler for creating a new user
 #[axum::debug_handler]
-pub async fn new_user(State(pool): State<PgPool>, Json(payload): Json<NewUser>) -> Result<StatusCode, (StatusCode, String)>  {
+pub async fn new_user(State(pool): State<PgPool>, Json(payload): Json<NewUser>) -> impl IntoResponse  {
     let query = "
         INSERT INTO users (username, email, password)
         VALUES ($1, $2, $3)
     ";
 
     // hashes the password; returns status 500 if hashing fails
-    let hashed_password = hash_password(&payload.password)
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Password hashing failed".into()))?;
+    let hashed_password = match hash_password(&payload.password) {
+        Ok(pw) => pw,
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "Password hashing failed").into_response(),
+    };
 
     // Queries the database
     let result = sqlx::query(query)
@@ -79,10 +81,10 @@ pub async fn new_user(State(pool): State<PgPool>, Json(payload): Json<NewUser>) 
     .await;
 
     match result {
-        Ok(_) => Ok(StatusCode::CREATED), // code 201 if successful
+        Ok(_) => StatusCode::CREATED.into_response(), // code 201 if successful
         Err(e) => {
             eprintln!("DB error: {:?}", e); // prints any errors from the database
-            Err((StatusCode::INTERNAL_SERVER_ERROR, "Failed to create user".into()))
+            (StatusCode::INTERNAL_SERVER_ERROR, "Failed to create user").into_response()
         }
     }
 }

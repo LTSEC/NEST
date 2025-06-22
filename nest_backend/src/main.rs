@@ -1,5 +1,6 @@
 use axum::{routing::{get, post}, Router};
 use sqlx::postgres::PgPoolOptions;
+use std::env;
 
 // import users.rs
 mod users;
@@ -9,8 +10,9 @@ use users::{new_user, get_user};
 // Should be able to test the API using curl in terminal
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let db_url = "";
-    let pool = PgPoolOptions::new().connect(db_url).await?;
+    let db_url = env::var("DATABASE_URL")
+        .expect("DATABASE_URL must be set");
+    let pool = PgPoolOptions::new().connect(&db_url).await?;
 
     // Creates the routes 
     let app = Router::new()

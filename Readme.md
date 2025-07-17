@@ -23,7 +23,7 @@ To Be Written
 
 ### Frameworks Used
 - Gin (Go)
-- TBD (Rust)
+- Axum (Rust)
 - Flask (Python)
 - Angular (TypeScript)
 

@@ -1,0 +1,27 @@
+$font-stack: sans-serif;
+
+// Lightmode colors
+$lm-primary-color: #10A7B1;
+$lm-secondary-color: #F2F0EF;
+$lm-text-color: #121212;
+
+// Darkmode colors
+$dm-primary-color: #126167;
+$dm-secondary-color: #1E1E1E;
+$dm-text-color: #F2F0EF;
+
+// CSS vars
+:root {
+  --font-stack:       #{$font-stack};
+  --color-primary:    #{$lm-primary-color};
+  --color-secondary:  #{$lm-secondary-color};
+  --color-text:       #{$lm-text-color};
+}
+
+// Override for dark mode
+.dark,
+[data-theme="dark"] {
+  --color-primary:    #{$dm-primary-color};
+  --color-secondary:  #{$dm-secondary-color};
+  --color-text:       #{$dm-text-color};
+}

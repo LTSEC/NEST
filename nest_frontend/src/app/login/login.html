@@ -1,0 +1,35 @@
+<!-- left side container with nest image -->
+<html lang="en" class="light">
+
+<div class="container">
+    <div class="left">
+        <div class="header">NEST</div>
+        <img src="assets/nest.png" alt="NEST Logo">
+    </div>
+
+    <div class="right">
+        <div class="header">Login</div>
+        <form (ngSubmit)="onLogin()" #loginForm="ngForm" class="login-form">
+            <input  name="username"
+                    [(ngModel)]="username"
+                    type="text"
+                    placeholder="Username"
+                    class="entry-box">
+
+            <input  name="password"
+                    [(ngModel)]="password"
+                    type="password"
+                    placeholder="Password"
+                    class="entry-box">
+
+            <button
+            type="submit"
+            [disabled]="loginForm.invalid"
+            >
+            Login
+            </button>
+        </form>
+    </div>
+</div>
+
+</html>

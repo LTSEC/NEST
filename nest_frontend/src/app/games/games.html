@@ -1,0 +1,29 @@
+<h2>Your Upcoming Games</h2>
+<div class="games-container">
+  <div class="game-card" *ngFor="let g of upcoming; let i = index">
+    <div>
+      <strong>Game Name</strong><br>
+      <h3>{{g.name}}</h3>
+    </div>
+    <div>
+      <strong>Start Date</strong><br>
+      <h3>{{g.startDate | date:'MM/dd/yyyy'}}</h3>
+    </div>
+    <div>
+      <strong>Game Organizer</strong><br>
+      <h3>{{g.organizer}}</h3>
+    </div>
+    <div>
+      <strong>Game Details</strong><br>
+      <h3>{{g.type}} • {{g.duration}}</h3>
+    </div>
+    <div class="description">
+      <strong>Game Description</strong><br>
+      <h3>{{g.description}}</h3>
+    </div>
+    <div class="countdown">
+      <strong>Countdown</strong><br>
+      <h3>{{countdowns[i]}}</h3>
+    </div>
+  </div>
+</div>

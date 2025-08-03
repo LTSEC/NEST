@@ -1,0 +1,53 @@
+<div class="games-container">
+  <h1 class="title">Games</h1>
+
+  <form class="game-form" (ngSubmit)="addOrUpdateGame()" #gameForm="ngForm">
+    <div class="form-row">
+      <label for="name">Name</label>
+      <input id="name" name="name" type="text" required [(ngModel)]="newGame.name" />
+    </div>
+
+    <div class="form-row">
+      <label for="description">Description</label>
+      <input id="description" name="description" type="text" required [(ngModel)]="newGame.description" />
+    </div>
+
+    <div class="form-row">
+      <label>Type</label>
+      <div class="type-options">
+        <label><input type="checkbox" [checked]="newGame.type.includes('CTF')" (change)="toggleType('CTF')" /> CTF</label>
+        <label><input type="checkbox" [checked]="newGame.type.includes('RvB')" (change)="toggleType('RvB')" /> RvB</label>
+        <label><input type="checkbox" [checked]="newGame.type.includes('Injects')" (change)="toggleType('Injects')" /> Injects</label>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <label for="date">Date</label>
+      <input id="date" name="date" type="date" [(ngModel)]="newGame.date" />
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="primary-btn" [disabled]="gameForm.invalid">
+        {{ editMode ? 'Update' : 'Add' }} Game
+      </button>
+      <button type="button" class="secondary-btn" *ngIf="editMode" (click)="cancelEdit()">
+        Cancel
+      </button>
+    </div>
+  </form>
+
+  <ul class="games-list">
+    <li *ngFor="let g of games; let i = index" [class.selected]="i === selectedGameIndex">
+      <div class="game-details">
+        <span class="game-name">{{ g.name }}</span>
+        <span class="game-description">{{ g.description }}</span>
+        <span class="game-type">{{ g.type.join(', ') }}</span>
+        <span class="game-date">{{ g.date }}</span>
+      </div>
+      <div class="game-actions">
+        <button class="edit-btn" [routerLink]="['/games', g.id, 'edit']">Edit</button>
+        <button class="delete-btn" (click)="deleteGame(i)">Delete</button>
+      </div>
+    </li>
+  </ul>
+</div>

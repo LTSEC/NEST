@@ -10,12 +10,16 @@ $dm-primary-color: #126167;
 $dm-secondary-color: #1E1E1E;
 $dm-text-color: #F2F0EF;
 
+// Misc colors
+$select-color: #0273F0;
+
 // CSS vars
 :root {
   --font-stack:       #{$font-stack};
   --color-primary:    #{$lm-primary-color};
   --color-secondary:  #{$lm-secondary-color};
   --color-text:       #{$lm-text-color};
+  --color-select:     #{$select-color};
 }
 
 // Override for dark mode

@@ -1,35 +1,47 @@
-<!-- left side container with nest image -->
-<html lang="en" class="light">
-
 <div class="container">
-    <div class="left">
-        <div class="header">NEST</div>
-        <img src="assets/nest.png" alt="NEST Logo">
+  <div class="left">
+    <div class="header">NEST</div>
+    <img src="assets/nest.png" alt="NEST Logo">
+  </div>
+
+  <div class="right">
+    <div class="header">
+      {{ isDevMode ? 'Dev Login' : 'Login' }}
     </div>
 
-    <div class="right">
-        <div class="header">Login</div>
-        <form (ngSubmit)="onLogin()" #loginForm="ngForm" class="login-form">
-            <input  name="username"
-                    [(ngModel)]="username"
-                    type="text"
-                    placeholder="Username"
-                    class="entry-box">
+    <form (ngSubmit)="onLogin()" #loginForm="ngForm" class="login-form">
+      <input
+        name="username"
+        [(ngModel)]="username"
+        type="text"
+        placeholder="Username"
+        class="entry-box"
+      />
 
-            <input  name="password"
-                    [(ngModel)]="password"
-                    type="password"
-                    placeholder="Password"
-                    class="entry-box">
+      <input
+        name="password"
+        [(ngModel)]="password"
+        type="password"
+        placeholder="Password"
+        class="entry-box"
+      />
 
-            <button
-            type="submit"
-            [disabled]="loginForm.invalid"
-            >
-            Login
-            </button>
-        </form>
-    </div>
+      <button
+        type="submit"
+        [disabled]="loginForm.invalid"
+      >
+        {{ isDevMode ? 'Login as Dev' : 'Login' }}
+      </button>
+
+      <div class="login-footer">
+        <a
+          (click)="toggleDevMode()"
+          class="admin-link"
+          role="button"
+        >
+          {{ isDevMode ? 'Back to User Login' : 'Dev Login' }}
+        </a>
+      </div>
+    </form>
+  </div>
 </div>
-
-</html>

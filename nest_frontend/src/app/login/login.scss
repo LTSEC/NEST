@@ -116,4 +116,21 @@ $rounded-button-radius: 16px;
             cursor:         pointer;
         }
     }
+
+    .login-footer {
+        text-align: center;
+        margin-top: 0.5rem;
+
+        .admin-link {
+        font-size: 0.875rem;
+        color: var(--color-primary);
+        text-decoration: underline;
+        cursor: pointer;
+        transition: color .2s;
+
+            &:hover {
+                color: var(--color-primary-dark);
+            }
+        }
+    }
 }

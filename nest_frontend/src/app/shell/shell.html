@@ -1,0 +1,33 @@
+<div class="layout">
+  <aside class="sidebar">
+    <button
+      *ngFor="let nav of navItems"
+      type="button"
+      [routerLink]="nav.route"
+      routerLinkActive="active"
+      class="nav-btn"
+    >
+      <img
+        [src]="nav.iconUrl"
+        [alt]="nav.label || 'nav icon'"
+        class="nav-btn__icon"
+      />
+    </button>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="logo">
+        <img src="assets/nest.png" alt="NEST" />
+        <span>NEST</span>
+      </div>
+      <div class="spacer"></div>
+      <button title="Notifications">🔔</button>
+      <img class="avatar" src="assets/avatar.jpg" alt="Me"/>
+    </header>
+
+    <section class="content">
+      <router-outlet></router-outlet>
+    </section>
+  </div>
+</div>

@@ -1,0 +1,85 @@
+@use '../../variables.scss';
+
+.layout {
+  display: flex; height: 100vh;
+  font-family: var(--font-stack);
+
+  .sidebar {
+    width: 72px;
+    background: var(--color-secondary);
+    border-right: 1px solid var(--color-text);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1rem 0;
+    gap: 1rem;
+    button {
+      background: none; border: none;
+      font-size: 1.5rem; color: white;
+    }
+  }
+
+  .main {
+    flex: 1; display: flex; flex-direction: column;
+
+    .topbar {
+      height: 60px; display: flex; align-items: center;
+      padding: 0 1rem; background: var(--color-secondary);
+      border-bottom: 1px solid var(--color-text);
+
+      .logo {
+        display: flex; align-items: center; gap: .5rem;
+        img { height: 32px; }
+        span { color: var(--color-text); font-size: 1.25rem; }
+      }
+      .spacer { flex: 1; }
+      button {
+        background: none; border: none;
+        font-size: 1.25rem; margin: 0 .5rem;
+        color: var(--color-text);
+      }
+      .avatar {
+        width: 32px; height: 32px; border-radius: 50%;
+      }
+    }
+
+    .content {
+      flex: 1; padding: 1rem;
+      background: var(--color-secondary);
+      overflow-y: auto;
+    }
+  }
+
+  .nav-btn {
+    width: 48px;
+    height: 48px;
+    background-color: transparent;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    padding: 0;
+    transition: background-color .2s, filter .2s;
+
+    &:hover {
+      background-color: rgba(212, 154, 154, 0.2);
+    }
+
+    &.active {
+      background-color: var(--color-select) !important;
+    }
+
+    &__icon {
+      width: 24px;
+      height: 24px;
+      transition: filter .2s;
+    }
+
+    &.active .nav-btn__icon {
+      filter: invert(1);
+    }
+  }
+  
+}

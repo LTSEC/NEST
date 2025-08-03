@@ -1,0 +1,199 @@
+<div class="editor-container">
+    <h2>Editing Game "{{name}}"</h2>
+    <nav class="editor-tabs">
+        <button (click)="selectTab('general')" [class.active]="activeTab==='general'">General</button>
+        <button (click)="selectTab('invites')" [class.active]="activeTab==='invites'">Invites</button>
+        <button (click)="selectTab('RvB')" [class.active]="activeTab==='RvB'">RvB</button>
+        <button (click)="selectTab('CTF')" [class.active]="activeTab==='CTF'">CTF</button>
+        <button (click)="selectTab('Injects')" [class.active]="activeTab==='Injects'">Injects</button>
+    </nav>
+
+    <div class="editor-content">
+        <section *ngIf="activeTab === 'general'">
+        <h2>General Settings</h2>
+        <form #generalForm="ngForm" (ngSubmit)="saveGeneral()">
+            <div class="form-row">
+                <label>Name</label>
+                <input name="name" required [(ngModel)]="name" />
+            </div>
+            <div class="form-row">
+                <label>Description</label>
+                <input name="description" required [(ngModel)]="description" />
+            </div>
+            <div class="form-row">
+                <label>Date</label>
+                <input name="date" type="date" [(ngModel)]="date" />
+            </div>
+            <button type="submit" [disabled]="generalForm.invalid">Save</button>
+        </form>
+        </section>
+
+        <section *ngIf="activeTab === 'invites'">
+            <h2>Invites</h2>
+
+            <div class="form-row">
+                <label for="invite-search">Search Teams</label>
+                <input
+                    id="invite-search"
+                    name="searchTerm"
+                    [(ngModel)]="searchTerm"
+                    placeholder="Type to search…"
+                    autocomplete="off" />
+            </div>
+
+            <ul class="suggestions-list">
+                <li *ngFor="let team of filteredTeams">
+                    <a href=""
+                        class="invite-link"
+                        (click)="inviteTeam(team); $event.preventDefault()">
+                        {{ team }}
+                    </a>
+                </li>
+            </ul>
+
+            <h3>Invited Teams</h3>
+            <ul class="invite-list">
+                <li *ngFor="let team of invited">
+                    <a href=""
+                        class="invite-link"
+                        (click)="removeInvite(team); $event.preventDefault()">
+                        {{ team }}
+                    </a>
+                </li>
+            </ul>
+
+            <button class="primary-btn" (click)="sendInvites()">
+                Send Invites
+            </button>
+        </section>
+
+        <section *ngIf="activeTab === 'RvB'" class="rvb-section">
+            <h2>RvB Network Topology</h2>
+            <div class="rvb-container">
+                <!-- Asset palette -->
+                <aside class="asset-palette" cdkDropList>
+                <h3>Palette</h3>
+                <div *ngFor="let a of palette"
+                    cdkDrag
+                    [cdkDragData]="a"
+                    class="asset-card">
+                    {{ a.label }}
+                </div>
+                </aside>
+
+                <!-- Grid + SVG edges with pan -->
+                <div #gridWrapper
+                    class="grid-wrapper"
+                    (mousedown)="startPan($event)"
+                    [class.panning]="isPanning">
+
+                <div class="pan-container"
+                    [ngStyle]="{ transform: 'translate(' + panX + 'px,' + panY + 'px)' }">
+
+                    <!-- SVG edges -->
+                    <svg class="edge-layer" preserveAspectRatio="none">
+                    <line *ngFor="let e of edges"
+                            [attr.x1]="xOf(e.source)"
+                            [attr.y1]="yOf(e.source)"
+                            [attr.x2]="xOf(e.target)"
+                            [attr.y2]="yOf(e.target)"
+                            stroke="var(--color-text)"
+                            stroke-width="2"/>
+                    </svg>
+
+                    <!-- Droppable grid -->
+                    <div #gridEl
+                        class="rvb-grid"
+                        cdkDropList
+                        (cdkDropListDropped)="onDrop($event)">
+                    <div *ngFor="let n of nodes"
+                        class="node"
+                        [class.immutable]="n.immutable"
+                        [ngStyle]="{ left: n.x + 'px', top: n.y + 'px' }">
+                        {{ n.label }}
+                    </div>
+                    </div>
+
+                </div>
+                </div>
+            </div>
+        </section>
+
+        <section *ngIf="activeTab === 'CTF'">
+        <h2>CTF Settings</h2>
+        <p>(not implemented yet)</p>
+        </section>
+
+        <section *ngIf="activeTab === 'Injects'">
+        <h2>Injects</h2>
+            <div class="inject-form-box">
+                <form #injectForm="ngForm" (ngSubmit)="addOrUpdateInject()">
+                    <div class="form-row">
+                        <label>Name</label>
+                        <input name="name" required [(ngModel)]="newInject.name" />
+                    </div>
+
+                    <div class="form-row">
+                        <label>Post Type</label>
+                        <select name="postType" [(ngModel)]="newInject.postType">
+                            <option value="manual">Manual</option>
+                            <option value="automatic">Automatic</option>
+                        </select>
+                    </div>
+
+                    <div class="form-row" *ngIf="newInject.postType==='automatic'">
+                        <label>Post Time (h:m)</label>
+                        <div class="time-inputs">
+                            <input
+                            type="number" min="0"
+                            name="postTimeHours"
+                            [(ngModel)]="newInject.postTimeHours" />
+                            <input
+                            type="number" min="0" max="59"
+                            name="postTimeMinutes"
+                            [(ngModel)]="newInject.postTimeMinutes" />
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <label>Description</label>
+                        <textarea name="description" required [(ngModel)]="newInject.description"></textarea>
+                    </div>
+
+                    <div class="form-row">
+                        <label>Points</label>
+                        <input type="number" min="0" name="points" required [(ngModel)]="newInject.points" />
+                    </div>
+
+                    <div class="form-row">
+                        <label>Attachments</label>
+                        <input type="file" multiple (change)="onFilesSelected($event)" />
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" (click)="nothing()">Preview</button>
+                        <button type="submit" [disabled]="injectForm.invalid">
+                            {{ editInjectIndex > -1 ? 'Update' : 'Save' }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+            <ul class="inject-list">
+                <li *ngFor="let inj of injects; let i = index">
+                    <div class="inject-details">
+                        <span class="inj-name">{{ inj.name }}</span>
+                        <span class="inj-type"> ({{ inj.postType }})</span>
+                        <span class="inj-time" *ngIf="inj.postType==='automatic'">
+                            +{{ inj.postTimeHours }}h {{ inj.postTimeMinutes }}m
+                        </span>
+                        <span class="inj-points">— {{ inj.points }} pts</span>
+                    </div>
+                    <div class="inject-actions">
+                        <button class="edit-btn" (click)="editInject(i)">Edit</button>
+                        <button class="delete-btn" (click)="deleteInject(i)">Delete</button>
+                    </div>
+                </li>
+            </ul>
+        </section>
+    </div>
+</div>

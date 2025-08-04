@@ -69,54 +69,6 @@
 
         <section *ngIf="activeTab === 'RvB'" class="rvb-section">
             <h2>RvB Network Topology</h2>
-            <div class="rvb-container">
-                <!-- Asset palette -->
-                <aside class="asset-palette" cdkDropList>
-                <h3>Palette</h3>
-                <div *ngFor="let a of palette"
-                    cdkDrag
-                    [cdkDragData]="a"
-                    class="asset-card">
-                    {{ a.label }}
-                </div>
-                </aside>
-
-                <!-- Grid + SVG edges with pan -->
-                <div #gridWrapper
-                    class="grid-wrapper"
-                    (mousedown)="startPan($event)"
-                    [class.panning]="isPanning">
-
-                <div class="pan-container"
-                    [ngStyle]="{ transform: 'translate(' + panX + 'px,' + panY + 'px)' }">
-
-                    <!-- SVG edges -->
-                    <svg class="edge-layer" preserveAspectRatio="none">
-                    <line *ngFor="let e of edges"
-                            [attr.x1]="xOf(e.source)"
-                            [attr.y1]="yOf(e.source)"
-                            [attr.x2]="xOf(e.target)"
-                            [attr.y2]="yOf(e.target)"
-                            stroke="var(--color-text)"
-                            stroke-width="2"/>
-                    </svg>
-
-                    <!-- Droppable grid -->
-                    <div #gridEl
-                        class="rvb-grid"
-                        cdkDropList
-                        (cdkDropListDropped)="onDrop($event)">
-                    <div *ngFor="let n of nodes"
-                        class="node"
-                        [class.immutable]="n.immutable"
-                        [ngStyle]="{ left: n.x + 'px', top: n.y + 'px' }">
-                        {{ n.label }}
-                    </div>
-                    </div>
-
-                </div>
-                </div>
-            </div>
         </section>
 
         <section *ngIf="activeTab === 'CTF'">

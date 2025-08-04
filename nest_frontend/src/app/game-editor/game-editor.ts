@@ -5,10 +5,15 @@ import {
 } from '@angular/core';
 import { CommonModule }                    from '@angular/common';
 import { FormsModule }                     from '@angular/forms';
-import { ActivatedRoute }                  from '@angular/router';
+import { ActivatedRoute, ParamMap }        from '@angular/router';
+import {
+  CdkDragEnd,
+  CdkDragDrop,
+  DragDropModule,
+} from '@angular/cdk/drag-drop';
 
 type PostType = 'automatic' | 'manual';
-type AssetType = 'router' | 'firewall' | 'switch' | 'phone' | 'workstation' | 'cloud';
+type AssetType = 'router' | 'firewall' | 'switch' | 'phone' | 'workstation' | 'cloud' | 'server';
 
 interface Inject {
   id: number;
@@ -21,7 +26,7 @@ interface Inject {
   attachments: File[];
 }
 
-interface Node {
+interface TopoNode {
   id: string;
   type: AssetType;
   label: string;
@@ -38,12 +43,11 @@ interface Edge {
 @Component({
   selector: 'app-game-editor',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, DragDropModule],
   templateUrl: './game-editor.html',
   styleUrls: ['./game-editor.scss']
 })
 export class GameEditor {
-  @ViewChild('gridEl',      { static: false }) gridEl!:      ElementRef<HTMLElement>;
   @ViewChild('gridWrapper', { static: false }) gridWrapper!: ElementRef<HTMLElement>;
 
   activeTab: 'general' | 'invites' | 'CTF' | 'RvB' | 'Injects' = 'general';
@@ -54,7 +58,7 @@ export class GameEditor {
   date = '';
 
   // Placeholder
-  gameId = 0
+  gameId = 0;
 
   // Invites
   searchTerm = '';
@@ -78,8 +82,13 @@ export class GameEditor {
   };
   editInjectIndex = -1;
 
+  // RvB topology
+  deviceTypes: AssetType[] = ['router', 'server'];
+  nodes: TopoNode[] = [];
+  private nextNodeId = 1;
+
   constructor(private route: ActivatedRoute) {
-    this.route.paramMap.subscribe(mp => {
+    this.route.paramMap.subscribe((mp: ParamMap) => {
       this.gameId = Number(mp.get('id'));
     });
   }
@@ -145,17 +154,32 @@ export class GameEditor {
     this.editInjectIndex = -1;
   }
 
-  // RvB pan/drag logic
+  // RvB drag & drop
+  drop(event: CdkDragDrop<any>) {
+    const data: any = event.item?.data;
+    // If it's an existing node, skip creation
+    if (data?.id) return;
 
-  nothing() {
-    return 0;
+    if (!data?.type) return;
+    const rect = this.gridWrapper.nativeElement.getBoundingClientRect();
+    const x = event.dropPoint.x - rect.left;
+    const y = event.dropPoint.y - rect.top;
+    this.nodes.push({
+      id: `${this.nextNodeId++}`,
+      type: data.type,
+      label: data.type.toUpperCase(),
+      x, y
+    });
   }
 
-  sendInvites() {
-    return 0;
+  onNodeDragEnded(event: CdkDragEnd, node: TopoNode) {
+    const rect = this.gridWrapper.nativeElement.getBoundingClientRect();
+    node.x = event.source.getFreeDragPosition().x;
+    node.y = event.source.getFreeDragPosition().y;
   }
 
-  saveGeneral() {
-    return 0;
-  }
+  // Unused placeholders
+  nothing() { return 0; }
+  sendInvites() { return 0; }
+  saveGeneral() { return 0; }
 }

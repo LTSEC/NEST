@@ -69,6 +69,34 @@
 
         <section *ngIf="activeTab === 'RvB'" class="rvb-section">
             <h2>RvB Network Topology</h2>
+            <div class="rvb-layout">
+                <!-- Palette -->
+                <div class="rvb-palette" cdkDropList [cdkDropListData]="deviceTypes">
+                    <div
+                        class="device"
+                        *ngFor="let type of deviceTypes"
+                        cdkDrag
+                        [cdkDragData]="{ type }">
+                        {{ type }}
+                    </div>
+                </div>
+                <!-- Grid -->
+                <div
+                    #gridWrapper
+                    class="rvb-grid"
+                    cdkDropList
+                    (cdkDropListDropped)="drop($event)">
+                    <div
+                        *ngFor="let node of nodes"
+                        class="node"
+                        cdkDrag
+                        [cdkDragData]="node"
+                        (cdkDragEnded)="onNodeDragEnded($event, node)"
+                        [ngStyle]="{ left: node.x + 'px', top: node.y + 'px' }">
+                        {{ node.label }}
+                    </div>
+                </div>
+              </div>
         </section>
 
         <section *ngIf="activeTab === 'CTF'">

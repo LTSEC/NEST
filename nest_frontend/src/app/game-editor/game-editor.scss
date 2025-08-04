@@ -140,3 +140,54 @@
   gap: 0.5rem;
   align-items: center;
 }
+
+.rvb-section {
+  h2 { margin-bottom: 1rem; }
+
+  .rvb-layout {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 1rem;
+    height: 500px;
+  }
+
+  .rvb-palette {
+    background: var(--color-secondary);
+    border: 1px solid var(--color-text);
+    border-radius: 4px;
+    padding: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+
+    .device {
+      padding: 0.5rem;
+      background: var(--color-primary);
+      color: var(--color-secondary);
+      border-radius: 4px;
+      text-align: center;
+      cursor: grab;
+    }
+  }
+
+  .rvb-grid {
+    background-image: radial-gradient(circle, var(--color-text) 1px, transparent 1px);
+    background-size: 20px 20px;
+    position: relative;
+    overflow: auto;
+    border: 1px solid var(--color-text);
+    border-radius: 4px;
+  }
+
+  .node {
+    position: absolute;
+    padding: 0.5rem;
+    background: rgba(16, 167, 177, 0.8);
+    color: var(--color-secondary);
+    border-radius: 4px;
+    cursor: grab;
+    user-select: none;
+
+    &.server { background: rgba(66, 135, 245, 0.8); }
+  }
+}

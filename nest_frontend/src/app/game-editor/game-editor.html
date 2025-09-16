@@ -6,6 +6,7 @@
         <button (click)="selectTab('RvB')" [class.active]="activeTab==='RvB'">RvB</button>
         <button (click)="selectTab('CTF')" [class.active]="activeTab==='CTF'">CTF</button>
         <button (click)="selectTab('Injects')" [class.active]="activeTab==='Injects'">Injects</button>
+        <button (click)="selectTab('Blue Team')" [class.active]="activeTab==='Blue Team'">Blue Team</button>
     </nav>
 
     <div class="editor-content">
@@ -174,6 +175,11 @@
                     </div>
                 </li>
             </ul>
+        </section>
+
+        <section *ngIf="activeTab === 'Blue Team'">
+        <h2>Blue Team Settings</h2>
+        <p>(not implemented yet)</p>
         </section>
     </div>
 </div>

@@ -50,7 +50,7 @@ interface Edge {
 export class GameEditor {
   @ViewChild('gridWrapper', { static: false }) gridWrapper!: ElementRef<HTMLElement>;
 
-  activeTab: 'general' | 'invites' | 'CTF' | 'RvB' | 'Injects' = 'general';
+  activeTab: 'general' | 'invites' | 'CTF' | 'RvB' | 'Injects' | 'Blue Team' = 'general';
 
   // General
   name = '';

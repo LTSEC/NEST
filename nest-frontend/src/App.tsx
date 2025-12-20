@@ -1,6 +1,7 @@
 import React from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import HomePage from './pages/HomePage';
+import DevSignIn from './pages/DevSignIn';
 import SignIn from './pages/SignIn';
 import PrivateRoute from './providers/PrivateRoute';
 
@@ -8,7 +9,7 @@ const App: React.FC = () => {
   return (
     <Routes>
       <Route path="/signin" element={<SignIn />} />
-      <Route path="/dev-signin" element={<SignIn />} />
+      <Route path="/dev-signin" element={<DevSignIn />} />
       <Route element={<PrivateRoute />}>
         <Route path="/" element={<HomePage />} />
       </Route>

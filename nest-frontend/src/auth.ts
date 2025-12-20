@@ -21,10 +21,13 @@ export const clearAuthCookie = (): void => {
   document.cookie = `${AUTH_COOKIE_NAME}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax`;
 };
 
+export type UserRole = 'user' | 'developer';
+
 export type VerifiedUser = {
   id: string;
   name: string;
   email?: string;
+  role: UserRole;
 };
 
 // Stubbed implementation to demonstrate how a backend service might verify the token
@@ -39,7 +42,11 @@ export const verifyTokenAgainstUserTable = async (
   // Placeholder lookup logic. Replace with a query such as:
   // SELECT id, name, email FROM users WHERE session_token = $1 LIMIT 1;
   if (token === 'demo-token') {
-    return { id: '1', name: 'Ada Lovelace', email: 'ada@example.com' };
+    return { id: '1', name: 'Ada Lovelace', email: 'ada@example.com', role: 'user' };
+  }
+
+  if (token === 'developer-demo-token') {
+    return { id: '42', name: 'Dev Admin', email: 'dev@example.com', role: 'developer' };
   }
 
   return null;

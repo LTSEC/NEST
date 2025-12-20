@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { AUTH_TOKEN_EXPIRY_HOURS } from '../auth';
 import { useAuth } from '../providers/AuthProvider';
 
-const SignIn: React.FC = () => {
+const DevSignIn: React.FC = () => {
   const navigate = useNavigate();
   const { login, isAuthenticated } = useAuth();
   const [username, setUsername] = useState('');
@@ -15,15 +15,15 @@ const SignIn: React.FC = () => {
     }
   }, [isAuthenticated, navigate]);
 
-  const displayName = useMemo(() => username.trim() || 'Demo User', [username]);
+  const displayName = useMemo(() => username.trim() || 'Dev User', [username]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    await login('demo-token', {
-      id: 'demo-user',
+    await login('developer-demo-token', {
+      id: 'developer-user',
       name: displayName,
-      role: 'user',
+      role: 'developer',
     });
 
     navigate('/');
@@ -33,13 +33,13 @@ const SignIn: React.FC = () => {
     <div className="grid min-h-screen grid-cols-1 bg-slate-50 text-slate-900 md:grid-cols-2">
       <div className="flex items-center justify-center bg-slate-900 p-12 text-white">
         <div className="flex max-w-md flex-col items-center gap-4 text-center">
-          <div className="flex h-24 w-24 items-center justify-center rounded-full border border-yellow-300/70 bg-yellow-300/30 text-lg font-semibold uppercase tracking-wide text-yellow-100">
-            Logo
+          <div className="flex h-24 w-24 items-center justify-center rounded-full border border-indigo-300/70 bg-indigo-300/30 text-lg font-semibold uppercase tracking-wide text-indigo-100">
+            Dev
           </div>
           <div className="space-y-2">
-            <p className="text-2xl font-semibold">Welcome back</p>
+            <p className="text-2xl font-semibold">Developer tools</p>
             <p className="text-sm text-slate-200">
-              A bold canvas ready for your bright yellow logo and a concise pitch for your platform.
+              Access build tools, analytics, and testing sandboxes to keep your games running smoothly.
             </p>
           </div>
         </div>
@@ -48,10 +48,10 @@ const SignIn: React.FC = () => {
       <div className="flex items-center justify-center bg-white p-8 md:p-12">
         <div className="w-full max-w-md space-y-8">
           <header className="space-y-2">
-            <p className="text-sm font-semibold uppercase tracking-wider text-indigo-600">Sign in</p>
-            <h1 className="text-2xl font-bold text-slate-900">Access your account</h1>
+            <p className="text-sm font-semibold uppercase tracking-wider text-indigo-600">Developer sign in</p>
+            <h1 className="text-2xl font-bold text-slate-900">Enter your sandbox</h1>
             <p className="text-sm text-slate-600">
-              Use your workspace credentials to continue. Session tokens expire after {AUTH_TOKEN_EXPIRY_HOURS} hours.
+              Use your developer credentials to continue. Session tokens expire after {AUTH_TOKEN_EXPIRY_HOURS} hours.
             </p>
           </header>
 
@@ -98,9 +98,9 @@ const SignIn: React.FC = () => {
           </form>
 
           <div className="text-sm text-slate-600">
-            Looking for developer tools?{' '}
-            <Link to="/dev-signin" className="font-semibold text-indigo-600 hover:text-indigo-500">
-              Developer Portal
+            Looking for the player portal?{' '}
+            <Link to="/signin" className="font-semibold text-indigo-600 hover:text-indigo-500">
+              Go to user sign in
             </Link>
           </div>
         </div>
@@ -109,4 +109,4 @@ const SignIn: React.FC = () => {
   );
 };
 
-export default SignIn;
+export default DevSignIn;

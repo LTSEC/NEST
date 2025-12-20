@@ -30,17 +30,71 @@ export type VerifiedUser = {
   role: UserRole;
 };
 
-const mockUsersTable: Record<SessionToken, VerifiedUser> = {
-  'demo-token': { id: '1', name: 'Ada Lovelace', email: 'ada@example.com', role: 'user' },
-  'developer-demo-token': { id: '42', name: 'Dev Admin', email: 'dev@example.com', role: 'developer' },
+type UsersTableRow = {
+  id: string;
+  username: string;
+  email: string;
+  password_hash: string;
+  password_plain?: string;
+  role: UserRole;
 };
 
+// Simulated SQL users table seeded from db/init.sql. These values mirror the
+// INSERT statements used when spinning up a development database.
+const usersTableRows: UsersTableRow[] = [
+  {
+    id: '1',
+    username: 'Test',
+    email: 'test@example.com',
+    password_hash: 'Test',
+    password_plain: 'Test',
+    role: 'user',
+  },
+  {
+    id: '2',
+    username: 'Developer',
+    email: 'dev@example.com',
+    password_hash: 'Dev',
+    password_plain: 'Dev',
+    role: 'developer',
+  },
+];
+
+const activeSessionIndex: Record<SessionToken, string> = {};
+
+const normalize = (value: string) => value.trim().toLowerCase();
+
+const findUserRowByUsername = (username: string): UsersTableRow | undefined => {
+  const normalized = normalize(username);
+  return usersTableRows.find((row) => normalize(row.username) === normalized);
+};
+
+const mapRowToVerifiedUser = (row: UsersTableRow): VerifiedUser => ({
+  id: row.id,
+  name: row.username,
+  email: row.email,
+  role: row.role,
+});
+
 export const upsertUserInMockTable = (token: SessionToken, user: VerifiedUser): void => {
-  mockUsersTable[token] = user;
+  const existingRow = usersTableRows.find((row) => row.id === user.id);
+
+  if (!existingRow) {
+    usersTableRows.push({
+      id: user.id,
+      username: user.name,
+      email: user.email ?? `${normalize(user.name)}@example.com`,
+      password_hash: 'temporary',
+      password_plain: 'temporary',
+      role: user.role,
+    });
+  }
+
+  activeSessionIndex[token] = user.id;
 };
 
 // Stubbed implementation to demonstrate how a backend service might verify the token
-// against a Postgres user table. Replace with a real fetch/DB call when available.
+// against a Postgres users table. Replace with a real fetch/DB call when available.
 export const verifyTokenAgainstUserTable = async (
   token: SessionToken
 ): Promise<VerifiedUser | null> => {
@@ -48,21 +102,53 @@ export const verifyTokenAgainstUserTable = async (
     return null;
   }
 
-  // Placeholder lookup logic. Replace with a query such as:
-  // SELECT id, name, email FROM users WHERE session_token = $1 LIMIT 1;
-  return mockUsersTable[token] ?? null;
+  const userId = activeSessionIndex[token];
+  if (!userId) {
+    return null;
+  }
+
+  const userRow = usersTableRows.find((row) => row.id === userId);
+  return userRow ? mapRowToVerifiedUser(userRow) : null;
+};
+
+export const authenticateWithUsersTable = async (
+  username: string,
+  password: string,
+  requiredRole?: UserRole
+): Promise<{ token: SessionToken; user: VerifiedUser } | null> => {
+  const row = findUserRowByUsername(username);
+  if (!row) {
+    return null;
+  }
+
+  const passwordMatches = row.password_plain === password || row.password_hash === password;
+  const roleMatches = !requiredRole || row.role === requiredRole;
+
+  if (!passwordMatches || !roleMatches) {
+    return null;
+  }
+
+  const sessionToken: SessionToken = `session-token-${row.id}`;
+  activeSessionIndex[sessionToken] = row.id;
+
+  return { token: sessionToken, user: mapRowToVerifiedUser(row) };
 };
 
 export const updateUserNameInPostgres = async (
   token: SessionToken,
   newName: string
 ): Promise<VerifiedUser> => {
-  if (!mockUsersTable[token]) {
+  const userId = activeSessionIndex[token];
+  if (!userId) {
     throw new Error('User not found in Postgres users table');
   }
 
-  const updatedUser = { ...mockUsersTable[token], name: newName };
-  mockUsersTable[token] = updatedUser;
+  const userRow = usersTableRows.find((row) => row.id === userId);
+  if (!userRow) {
+    throw new Error('User not found in Postgres users table');
+  }
 
-  return updatedUser;
+  userRow.username = newName;
+
+  return mapRowToVerifiedUser(userRow);
 };

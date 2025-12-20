@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { AUTH_TOKEN_EXPIRY_HOURS } from '../auth';
+import { AUTH_TOKEN_EXPIRY_HOURS, authenticateWithUsersTable } from '../auth';
 import { useAuth } from '../providers/AuthProvider';
 
 const SignIn: React.FC = () => {
@@ -8,6 +8,7 @@ const SignIn: React.FC = () => {
   const { login, isAuthenticated } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -15,16 +16,17 @@ const SignIn: React.FC = () => {
     }
   }, [isAuthenticated, navigate]);
 
-  const displayName = useMemo(() => username.trim() || 'Demo User', [username]);
-
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setError(null);
 
-    await login('demo-token', {
-      id: 'demo-user',
-      name: displayName,
-      role: 'user',
-    });
+    const result = await authenticateWithUsersTable(username, password, 'user');
+    if (!result) {
+      setError('Invalid username or password. Use the seeded "Test" user to try the flow.');
+      return;
+    }
+
+    await login(result.token, result.user);
 
     navigate('/');
   };
@@ -88,6 +90,8 @@ const SignIn: React.FC = () => {
                 required
               />
             </div>
+
+            {error && <p className="text-sm text-red-600">{error}</p>}
 
             <button
               type="submit"

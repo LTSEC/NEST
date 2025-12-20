@@ -30,6 +30,15 @@ export type VerifiedUser = {
   role: UserRole;
 };
 
+const mockUsersTable: Record<SessionToken, VerifiedUser> = {
+  'demo-token': { id: '1', name: 'Ada Lovelace', email: 'ada@example.com', role: 'user' },
+  'developer-demo-token': { id: '42', name: 'Dev Admin', email: 'dev@example.com', role: 'developer' },
+};
+
+export const upsertUserInMockTable = (token: SessionToken, user: VerifiedUser): void => {
+  mockUsersTable[token] = user;
+};
+
 // Stubbed implementation to demonstrate how a backend service might verify the token
 // against a Postgres user table. Replace with a real fetch/DB call when available.
 export const verifyTokenAgainstUserTable = async (
@@ -41,13 +50,19 @@ export const verifyTokenAgainstUserTable = async (
 
   // Placeholder lookup logic. Replace with a query such as:
   // SELECT id, name, email FROM users WHERE session_token = $1 LIMIT 1;
-  if (token === 'demo-token') {
-    return { id: '1', name: 'Ada Lovelace', email: 'ada@example.com', role: 'user' };
+  return mockUsersTable[token] ?? null;
+};
+
+export const updateUserNameInPostgres = async (
+  token: SessionToken,
+  newName: string
+): Promise<VerifiedUser> => {
+  if (!mockUsersTable[token]) {
+    throw new Error('User not found in Postgres users table');
   }
 
-  if (token === 'developer-demo-token') {
-    return { id: '42', name: 'Dev Admin', email: 'dev@example.com', role: 'developer' };
-  }
+  const updatedUser = { ...mockUsersTable[token], name: newName };
+  mockUsersTable[token] = updatedUser;
 
-  return null;
+  return updatedUser;
 };

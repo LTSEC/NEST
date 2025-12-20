@@ -1,28 +1,67 @@
-import React, { createContext, useContext, useMemo, useState } from 'react';
-
-export type User = {
-  id: string;
-  name: string;
-};
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import {
+  SessionToken,
+  VerifiedUser,
+  clearAuthCookie,
+  readAuthCookie,
+  setAuthCookie,
+  verifyTokenAgainstUserTable,
+} from '../auth';
+import { useSessionVerification } from '../hooks/useSessionVerification';
 
 export type AuthContextType = {
-  user: User | null;
-  login: (user: User) => void;
+  user: VerifiedUser | null;
+  token: SessionToken | null;
+  isAuthenticated: boolean;
+  loading: boolean;
+  login: (token: SessionToken, user?: VerifiedUser) => Promise<void>;
   logout: () => void;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<SessionToken | null>(() => readAuthCookie());
+  const [user, setUser] = useState<VerifiedUser | null>(null);
+
+  const { user: verifiedUser, loading } = useSessionVerification(token);
+
+  useEffect(() => {
+    setUser(verifiedUser);
+  }, [verifiedUser]);
+
+  const login = useCallback(
+    async (newToken: SessionToken, overrideUser?: VerifiedUser) => {
+      setAuthCookie(newToken);
+      setToken(newToken);
+
+      if (overrideUser) {
+        setUser(overrideUser);
+        return;
+      }
+
+      const verified = await verifyTokenAgainstUserTable(newToken);
+      setUser(verified);
+    },
+    []
+  );
+
+  const logout = useCallback(() => {
+    clearAuthCookie();
+    setToken(null);
+    setUser(null);
+  }, []);
 
   const value = useMemo<AuthContextType>(
     () => ({
       user,
-      login: setUser,
-      logout: () => setUser(null),
+      token,
+      isAuthenticated: Boolean(token && user),
+      loading,
+      login,
+      logout,
     }),
-    [user]
+    [loading, login, logout, token, user]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

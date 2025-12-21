@@ -1,0 +1,18 @@
+routers:
+  - name: Blank
+    id: router-blank
+  - name: VyOS
+    id: router-vyos
+  - name: MikroTik
+    id: router-mikrotik
+hosts:
+  - name: Blank
+    id: host-blank
+  - name: Debian
+    id: host-debian
+  - name: Ubuntu
+    id: host-ubuntu
+  - name: UbuntuVNC
+    id: host-ubuntuvnc
+  - name: KaliVNC
+    id: host-kalivnc

@@ -12,6 +12,7 @@ import SignIn from './pages/SignIn';
 import ComingSoonPage from './pages/ComingSoonPage';
 import GameList from './pages/GameList';
 import TeamList from './pages/TeamList';
+import GameSessionView from './pages/GameSessionView';
 import PrivateRoute from './providers/PrivateRoute';
 
 const App: React.FC = () => {
@@ -27,6 +28,7 @@ const App: React.FC = () => {
         <Route path="/my-games/:gameId/edit" element={<GameEditor />} />
         <Route path="/my-games/:gameId/network" element={<NetworkEditor />} />
         <Route path="/games" element={<GameList />} />
+        <Route path="/games/:sessionId" element={<GameSessionView />} />
         <Route path="/teams" element={<TeamList />} />
         <Route path="/ctfs" element={<ComingSoonPage title="My CTFs" />} />
         <Route path="/analytics" element={<ComingSoonPage title="Analytics" />} />

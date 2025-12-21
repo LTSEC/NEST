@@ -207,6 +207,15 @@ const MyGames: React.FC = () => {
                       </div>
                       <span className="text-xs font-semibold text-indigo-700">#{session.id}</span>
                     </div>
+                    <div className="flex flex-wrap gap-2 text-[11px] font-semibold">
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/games/${session.id}`)}
+                        className="rounded-lg bg-indigo-600 px-3 py-1 text-white shadow-sm transition hover:bg-indigo-500"
+                      >
+                        View game
+                      </button>
+                    </div>
                     {session.status === 'scheduled' && (
                       <div className="flex flex-wrap gap-2 text-[11px] text-slate-600">
                         {listTeams().map((team) => (

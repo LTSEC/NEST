@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import NavBar from '../components/NavBar';
-import { Game, GameType, RvbService, createGame, getGameById, updateGame } from '../data/games';
+import { Credential, Game, GameType, RvbService, createGame, getGameById, updateGame } from '../data/games';
 import { useAuth } from '../providers/AuthProvider';
 import ComingSoon from './partials/ComingSoon';
 
@@ -25,7 +25,9 @@ const GameEditor: React.FC = () => {
   const [name, setName] = useState(existingGame?.name ?? '');
   const [selectedTypes, setSelectedTypes] = useState<GameType[]>(existingGame?.types ?? []);
   const [selectedServices, setSelectedServices] = useState<RvbService[]>(existingGame?.rvbServices ?? []);
-  const [credentials, setCredentials] = useState(existingGame?.credentials?.join('\n') ?? 'root:changeme');
+  const [credentials, setCredentials] = useState<Credential[]>(
+    existingGame?.credentials ?? [{ username: 'root', password: 'changeme' }]
+  );
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -33,7 +35,9 @@ const GameEditor: React.FC = () => {
       setName(existingGame.name);
       setSelectedTypes(existingGame.types);
       setSelectedServices(existingGame.rvbServices);
-      setCredentials(existingGame.credentials.join('\n'));
+      setCredentials(existingGame.credentials.length
+        ? existingGame.credentials
+        : [{ username: 'root', password: 'changeme' }]);
     }
   }, [existingGame]);
 
@@ -83,7 +87,7 @@ const GameEditor: React.FC = () => {
           name,
           types: selectedTypes,
           rvbServices: selectedServices,
-          credentials: hasRvbSelected ? credentials.split('\n').map((line) => line.trim()).filter(Boolean) : [],
+          credentials: hasRvbSelected ? credentials : [],
           teamCount: existingGame.teamCount,
         });
       } else {
@@ -92,12 +96,7 @@ const GameEditor: React.FC = () => {
           developerId: user.id,
           types: selectedTypes,
           rvbServices: hasRvbSelected ? selectedServices : [],
-          credentials: hasRvbSelected
-            ? credentials
-                .split('\n')
-                .map((line) => line.trim())
-                .filter(Boolean)
-            : [],
+          credentials: hasRvbSelected ? credentials : [],
           teamCount: existingGame?.teamCount ?? 0,
         });
       }
@@ -210,17 +209,75 @@ const GameEditor: React.FC = () => {
               </p>
 
               <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-800" htmlFor="credential-list">
-                  Credentials (shared with players)
-                </label>
-                <textarea
-                  id="credential-list"
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm transition focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                  rows={3}
-                  value={credentials}
-                  onChange={(event) => setCredentials(event.target.value)}
-                />
-                <p className="text-xs text-slate-600">Defaults to root:changeme unless overridden.</p>
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-semibold text-slate-800" htmlFor="credential-list">
+                    Credentials (shared with players)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCredentials((prev) => [...prev, { username: 'user', password: 'password' }])
+                    }
+                    className="rounded-lg bg-white px-3 py-1 text-xs font-semibold text-indigo-700 shadow-sm ring-1 ring-indigo-200 transition hover:bg-indigo-50"
+                  >
+                    Add credential
+                  </button>
+                </div>
+                <div id="credential-list" className="space-y-2">
+                  {credentials.map((credential, index) => (
+                    <div
+                      key={`${credential.username}-${index}`}
+                      className="grid gap-2 rounded-lg bg-white p-3 text-sm shadow-sm ring-1 ring-slate-200 md:grid-cols-2"
+                    >
+                      <label className="flex flex-col gap-1 text-xs font-semibold text-slate-700">
+                        Username
+                        <input
+                          type="text"
+                          value={credential.username}
+                          onChange={(event) => {
+                            const value = event.target.value;
+                            setCredentials((prev) =>
+                              prev.map((entry, entryIndex) =>
+                                entryIndex === index ? { ...entry, username: value } : entry
+                              )
+                            );
+                          }}
+                          className="rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1 text-xs font-semibold text-slate-700">
+                        Password
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={credential.password}
+                            onChange={(event) => {
+                              const value = event.target.value;
+                              setCredentials((prev) =>
+                                prev.map((entry, entryIndex) =>
+                                  entryIndex === index ? { ...entry, password: value } : entry
+                                )
+                              );
+                            }}
+                            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setCredentials((prev) =>
+                                prev.filter((_, entryIndex) => entryIndex !== index || prev.length === 1)
+                              )
+                            }
+                            className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-600 ring-1 ring-red-100 transition hover:bg-red-100"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </label>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-slate-600">Defaults to root/changeme unless overridden.</p>
               </div>
             </div>
           )}

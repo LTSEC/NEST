@@ -3,13 +3,18 @@ import { VerifiedUser } from '../auth';
 export type GameType = 'Injects' | 'CTFs' | 'Red vs. Blue';
 export type RvbService = 'Scoring Engine' | 'DNS' | 'CDN' | 'CA';
 
+export type Credential = {
+  username: string;
+  password: string;
+};
+
 export type Game = {
   id: string;
   name: string;
   developerId: string;
   types: GameType[];
   rvbServices: RvbService[];
-  credentials: string[];
+  credentials: Credential[];
   teamCount: number;
   createdAt: string;
 };
@@ -29,7 +34,7 @@ const seededGames: Game[] = [
     developerId: '2',
     types: ['Red vs. Blue'],
     rvbServices: ['Scoring Engine', 'DNS'],
-    credentials: ['root:changeme'],
+    credentials: [{ username: 'root', password: 'changeme' }],
     teamCount: 4,
     createdAt: new Date().toISOString(),
   },
@@ -82,7 +87,7 @@ export const createGame = (params: {
   developerId: VerifiedUser['id'];
   types: GameType[];
   rvbServices?: RvbService[];
-  credentials?: string[];
+  credentials?: Credential[];
   teamCount?: number;
 }): Game => {
   const trimmedName = params.name.trim();
@@ -100,7 +105,9 @@ export const createGame = (params: {
     ? (params.rvbServices ?? []).filter((service) => isValidService(service))
     : [];
   const teamCount = includesRvb ? Math.max(0, params.teamCount ?? 0) : 0;
-  const credentials = includesRvb ? params.credentials ?? ['root:changeme'] : [];
+  const credentials = includesRvb
+    ? params.credentials ?? [{ username: 'root', password: 'changeme' }]
+    : [];
 
   const newGame: Game = {
     id: generateId(),

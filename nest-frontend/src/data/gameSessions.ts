@@ -17,7 +17,7 @@ export type GameSession = {
   invitedTeamIds: string[];
   participantTeamIds: string[];
   minPlayers: number;
-  status: 'scheduled' | 'running' | 'completed';
+  status: 'scheduled' | 'running' | 'paused' | 'completed';
 };
 
 const seededSessions: GameSession[] = [
@@ -73,6 +73,8 @@ const sessionsTable: GameSession[] = [...seededSessions];
 const generateId = () => `session-${Math.random().toString(16).slice(2, 10)}`;
 
 const updateStatus = (session: GameSession): GameSession => {
+    if (session.status === 'paused') return session;
+
   const now = Date.now();
   const start = new Date(session.startTime).getTime();
   const end = new Date(session.endTime).getTime();
@@ -95,6 +97,11 @@ const sortSessions = (sessions: GameSession[]) =>
 export const listActiveGameSessions = (options?: { publicOnly?: boolean }): GameSession[] => {
   const sessions = sessionsTable.map(updateStatus).filter((session) => session.status === 'running');
   return sortSessions(options?.publicOnly ? sessions.filter((session) => session.visibility === 'public') : sessions);
+};
+
+export const getSessionById = (sessionId: string): GameSession | undefined => {
+  const session = sessionsTable.find((entry) => entry.id === sessionId);
+  return session ? updateStatus(session) : undefined;
 };
 
 export const listDeveloperSessions = (developerId: VerifiedUser['id']): GameSession[] =>
@@ -177,6 +184,34 @@ export const joinSessionAsTeam = (sessionId: string, teamId: string): GameSessio
   if (session.visibility === 'private' && !session.invitedTeamIds.includes(teamId)) return session;
 
   session.participantTeamIds = Array.from(new Set([...session.participantTeamIds, teamId]));
+  return session;
+};
+
+export const pauseSession = (sessionId: string): GameSession | undefined => {
+  const session = sessionsTable.find((entry) => entry.id === sessionId);
+  if (!session) return undefined;
+  session.status = 'paused';
+  return session;
+};
+
+export const resumeSession = (sessionId: string): GameSession | undefined => {
+  const session = sessionsTable.find((entry) => entry.id === sessionId);
+  if (!session) return undefined;
+  return updateStatus(session);
+};
+
+export const shutdownSession = (sessionId: string): GameSession | undefined => {
+  const session = sessionsTable.find((entry) => entry.id === sessionId);
+  if (!session) return undefined;
+  session.status = 'completed';
+  return session;
+};
+
+export const removeTeamFromSession = (sessionId: string, teamId: string): GameSession | undefined => {
+  const session = sessionsTable.find((entry) => entry.id === sessionId);
+  if (!session) return undefined;
+  session.participantTeamIds = session.participantTeamIds.filter((id) => id !== teamId);
+  session.invitedTeamIds = session.invitedTeamIds.filter((id) => id !== teamId);
   return session;
 };
 

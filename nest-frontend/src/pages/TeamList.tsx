@@ -29,6 +29,7 @@ const TeamList: React.FC = () => {
   const [teams, setTeams] = useState<Team[]>(listTeams());
   const [invites, setInvites] = useState<TeamInvitation[]>(user ? listTeamInvitationsForUser(user.id) : []);
   const [teamNameInput, setTeamNameInput] = useState('');
+  const [renameInput, setRenameInput] = useState('');
   const [pendingLeave, setPendingLeave] = useState<string | null>(null);
   const [inviteeInput, setInviteeInput] = useState('');
   const [message, setMessage] = useState<string | null>(null);
@@ -44,7 +45,8 @@ const TeamList: React.FC = () => {
   useEffect(() => {
     setTeams(listTeams());
     if (user) setInvites(listTeamInvitationsForUser(user.id));
-  }, [user]);
+    setRenameInput(myTeam?.name ?? '');
+  }, [myTeam?.name, user]);
 
   const refresh = () => {
     setTeams(listTeams());
@@ -97,8 +99,8 @@ const TeamList: React.FC = () => {
   };
 
   const handleRenameTeam = (teamId: string) => {
-    renameTeam(teamId, teamNameInput || 'Updated Team');
-    setTeamNameInput('');
+    renameTeam(teamId, renameInput || 'Updated Team');
+    setRenameInput('');
     refresh();
   };
 
@@ -265,6 +267,12 @@ const TeamList: React.FC = () => {
                         >
                           Rename
                         </button>
+                        <input
+                          value={renameInput}
+                          onChange={(event) => setRenameInput(event.target.value)}
+                          placeholder="New team name"
+                          className="w-44 rounded-lg border border-slate-200 px-3 py-1 text-xs shadow-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                        />
                         <div className="flex items-center gap-2">
                           <input
                             value={inviteeInput}

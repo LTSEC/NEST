@@ -1,4 +1,4 @@
-import rawRegistry from '../../../network-assets.yaml?raw';
+import rawRegistry from "../assets/network-assets.yaml?raw";
 
 export type NetworkCategory = 'router' | 'host';
 

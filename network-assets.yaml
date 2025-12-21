@@ -1,14 +1,14 @@
 {
   "routers": [
-    { "id": "router-blank", "label": "Blank" },
-    { "id": "router-vyos", "label": "VyOS" },
-    { "id": "router-mikrotik", "label": "MikroTik" }
+    { "id": "-1", "label": "Blank" },
+    { "id": "2", "label": "VyOS" },
+    { "id": "-1", "label": "MikroTik" }
   ],
   "hosts": [
-    { "id": "host-blank", "label": "Blank" },
-    { "id": "host-debian", "label": "Debian" },
-    { "id": "host-ubuntu", "label": "Ubuntu" },
-    { "id": "host-ubuntu-vnc", "label": "Ubuntu VNC" },
-    { "id": "host-kali-vnc", "label": "Kali VNC" }
+    { "id": "-1", "label": "Blank" },
+    { "id": "0", "label": "Debian" },
+    { "id": "1", "label": "Ubuntu" },
+    { "id": "-1", "label": "Ubuntu VNC" },
+    { "id": "-1", "label": "Kali VNC" }
   ]
 }

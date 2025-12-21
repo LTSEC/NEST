@@ -1,0 +1,14 @@
+{
+  "routers": [
+    { "id": "router-blank", "label": "Blank" },
+    { "id": "router-vyos", "label": "VyOS" },
+    { "id": "router-mikrotik", "label": "MikroTik" }
+  ],
+  "hosts": [
+    { "id": "host-blank", "label": "Blank" },
+    { "id": "host-debian", "label": "Debian" },
+    { "id": "host-ubuntu", "label": "Ubuntu" },
+    { "id": "host-ubuntu-vnc", "label": "Ubuntu VNC" },
+    { "id": "host-kali-vnc", "label": "Kali VNC" }
+  ]
+}

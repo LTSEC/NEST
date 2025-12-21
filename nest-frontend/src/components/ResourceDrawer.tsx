@@ -1,7 +1,5 @@
 import React from 'react';
-
-const routerItems = ['Blank', 'VyOS', 'MikroTik'];
-const hostItems = ['Blank', 'Debian', 'Ubuntu', 'UbuntuVNC', 'KaliVNC'];
+import { networkItemsByCategory } from '../data/networkItems';
 
 interface ResourceDrawerProps {
   open: boolean;
@@ -24,13 +22,15 @@ const ResourceDrawer: React.FC<ResourceDrawerProps> = ({ open, onToggle }) => {
           <div className="space-y-2">
             <div className="text-xs uppercase tracking-wide text-slate-400">Routers</div>
             <div className="flex flex-wrap gap-2">
-              {routerItems.map((item) => (
+              {networkItemsByCategory.router.map((item) => (
                 <button
-                  key={item}
+                  key={item.id}
                   type="button"
+                  data-item-id={item.id}
                   className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 font-medium text-white shadow-sm transition hover:border-white/30 hover:bg-white/10"
                 >
-                  {item}
+                  <div className="text-sm font-semibold">{item.label}</div>
+                  <div className="text-[10px] font-medium uppercase tracking-wide text-slate-400">ID: {item.id}</div>
                 </button>
               ))}
             </div>
@@ -38,13 +38,15 @@ const ResourceDrawer: React.FC<ResourceDrawerProps> = ({ open, onToggle }) => {
           <div className="space-y-2">
             <div className="text-xs uppercase tracking-wide text-slate-400">Hosts</div>
             <div className="flex flex-wrap gap-2">
-              {hostItems.map((item) => (
+              {networkItemsByCategory.host.map((item) => (
                 <button
-                  key={item}
+                  key={item.id}
                   type="button"
+                  data-item-id={item.id}
                   className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 font-medium text-white shadow-sm transition hover:border-white/30 hover:bg-white/10"
                 >
-                  {item}
+                  <div className="text-sm font-semibold">{item.label}</div>
+                  <div className="text-[10px] font-medium uppercase tracking-wide text-slate-400">ID: {item.id}</div>
                 </button>
               ))}
             </div>

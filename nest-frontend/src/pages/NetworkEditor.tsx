@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import NavBar from '../components/NavBar';
+import ResourceDrawer from '../components/ResourceDrawer';
 import { getGameById } from '../data/games';
 import { useAuth } from '../providers/AuthProvider';
 
@@ -17,6 +18,7 @@ const NetworkEditor: React.FC = () => {
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(true);
   const dragOrigin = useRef({ x: 0, y: 0 });
   const offsetOrigin = useRef({ x: 0, y: 0 });
 
@@ -88,6 +90,8 @@ const NetworkEditor: React.FC = () => {
           </div>
         </div>
 
+        <ResourceDrawer open={drawerOpen} onToggle={() => setDrawerOpen((open) => !open)} />
+
         <div className="absolute right-4 top-4 z-20 flex items-center gap-2">
           <button
             type="button"
@@ -115,7 +119,7 @@ const NetworkEditor: React.FC = () => {
 
         <div className="absolute inset-0" aria-label="Network canvas">
           <div
-            className={`pointer-events-none absolute inset-0 transition ${dragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+            className={`pointer-events-none absolute inset-0 rounded-lg transition ${dragging ? 'cursor-grabbing ring-2 ring-sky-400/60 brightness-110' : 'cursor-grab ring-1 ring-white/5'}`}
             style={{
               backgroundImage:
                 'radial-gradient(circle at 1px 1px, rgba(255,255,255,0.08) 1px, transparent 0)',

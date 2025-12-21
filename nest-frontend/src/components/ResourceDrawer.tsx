@@ -12,7 +12,7 @@ const ResourceDrawer: React.FC<ResourceDrawerProps> = ({ open, onToggle }) => {
   return (
     <div className="pointer-events-auto absolute left-0 top-0 z-30 h-full">
       <div
-        className={`relative flex h-full max-h-[calc(100vh-72px)] w-72 translate-x-0 flex-col overflow-visible rounded-r-xl border border-white/10 bg-slate-900/85 backdrop-blur transition-transform duration-300 ${open ? 'translate-x-0' : '-translate-x-[calc(100%-20px)]'}`}
+        className={`relative flex h-full max-h-[calc(100vh-72px)] w-72 translate-x-0 flex-col overflow-hidden rounded-r-xl border border-white/10 bg-slate-900/85 backdrop-blur transition-transform duration-300 ${open ? '' : '-translate-x-[calc(100%-16px)]'}`}
         onWheel={(event) => event.stopPropagation()}
         onMouseDown={(event) => event.stopPropagation()}
       >
@@ -52,9 +52,8 @@ const ResourceDrawer: React.FC<ResourceDrawerProps> = ({ open, onToggle }) => {
         <button
           type="button"
           aria-label={open ? 'Collapse resource drawer' : 'Expand resource drawer'}
-          aria-expanded={open}
           onClick={onToggle}
-          className={`absolute top-6 -right-3 flex h-10 w-8 items-center justify-center rounded-r-lg border border-white/10 bg-slate-900/85 text-white shadow-lg transition hover:bg-slate-800 ${open ? 'shadow-sky-500/30' : 'shadow-white/10'}`}
+          className={`absolute top-6 right-[-14px] flex h-10 w-7 items-center justify-center rounded-r-lg border border-white/10 bg-slate-900/85 text-white shadow-lg transition hover:bg-slate-800 ${open ? 'shadow-sky-500/30' : 'shadow-white/10'}`}
         >
           <span className={`transition-transform ${open ? 'rotate-180' : ''}`}>&#x25C0;</span>
         </button>

@@ -9,6 +9,26 @@ export type HostedGameStatus = {
   gameId: string;
 };
 
+export const destroyHostedGame = async (hostedGameId: number): Promise<void> => {
+  const response = await fetch(`http://localhost:4545/api/games/${hostedGameId}`, { method: 'DELETE' });
+  if (!response.ok) {
+    throw new Error('Failed to destroy game infrastructure');
+  }
+};
+
+export const readTerraformConsole = async (): Promise<string[]> => {
+  const response = await fetch('http://localhost:4545/api/terraform/console');
+  if (!response.ok) {
+    throw new Error('Unable to read terraform console');
+  }
+
+  const body = await response.text();
+  return body
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+};
+
 type BackendGameStatus = {
   ID: number;
   Name: string;

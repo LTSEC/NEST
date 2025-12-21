@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import NavBar from '../components/NavBar';
 import { Game, deleteGame, listGamesForDeveloper } from '../data/games';
@@ -8,7 +8,10 @@ import {
   inviteTeamToSession,
   listDeveloperSessions,
   scheduleGameSession,
+  shutdownSession,
+  updateInfrastructureStatus,
 } from '../data/gameSessions';
+import { destroyHostedGame, hostGameInstance, readTerraformConsole } from '../data/gameHosting';
 import { listTeams } from '../data/teams';
 import { useAuth } from '../providers/AuthProvider';
 import ComingSoon from './partials/ComingSoon';
@@ -30,6 +33,12 @@ const MyGames: React.FC = () => {
   const [visibility, setVisibility] = useState<GameVisibility>('public');
   const [minPlayersInput, setMinPlayersInput] = useState('3');
   const [invitedTeams, setInvitedTeams] = useState<string[]>([]);
+  const [consoleLogs, setConsoleLogs] = useState<string[]>([]);
+  const [consoleVisible, setConsoleVisible] = useState(false);
+  const [consoleTitle, setConsoleTitle] = useState('');
+  const [consoleMode, setConsoleMode] = useState<'create' | 'destroy' | null>(null);
+  const consoleIntervalRef = useRef<number | null>(null);
+  const [destroyingSessionId, setDestroyingSessionId] = useState<string | null>(null);
 
   useEffect(() => {
     if (user && isDeveloper) {
@@ -38,6 +47,32 @@ const MyGames: React.FC = () => {
     }
   }, [isDeveloper, user]);
 
+  useEffect(() => {
+    const refreshConsole = async () => {
+      try {
+        const lines = await readTerraformConsole();
+        setConsoleLogs(lines);
+      } catch (error) {
+        setConsoleLogs((prev) => [
+          ...(prev.length ? prev : ['Terraform console']),
+          error instanceof Error ? error.message : 'Unable to read terraform console',
+        ]);
+      }
+    };
+
+    if (!consoleVisible) return undefined;
+
+    refreshConsole();
+    const intervalId = window.setInterval(refreshConsole, 2000);
+    consoleIntervalRef.current = intervalId;
+
+    return () => {
+      if (consoleIntervalRef.current) {
+        clearInterval(consoleIntervalRef.current);
+      }
+    };
+  }, [consoleVisible]);
+
   const filteredGames = useMemo(
     () =>
       games.filter((game) => game.name.toLowerCase().includes(searchTerm.trim().toLowerCase())),
@@ -45,7 +80,10 @@ const MyGames: React.FC = () => {
   );
 
   const activeHostedCount = useMemo(
-    () => sessions.filter((session) => session.status === 'running').length,
+    () =>
+      sessions.filter(
+        (session) => session.status === 'running' || session.infrastructureStatus === 'creating'
+      ).length,
     [sessions],
   );
 
@@ -55,9 +93,19 @@ const MyGames: React.FC = () => {
     setGames(listGamesForDeveloper(user.id));
   };
 
-  const startHostingGame = (game: Game, teams?: number) => {
+  const startHostingGame = async (game: Game, teams?: number) => {
+    if (!user) return;
+    if (activeHostedCount > 0) {
+      setHostingError('You can only host one game at a time.');
+      return;
+    }
+
     setHostingGameId(game.id);
     setHostingError(null);
+    setConsoleLogs([]);
+    setConsoleTitle(`Hosting ${game.name}`);
+    setConsoleMode('create');
+    setConsoleVisible(true);
 
     try {
       const start = startTimeInput ? new Date(startTimeInput) : new Date();
@@ -66,6 +114,7 @@ const MyGames: React.FC = () => {
       if (end <= start) {
         setHostingError('End time must be after start time.');
         setHostingGameId(null);
+        setConsoleVisible(false);
         return;
       }
 
@@ -73,17 +122,23 @@ const MyGames: React.FC = () => {
       const safeMinPlayers = Number.isFinite(minPlayers) && minPlayers > 0 ? Math.floor(minPlayers) : 1;
       const effectiveMinimum = teams ? Math.max(safeMinPlayers, teams) : safeMinPlayers;
 
-      scheduleGameSession(game, { id: user!.id, name: user!.name }, {
+      const hosted = await hostGameInstance(game, { teamCount: teams });
+
+      const session = scheduleGameSession(game, { id: user.id, name: user.name }, {
         startTime: start.toISOString(),
         endTime: end.toISOString(),
         visibility,
         invitedTeamIds: invitedTeams,
         minPlayers: effectiveMinimum,
+        infrastructureId: hosted.id,
+        infrastructureStatus: hosted.status === 'running' ? 'active' : 'creating',
       });
 
-      setSessions(listDeveloperSessions(user!.id));
+      updateInfrastructureStatus(session.id, hosted.status === 'running' ? 'active' : 'creating');
+      setSessions(listDeveloperSessions(user.id));
     } catch (error) {
       setHostingError(error instanceof Error ? error.message : 'Failed to host game.');
+      setConsoleVisible(false);
     }
 
     setHostingGameId(null);
@@ -102,17 +157,45 @@ const MyGames: React.FC = () => {
     setInvitedTeams([]);
   };
 
-  const confirmTeamSelection = () => {
+  const confirmTeamSelection = async () => {
     if (!pendingHostGame) return;
 
     const parsedTeams = Number(teamCountInput);
     const safeTeamCount = Number.isFinite(parsedTeams) && parsedTeams > 0 ? Math.floor(parsedTeams) : 1;
     const gameToHost = pendingHostGame;
     setPendingHostGame(null);
-    startHostingGame(gameToHost, safeTeamCount);
+    await startHostingGame(gameToHost, safeTeamCount);
   };
 
   const cancelTeamSelection = () => setPendingHostGame(null);
+
+  const handleDestroySession = async (session: GameSession) => {
+    if (!user) return;
+    if (!session.infrastructureId) {
+      setHostingError('No infrastructure deployment was recorded for this game.');
+      return;
+    }
+
+    const confirmed = window.confirm('This will destroy the terraform deployment for this game. Continue?');
+    if (!confirmed) return;
+
+    setDestroyingSessionId(session.id);
+    setConsoleLogs([]);
+    setConsoleTitle(`Destroying ${session.gameName}`);
+    setConsoleMode('destroy');
+    setConsoleVisible(true);
+
+    try {
+      await destroyHostedGame(session.infrastructureId);
+      shutdownSession(session.id);
+      updateInfrastructureStatus(session.id, 'destroying');
+      setSessions(listDeveloperSessions(user.id));
+    } catch (error) {
+      setHostingError(error instanceof Error ? error.message : 'Failed to destroy game.');
+    }
+
+    setDestroyingSessionId(null);
+  };
 
   if (!user) return null;
 
@@ -195,6 +278,9 @@ const MyGames: React.FC = () => {
                         </p>
                         <p className="text-[11px] text-slate-500">Visibility: {session.visibility}</p>
                         <p className="text-[11px] text-slate-500">Minimum players: {session.minPlayers}</p>
+                        <p className="text-[11px] text-slate-500">
+                          Infrastructure: {session.infrastructureStatus ?? 'Not provisioned'}
+                        </p>
                         {session.invitedTeamIds.length > 0 && (
                           <p className="text-[11px] text-slate-500">
                             Invited:{' '}
@@ -214,6 +300,25 @@ const MyGames: React.FC = () => {
                         className="rounded-lg bg-indigo-600 px-3 py-1 text-white shadow-sm transition hover:bg-indigo-500"
                       >
                         View game
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setConsoleTitle(`Terraform console for ${session.gameName}`);
+                          setConsoleMode(null);
+                          setConsoleVisible(true);
+                        }}
+                        className="rounded-lg bg-slate-100 px-3 py-1 text-indigo-700 ring-1 ring-indigo-100 transition hover:bg-slate-50"
+                      >
+                        View terraform console
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDestroySession(session)}
+                        disabled={destroyingSessionId === session.id}
+                        className="rounded-lg bg-red-600 px-3 py-1 text-white shadow-sm transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-70"
+                      >
+                        {destroyingSessionId === session.id ? 'Destroying...' : 'Destroy game'}
                       </button>
                     </div>
                     {session.status === 'scheduled' && (
@@ -287,10 +392,14 @@ const MyGames: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => handleHostClick(game)}
-                      disabled={hostingGameId === game.id}
+                      disabled={hostingGameId === game.id || activeHostedCount > 0}
                       className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
                     >
-                      {hostingGameId === game.id ? 'Hosting...' : 'Host game'}
+                      {hostingGameId === game.id
+                        ? 'Hosting...'
+                        : activeHostedCount > 0
+                        ? 'Hosting locked'
+                        : 'Host game'}
                     </button>
                     <button
                       type="button"
@@ -442,6 +551,33 @@ const MyGames: React.FC = () => {
                 </button>
               </div>
             </div>
+          </div>
+        )}
+
+        {consoleVisible && (
+          <div className="fixed bottom-4 right-4 z-20 w-full max-w-xl overflow-hidden rounded-xl bg-white shadow-xl ring-1 ring-slate-200">
+            <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">{consoleTitle || 'Terraform console'}</p>
+                <p className="text-[11px] text-slate-500">
+                  {consoleMode === 'create'
+                    ? 'Provisioning infrastructure...'
+                    : consoleMode === 'destroy'
+                    ? 'Destroying infrastructure...'
+                    : 'Live output from the terraform console'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setConsoleVisible(false)}
+                className="rounded-lg bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-200"
+              >
+                Close
+              </button>
+            </div>
+            <pre className="max-h-64 overflow-y-auto bg-slate-900 px-4 py-3 text-xs text-slate-100">
+              {(consoleLogs.length ? consoleLogs : ['Waiting for console output...']).join('\n')}
+            </pre>
           </div>
         )}
       </main>

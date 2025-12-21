@@ -119,7 +119,9 @@ const NetworkEditor: React.FC = () => {
   const [customServices, setCustomServices] = useState<CustomServiceInstance[]>([]);
   const [serviceLinks, setServiceLinks] = useState<ServiceLink[]>([]);
   const [anchorPositions, setAnchorPositions] = useState<Record<string, { x: number; y: number }>>({});
-  const [nodeRects, setNodeRects] = useState<Record<string, { x: number; y: number; width: number; height: number }>>({});
+  const [nodeBounds, setNodeBounds] = useState<
+    Record<string, { x: number; y: number; width: number; height: number; centerX: number; centerY: number }>
+  >({});
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
   const [linkInProgress, setLinkInProgress] = useState<{ anchorId: string; point: { x: number; y: number } } | null>(null);
@@ -137,6 +139,28 @@ const NetworkEditor: React.FC = () => {
   const nodeStart = useRef({ x: 0, y: 0 });
   const anchorRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const nodeRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  const surfacePointToward = (
+    bounds: { centerX: number; centerY: number; width: number; height: number },
+    target: { x: number; y: number },
+  ) => {
+    const dx = target.x - bounds.centerX;
+    const dy = target.y - bounds.centerY;
+    if (dx === 0 && dy === 0) {
+      return { x: bounds.centerX, y: bounds.centerY };
+    }
+
+    const halfWidth = bounds.width / 2;
+    const halfHeight = bounds.height / 2;
+    const tx = dx === 0 ? Number.POSITIVE_INFINITY : halfWidth / Math.abs(dx);
+    const ty = dy === 0 ? Number.POSITIVE_INFINITY : halfHeight / Math.abs(dy);
+    const t = Math.min(tx, ty);
+
+    return {
+      x: bounds.centerX + dx * t,
+      y: bounds.centerY + dy * t,
+    };
+  };
 
   const createInterface = (name: string): NetworkInterface => ({
     id: createId(),
@@ -403,29 +427,16 @@ const NetworkEditor: React.FC = () => {
     setCustomServiceModal(null);
   };
 
-  const removeCustomService = (id: string) => {
-    const keepHostServices = window.confirm(
-      'Remove this custom service? Select OK to keep underlying host services enabled or Cancel to disable them.',
-    );
-
+  const removeCustomServiceInstance = (customServiceId: string) => {
+    setCustomServices((current) => current.filter((service) => service.id !== customServiceId));
     setNodes((current) =>
-      current.map((node) => {
-        if (keepHostServices) {
-          let changed = false;
-          const nextServices = node.services.map((service) => {
-            if (service.customServiceId !== id) return service;
-            changed = true;
-            return { ...service, customServiceId: undefined };
-          });
-          return changed ? { ...node, services: nextServices } : node;
-        }
-
-        const filtered = node.services.filter((service) => service.customServiceId !== id);
-        return filtered.length === node.services.length ? node : { ...node, services: filtered };
-      }),
+      current.map((node) => ({
+        ...node,
+        services: node.services.map((service) =>
+          service.customServiceId === customServiceId ? { ...service, customServiceId: undefined } : service,
+        ),
+      })),
     );
-
-    setCustomServices((current) => current.filter((service) => service.id !== id));
   };
 
   const handleSaveNetwork = () => {
@@ -791,35 +802,36 @@ const NetworkEditor: React.FC = () => {
     return complete ? 'complete' : 'incomplete';
   };
 
-  const customServiceIssues = (service: CustomServiceInstance) => {
-    const definition = customServicesById[service.definitionId];
-    if (!definition) return ['Unknown service definition'];
+  const describeCustomServiceIssues = (
+    definitionId: string,
+    bindings: Record<string, string | undefined>,
+  ): string[] => {
+    const definition = customServicesById[definitionId];
+    if (!definition) return ['Missing service definition'];
 
     const issues: string[] = [];
-    const missingDependencies = (definition.dependencies ?? []).filter(
-      (dependencyId) => !nodes.some((node) => node.services.some((svc) => svc.serviceId === dependencyId)),
-    );
 
-    if (missingDependencies.length > 0) {
-      issues.push(`Missing dependencies: ${missingDependencies.map((dep) => serviceDefinitionsById[dep]?.name ?? dep).join(', ')}`);
-    }
+    const missingDependencies = (definition.dependencies ?? []).filter(
+      (dependencyId) => !nodes.some((node) => node.services.some((service) => service.serviceId === dependencyId)),
+    );
+    missingDependencies.forEach((dependencyId) => {
+      issues.push(`Dependency not present: ${serviceDefinitionsById[dependencyId]?.name ?? dependencyId}`);
+    });
 
     (definition.requiredRoles ?? []).forEach((role) => {
-      const hostId = service.roleBindings[role.role];
+      const hostId = bindings[role.role];
       if (!hostId) {
-        issues.push(`Role ${role.role} not assigned`);
+        issues.push(`Unassigned role: ${role.role}`);
         return;
       }
       const host = nodes.find((node) => node.id === hostId);
       if (!host) {
-        issues.push(`Role ${role.role} host missing`);
+        issues.push(`Missing host for role ${role.role}`);
         return;
       }
-      const hasService = host.services.some((svc) => svc.serviceId === role.serviceId);
+      const hasService = host.services.some((service) => service.serviceId === role.serviceId);
       if (!hasService) {
-        issues.push(
-          `${role.role} missing ${serviceDefinitionsById[role.serviceId]?.name ?? role.serviceId} service on host ${host.label}`,
-        );
+        issues.push(`Required service not enabled on ${host.label}: ${serviceDefinitionsById[role.serviceId]?.name ?? role.serviceId}`);
       }
     });
 
@@ -1125,7 +1137,7 @@ const NetworkEditor: React.FC = () => {
     if (!container) return;
     const rect = container.getBoundingClientRect();
     const positions: Record<string, { x: number; y: number }> = {};
-    const bounds: Record<string, { x: number; y: number; width: number; height: number }> = {};
+    const bounds: Record<string, { x: number; y: number; width: number; height: number; centerX: number; centerY: number }> = {};
 
     Object.entries(anchorRefs.current).forEach(([key, element]) => {
       if (!element) return;
@@ -1140,17 +1152,16 @@ const NetworkEditor: React.FC = () => {
 
     Object.entries(nodeRefs.current).forEach(([key, element]) => {
       if (!element) return;
-      const nodeRect = element.getBoundingClientRect();
-      bounds[key] = {
-        x: (nodeRect.left - rect.left - offset.x) / scale,
-        y: (nodeRect.top - rect.top - offset.y) / scale,
-        width: nodeRect.width / scale,
-        height: nodeRect.height / scale,
-      };
+      const box = element.getBoundingClientRect();
+      const x = (box.left - rect.left - offset.x) / scale;
+      const y = (box.top - rect.top - offset.y) / scale;
+      const width = box.width / scale;
+      const height = box.height / scale;
+      bounds[key] = { x, y, width, height, centerX: x + width / 2, centerY: y + height / 2 };
     });
 
     setAnchorPositions(positions);
-    setNodeRects(bounds);
+    setNodeBounds(bounds);
   }, [nodes, scale, offset]);
 
   const nodeEdgePoint = (
@@ -1211,7 +1222,7 @@ const NetworkEditor: React.FC = () => {
         </div>
       </div>
 
-      <div className="pointer-events-auto absolute left-4 top-20 z-20 w-80 space-y-2">
+      <div className="pointer-events-auto absolute left-4 top-20 z-20 w-80 space-y-2" onWheel={(event) => event.stopPropagation()}>
         <div className="rounded-lg border border-white/10 bg-slate-900/85 p-3 text-xs shadow-lg backdrop-blur">
           <div className="mb-2 flex items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-slate-200">
             <span>Custom services</span>
@@ -1219,48 +1230,47 @@ const NetworkEditor: React.FC = () => {
           </div>
           <div className="space-y-2">
             {customServices.length === 0 && <div className="text-[11px] text-slate-300">None registered</div>}
-            {customServices.map((service) => {
-              const definition = customServicesById[service.definitionId];
-              const issues = customServiceIssues(service);
-              return (
-                <div
-                  key={service.id}
-                  className={`rounded border px-2 py-2 text-[11px] ${
-                    service.status === 'complete'
+            <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
+              {customServices.map((service) => {
+                const definition = customServicesById[service.definitionId];
+                const issues =
+                  service.status === 'complete'
+                    ? []
+                    : describeCustomServiceIssues(service.definitionId, service.roleBindings);
+                return (
+                  <div
+                    key={service.id}
+                    className={`rounded border px-2 py-2 text-[11px] ${
+                      service.status === 'complete'
                       ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-50'
                       : 'border-amber-400/40 bg-amber-500/10 text-amber-50'
                   }`}
-                >
-                  <div className="flex items-center justify-between font-semibold">
-                    <div className="flex flex-col">
+                  >
+                    <div className="flex items-center justify-between font-semibold">
                       <span>{definition?.name ?? service.definitionId}</span>
-                      {service.status === 'incomplete' && issues.length > 0 && (
-                        <span className="text-[10px] font-normal text-white/80">{issues[0]}</span>
-                      )}
+                      <div className="flex items-center gap-2">
+                        <span className="uppercase tracking-wide">{service.status}</span>
+                        <button
+                          type="button"
+                          onClick={() => removeCustomServiceInstance(service.id)}
+                          className="rounded bg-black/20 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white/80 ring-1 ring-white/10 transition hover:bg-rose-500/20 hover:text-white"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="uppercase tracking-wide">{service.status}</span>
-                      <button
-                        type="button"
-                        aria-label={`Remove ${definition?.name ?? service.definitionId}`}
-                        onClick={() => removeCustomService(service.id)}
-                        className="rounded bg-white/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white transition hover:bg-white/20"
-                      >
-                        Delete
-                      </button>
-                    </div>
+                    {definition?.description && <div className="text-[10px] text-white/80">{definition.description}</div>}
+                    {issues.length > 0 && (
+                      <ul className="mt-2 list-disc space-y-1 pl-4 text-[10px] text-amber-50/90">
+                        {issues.map((issue) => (
+                          <li key={issue}>{issue}</li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
-                  {definition?.description && <div className="text-[10px] text-white/80">{definition.description}</div>}
-                  {service.status === 'incomplete' && issues.length > 1 && (
-                    <ul className="mt-1 list-inside list-disc space-y-0.5 text-[10px] text-white/80">
-                      {issues.slice(1).map((issue) => (
-                        <li key={issue}>{issue}</li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>
@@ -1318,18 +1328,14 @@ const NetworkEditor: React.FC = () => {
                     const fromNode = nodes.find((node) => node.id === link.fromHostId);
                     const toNode = nodes.find((node) => node.id === link.toHostId);
                     if (!fromNode || !toNode) return null;
-                    const fromRect = nodeRects[fromNode.id];
-                    const toRect = nodeRects[toNode.id];
+                    const fromBox = nodeBounds[link.fromHostId];
+                    const toBox = nodeBounds[link.toHostId];
                     const fallbackStart = { x: fromNode.x + 120, y: fromNode.y + 70 };
                     const fallbackEnd = { x: toNode.x + 120, y: toNode.y + 70 };
-                    const endCenter = toRect
-                      ? { x: toRect.x + toRect.width / 2, y: toRect.y + toRect.height / 2 }
-                      : fallbackEnd;
-                    const startCenter = fromRect
-                      ? { x: fromRect.x + fromRect.width / 2, y: fromRect.y + fromRect.height / 2 }
-                      : fallbackStart;
-                    const start = fromRect ? nodeEdgePoint(fromRect, endCenter) : startCenter;
-                    const end = toRect ? nodeEdgePoint(toRect, startCenter) : endCenter;
+                    const fromCenter = fromBox ? { x: fromBox.centerX, y: fromBox.centerY } : fallbackStart;
+                    const toCenter = toBox ? { x: toBox.centerX, y: toBox.centerY } : fallbackEnd;
+                    const start = fromBox ? surfacePointToward(fromBox, toCenter) : fallbackStart;
+                    const end = toBox ? surfacePointToward(toBox, fromCenter) : fallbackEnd;
                     const dx = Math.max(Math.abs(end.x - start.x) * 0.25, 60);
                     const path = `M ${start.x} ${start.y} C ${start.x + dx} ${start.y} ${end.x - dx} ${end.y} ${end.x} ${end.y}`;
                     const customService = customServices.find((service) => service.id === link.customServiceId);
@@ -1404,6 +1410,13 @@ const NetworkEditor: React.FC = () => {
                     }}
                     className="absolute"
                     style={{ left: node.x, top: node.y }}
+                    ref={(element) => {
+                      if (element) {
+                        nodeRefs.current[node.id] = element;
+                      } else {
+                        delete nodeRefs.current[node.id];
+                      }
+                    }}
                     onMouseDown={(event) => handleNodeMouseDown(event, node)}
                     onContextMenu={(event) => handleNodeContextMenu(event, node)}
                     role="button"
@@ -1855,7 +1868,7 @@ const NetworkEditor: React.FC = () => {
           <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4">
             <div
               className="w-full max-w-xl space-y-4 overflow-y-auto rounded-lg border border-white/10 bg-slate-900/95 p-6 text-sm shadow-2xl"
-              style={{ maxHeight: '85vh' }}
+              style={{ maxHeight: '80vh' }}
               onWheel={(event) => event.stopPropagation()}
             >
               {(() => {

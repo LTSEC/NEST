@@ -3,8 +3,8 @@ version: '3.9'
 services:
   frontend:
     build:
-      context: ./nest-frontend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: nest-frontend/Dockerfile
     ports:
       - "${APP_PORT:-5173}:${APP_PORT:-5173}"
     environment:

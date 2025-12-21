@@ -3,11 +3,14 @@ WORKDIR /app
 ENV APP_PORT=5173
 
 # Install dependencies
-COPY package.json ./
+COPY nest-frontend/package.json ./
 RUN npm install
 
 # Copy source
-COPY . .
+COPY nest-frontend/ ./
+
+# Copy the network-assets file
+COPY network-assets.yaml ./src/assets/network-assets.yaml
 
 EXPOSE ${APP_PORT}
 

@@ -5,6 +5,7 @@ import DevSignIn from './pages/DevSignIn';
 import DeveloperHome from './pages/DeveloperHome';
 import Landing from './pages/Landing';
 import MyGames from './pages/MyGames';
+import GameEditor from './pages/GameEditor';
 import NetworkEditor from './pages/NetworkEditor';
 import Profile from './pages/Profile';
 import SignIn from './pages/SignIn';
@@ -20,6 +21,8 @@ const App: React.FC = () => {
         <Route path="/app" element={<Home />} />
         <Route path="/developer" element={<DeveloperHome />} />
         <Route path="/my-games" element={<MyGames />} />
+        <Route path="/my-games/new" element={<GameEditor />} />
+        <Route path="/my-games/:gameId/edit" element={<GameEditor />} />
         <Route path="/my-games/:gameId/network" element={<NetworkEditor />} />
         <Route path="/games" element={<ComingSoonPage title="Game List" />} />
         <Route path="/teams" element={<ComingSoonPage title="Team List" />} />

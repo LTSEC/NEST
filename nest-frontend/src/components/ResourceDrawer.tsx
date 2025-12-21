@@ -1,25 +1,5 @@
 import React from 'react';
-
-type ResourceKind = 'router' | 'host';
-
-interface ResourceItem {
-  label: string;
-  kind: ResourceKind;
-}
-
-const routerItems: ResourceItem[] = [
-  { label: 'Blank', kind: 'router' },
-  { label: 'VyOS', kind: 'router' },
-  { label: 'MikroTik', kind: 'router' },
-];
-
-const hostItems: ResourceItem[] = [
-  { label: 'Blank', kind: 'host' },
-  { label: 'Debian', kind: 'host' },
-  { label: 'Ubuntu', kind: 'host' },
-  { label: 'UbuntuVNC', kind: 'host' },
-  { label: 'KaliVNC', kind: 'host' },
-];
+import { networkItemsByCategory } from '../data/networkItems';
 
 interface ResourceDrawerProps {
   open: boolean;
@@ -50,15 +30,15 @@ const ResourceDrawer: React.FC<ResourceDrawerProps> = ({ open, onToggle, onStart
           <div className="space-y-2">
             <div className="text-xs uppercase tracking-wide text-slate-400">Routers</div>
             <div className="flex flex-wrap gap-2">
-              {routerItems.map((item) => (
+              {networkItemsByCategory.router.map((item) => (
                 <button
-                  key={item.label}
+                  key={item.id}
                   type="button"
-                  draggable
-                  onDragStart={(event) => handleDragStart(event, item)}
-                  className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 font-medium text-white shadow-sm transition hover:border-sky-300/40 hover:bg-white/15"
+                  data-item-id={item.id}
+                  className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 font-medium text-white shadow-sm transition hover:border-white/30 hover:bg-white/10"
                 >
-                  {item.label}
+                  <div className="text-sm font-semibold">{item.label}</div>
+                  <div className="text-[10px] font-medium uppercase tracking-wide text-slate-400">ID: {item.id}</div>
                 </button>
               ))}
             </div>
@@ -66,15 +46,15 @@ const ResourceDrawer: React.FC<ResourceDrawerProps> = ({ open, onToggle, onStart
           <div className="space-y-2">
             <div className="text-xs uppercase tracking-wide text-slate-400">Hosts</div>
             <div className="flex flex-wrap gap-2">
-              {hostItems.map((item) => (
+              {networkItemsByCategory.host.map((item) => (
                 <button
-                  key={item.label}
+                  key={item.id}
                   type="button"
-                  draggable
-                  onDragStart={(event) => handleDragStart(event, item)}
-                  className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 font-medium text-white shadow-sm transition hover:border-emerald-300/40 hover:bg-white/15"
+                  data-item-id={item.id}
+                  className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 font-medium text-white shadow-sm transition hover:border-white/30 hover:bg-white/10"
                 >
-                  {item.label}
+                  <div className="text-sm font-semibold">{item.label}</div>
+                  <div className="text-[10px] font-medium uppercase tracking-wide text-slate-400">ID: {item.id}</div>
                 </button>
               ))}
             </div>

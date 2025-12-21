@@ -1,15 +1,15 @@
 import React from 'react';
-import { networkItemsByCategory } from '../data/networkItems';
+import { NetworkItem, networkItemsByCategory } from '../data/networkItems';
 
 interface ResourceDrawerProps {
   open: boolean;
   onToggle: () => void;
-  onStartDrag: (item: ResourceItem) => void;
+  onStartDrag: (item: NetworkItem) => void;
 }
 
 const ResourceDrawer: React.FC<ResourceDrawerProps> = ({ open, onToggle, onStartDrag }) => {
-  const handleDragStart = (event: React.DragEvent<HTMLButtonElement>, item: ResourceItem) => {
-    event.dataTransfer.setData('application/nest-node-kind', item.kind);
+  const handleDragStart = (event: React.DragEvent<HTMLButtonElement>, item: NetworkItem) => {
+    event.dataTransfer.setData('application/nest-node-kind', item.category);
     event.dataTransfer.setData('application/nest-node-label', item.label);
     event.dataTransfer.effectAllowed = 'copy';
     onStartDrag(item);
@@ -34,6 +34,8 @@ const ResourceDrawer: React.FC<ResourceDrawerProps> = ({ open, onToggle, onStart
                 <button
                   key={item.id}
                   type="button"
+                  draggable
+                  onDragStart={(event) => handleDragStart(event, item)}
                   data-item-id={item.id}
                   className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 font-medium text-white shadow-sm transition hover:border-white/30 hover:bg-white/10"
                 >
@@ -50,6 +52,8 @@ const ResourceDrawer: React.FC<ResourceDrawerProps> = ({ open, onToggle, onStart
                 <button
                   key={item.id}
                   type="button"
+                  draggable
+                  onDragStart={(event) => handleDragStart(event, item)}
                   data-item-id={item.id}
                   className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 font-medium text-white shadow-sm transition hover:border-white/30 hover:bg-white/10"
                 >

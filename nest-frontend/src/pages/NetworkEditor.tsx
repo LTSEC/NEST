@@ -6,6 +6,11 @@ import { useAuth } from '../providers/AuthProvider';
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
+const MAP_WIDTH = 3200;
+const MAP_HEIGHT = 2400;
+const MIN_SCALE = 0.5;
+const MAX_SCALE = 2.5;
+
 interface NetworkNode {
   id: string;
   label: string;
@@ -43,6 +48,26 @@ const NetworkEditor: React.FC = () => {
   const nodeDragOrigin = useRef({ x: 0, y: 0 });
   const nodeStart = useRef({ x: 0, y: 0 });
 
+  const constrainOffset = (nextOffset: { x: number; y: number }, nextScale: number) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return nextOffset;
+
+    const viewWidth = rect.width / nextScale;
+    const viewHeight = rect.height / nextScale;
+
+    const clampedX =
+      viewWidth >= MAP_WIDTH
+        ? -((MAP_WIDTH * nextScale - rect.width) / 2)
+        : clamp(nextOffset.x, -(MAP_WIDTH - viewWidth) * nextScale, 0);
+
+    const clampedY =
+      viewHeight >= MAP_HEIGHT
+        ? -((MAP_HEIGHT * nextScale - rect.height) / 2)
+        : clamp(nextOffset.y, -(MAP_HEIGHT - viewHeight) * nextScale, 0);
+
+    return { x: clampedX, y: clampedY };
+  };
+
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -62,15 +87,18 @@ const NetworkEditor: React.FC = () => {
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return { x: 0, y: 0 };
     return {
-      x: (clientX - rect.left - offset.x) / scale,
-      y: (clientY - rect.top - offset.y) / scale,
+      x: clamp((clientX - rect.left - offset.x) / scale, 0, MAP_WIDTH),
+      y: clamp((clientY - rect.top - offset.y) / scale, 0, MAP_HEIGHT),
     };
   };
 
   const handleCanvasMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
+    const target = event.target as HTMLElement;
+    if (target.closest('button, [role="button"], a, input, textarea, select, option')) return;
     setContextMenu(null);
     setIsPanning(true);
+    event.preventDefault();
     dragOrigin.current = { x: event.clientX, y: event.clientY };
     offsetOrigin.current = { ...offset };
   };
@@ -82,7 +110,13 @@ const NetworkEditor: React.FC = () => {
       const dy = world.y - nodeDragOrigin.current.y;
       setNodes((current) =>
         current.map((node) =>
-          node.id === draggingNodeId ? { ...node, x: nodeStart.current.x + dx, y: nodeStart.current.y + dy } : node,
+          node.id === draggingNodeId
+            ? {
+                ...node,
+                x: clamp(nodeStart.current.x + dx, 0, MAP_WIDTH),
+                y: clamp(nodeStart.current.y + dy, 0, MAP_HEIGHT),
+              }
+            : node,
         ),
       );
       return;
@@ -91,7 +125,8 @@ const NetworkEditor: React.FC = () => {
     if (!isPanning) return;
     const deltaX = event.clientX - dragOrigin.current.x;
     const deltaY = event.clientY - dragOrigin.current.y;
-    setOffset({ x: offsetOrigin.current.x + deltaX, y: offsetOrigin.current.y + deltaY });
+    const nextOffset = { x: offsetOrigin.current.x + deltaX, y: offsetOrigin.current.y + deltaY };
+    setOffset(constrainOffset(nextOffset, scale));
   };
 
   const stopDragging = () => {
@@ -103,14 +138,14 @@ const NetworkEditor: React.FC = () => {
     event.preventDefault();
     setContextMenu(null);
     const direction = event.deltaY > 0 ? -0.1 : 0.1;
-    setScale((current) => clamp(Number((current + direction).toFixed(2)), 0.5, 2.5));
+    setScale((current) => clamp(Number((current + direction).toFixed(2)), MIN_SCALE, MAX_SCALE));
   };
 
-  const zoomIn = () => setScale((current) => clamp(Number((current + 0.1).toFixed(2)), 0.5, 2.5));
-  const zoomOut = () => setScale((current) => clamp(Number((current - 0.1).toFixed(2)), 0.5, 2.5));
+  const zoomIn = () => setScale((current) => clamp(Number((current + 0.1).toFixed(2)), MIN_SCALE, MAX_SCALE));
+  const zoomOut = () => setScale((current) => clamp(Number((current - 0.1).toFixed(2)), MIN_SCALE, MAX_SCALE));
   const resetView = () => {
     setScale(1);
-    setOffset({ x: 0, y: 0 });
+    setOffset(constrainOffset({ x: 0, y: 0 }, 1));
   };
 
   const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
@@ -120,13 +155,17 @@ const NetworkEditor: React.FC = () => {
     if (!kind || !label) return;
 
     const point = screenToWorld(event.clientX, event.clientY);
-    setNodes((current) => [...current, { id: createId(), kind, label, x: point.x, y: point.y }]);
+    setNodes((current) => [
+      ...current,
+      { id: createId(), kind, label, x: clamp(point.x, 0, MAP_WIDTH), y: clamp(point.y, 0, MAP_HEIGHT) },
+    ]);
     setContextMenu(null);
   };
 
   const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
     if (event.dataTransfer.types.includes('application/nest-node-kind')) {
       event.preventDefault();
+      event.dataTransfer.dropEffect = 'copy';
     }
   };
 
@@ -169,11 +208,14 @@ const NetworkEditor: React.FC = () => {
 
   const viewBox = useMemo(() => {
     const rect = canvasRef.current?.getBoundingClientRect();
+    const width = rect ? rect.width / scale : 0;
+    const height = rect ? rect.height / scale : 0;
+
     return {
       x: (-offset.x) / scale,
       y: (-offset.y) / scale,
-      width: rect ? rect.width / scale : 0,
-      height: rect ? rect.height / scale : 0,
+      width,
+      height,
     };
   }, [offset, scale]);
 
@@ -181,23 +223,11 @@ const NetworkEditor: React.FC = () => {
     const padding = 12;
     const mapWidth = 220;
     const mapHeight = 140;
-    const allX = nodes.length ? nodes.map((node) => node.x) : [0];
-    const allY = nodes.length ? nodes.map((node) => node.y) : [0];
-    allX.push(viewBox.x, viewBox.x + viewBox.width);
-    allY.push(viewBox.y, viewBox.y + viewBox.height);
-
-    const minX = Math.min(...allX) - padding;
-    const maxX = Math.max(...allX) + padding;
-    const minY = Math.min(...allY) - padding;
-    const maxY = Math.max(...allY) + padding;
-
-    const contentWidth = Math.max(maxX - minX, 1);
-    const contentHeight = Math.max(maxY - minY, 1);
-    const scaleFactor = Math.min((mapWidth - padding * 2) / contentWidth, (mapHeight - padding * 2) / contentHeight);
+    const scaleFactor = Math.min((mapWidth - padding * 2) / MAP_WIDTH, (mapHeight - padding * 2) / MAP_HEIGHT);
 
     const project = (x: number, y: number) => ({
-      x: (x - minX) * scaleFactor + padding,
-      y: (y - minY) * scaleFactor + padding,
+      x: x * scaleFactor + padding,
+      y: y * scaleFactor + padding,
     });
 
     const projectedNodes = nodes.map((node) => ({
@@ -222,16 +252,26 @@ const NetworkEditor: React.FC = () => {
     };
   }, [nodes, viewBox]);
 
+  const mapTransform = {
+    transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
+    width: MAP_WIDTH,
+    height: MAP_HEIGHT,
+    transformOrigin: 'top left',
+  } as const;
+
   const backgroundStyle = {
     backgroundImage:
       'radial-gradient(circle at 1px 1px, rgba(255,255,255,0.16) 1.2px, transparent 0), radial-gradient(circle at 40px 40px, rgba(80,180,255,0.08) 1px, transparent 0)',
     backgroundSize: '80px 80px, 80px 80px',
-    transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
   } as const;
 
-  const contentStyle = {
-    transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
-  } as const;
+  useEffect(() => {
+    setOffset((current) => {
+      const constrained = constrainOffset(current, scale);
+      if (constrained.x === current.x && constrained.y === current.y) return current;
+      return constrained;
+    });
+  }, [scale]);
 
   return (
     <div className="h-screen w-screen bg-slate-950 text-white">
@@ -260,7 +300,11 @@ const NetworkEditor: React.FC = () => {
           </div>
         </div>
 
-        <ResourceDrawer open={drawerOpen} onToggle={() => setDrawerOpen((open) => !open)} onStartDrag={() => setContextMenu(null)} />
+        <ResourceDrawer
+          open={drawerOpen}
+          onToggle={() => setDrawerOpen((open) => !open)}
+          onStartDrag={(_item) => setContextMenu(null)}
+        />
 
         <div className="pointer-events-none absolute right-4 top-4 z-20 flex items-center gap-2">
           <button
@@ -288,32 +332,36 @@ const NetworkEditor: React.FC = () => {
         </div>
 
         <div className="absolute inset-0" aria-label="Network canvas">
-          <div className="absolute inset-0" style={backgroundStyle} />
-
-          <div className="absolute inset-0" style={contentStyle}>
+          <div className="absolute" style={mapTransform}>
             <div className="relative h-full w-full">
-              {nodes.map((node) => (
-                <div
-                  key={node.id}
-                  className="absolute"
-                  style={{ left: node.x, top: node.y }}
-                  onMouseDown={(event) => handleNodeMouseDown(event, node)}
-                  onContextMenu={(event) => handleNodeContextMenu(event, node)}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`${node.kind} ${node.label}`}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Delete') deleteNode(node.id);
-                  }}
-                >
+              <div
+                className="absolute inset-0 rounded-xl border border-white/20 bg-slate-900/60"
+                style={backgroundStyle}
+              />
+              <div className="absolute inset-0">
+                {nodes.map((node) => (
                   <div
-                    className={`pointer-events-auto select-none rounded-lg border px-3 py-2 text-sm font-semibold shadow-lg backdrop-blur transition ${node.kind === 'router' ? 'border-sky-400/30 bg-sky-500/20 text-sky-100' : 'border-emerald-400/30 bg-emerald-500/15 text-emerald-100'}`}
+                    key={node.id}
+                    className="absolute"
+                    style={{ left: node.x, top: node.y }}
+                    onMouseDown={(event) => handleNodeMouseDown(event, node)}
+                    onContextMenu={(event) => handleNodeContextMenu(event, node)}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`${node.kind} ${node.label}`}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Delete') deleteNode(node.id);
+                    }}
                   >
-                    <div className="text-[11px] uppercase tracking-wide opacity-80">{node.kind}</div>
-                    <div>{node.label}</div>
+                    <div
+                      className={`pointer-events-auto select-none rounded-lg border px-3 py-2 text-sm font-semibold shadow-lg backdrop-blur transition ${node.kind === 'router' ? 'border-sky-400/30 bg-sky-500/20 text-sky-100' : 'border-emerald-400/30 bg-emerald-500/15 text-emerald-100'}`}
+                    >
+                      <div className="text-[11px] uppercase tracking-wide opacity-80">{node.kind}</div>
+                      <div>{node.label}</div>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
 

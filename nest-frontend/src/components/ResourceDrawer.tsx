@@ -1,14 +1,40 @@
 import React from 'react';
 
-const routerItems = ['Blank', 'VyOS', 'MikroTik'];
-const hostItems = ['Blank', 'Debian', 'Ubuntu', 'UbuntuVNC', 'KaliVNC'];
+type ResourceKind = 'router' | 'host';
+
+interface ResourceItem {
+  label: string;
+  kind: ResourceKind;
+}
+
+const routerItems: ResourceItem[] = [
+  { label: 'Blank', kind: 'router' },
+  { label: 'VyOS', kind: 'router' },
+  { label: 'MikroTik', kind: 'router' },
+];
+
+const hostItems: ResourceItem[] = [
+  { label: 'Blank', kind: 'host' },
+  { label: 'Debian', kind: 'host' },
+  { label: 'Ubuntu', kind: 'host' },
+  { label: 'UbuntuVNC', kind: 'host' },
+  { label: 'KaliVNC', kind: 'host' },
+];
 
 interface ResourceDrawerProps {
   open: boolean;
   onToggle: () => void;
+  onStartDrag: (item: ResourceItem) => void;
 }
 
-const ResourceDrawer: React.FC<ResourceDrawerProps> = ({ open, onToggle }) => {
+const ResourceDrawer: React.FC<ResourceDrawerProps> = ({ open, onToggle, onStartDrag }) => {
+  const handleDragStart = (event: React.DragEvent<HTMLButtonElement>, item: ResourceItem) => {
+    event.dataTransfer.setData('application/nest-node-kind', item.kind);
+    event.dataTransfer.setData('application/nest-node-label', item.label);
+    event.dataTransfer.effectAllowed = 'copy';
+    onStartDrag(item);
+  };
+
   return (
     <div className="pointer-events-auto absolute bottom-0 left-0 right-0 z-30 flex justify-center">
       <div
@@ -26,11 +52,13 @@ const ResourceDrawer: React.FC<ResourceDrawerProps> = ({ open, onToggle }) => {
             <div className="flex flex-wrap gap-2">
               {routerItems.map((item) => (
                 <button
-                  key={item}
+                  key={item.label}
                   type="button"
-                  className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 font-medium text-white shadow-sm transition hover:border-white/30 hover:bg-white/10"
+                  draggable
+                  onDragStart={(event) => handleDragStart(event, item)}
+                  className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 font-medium text-white shadow-sm transition hover:border-sky-300/40 hover:bg-white/15"
                 >
-                  {item}
+                  {item.label}
                 </button>
               ))}
             </div>
@@ -40,11 +68,13 @@ const ResourceDrawer: React.FC<ResourceDrawerProps> = ({ open, onToggle }) => {
             <div className="flex flex-wrap gap-2">
               {hostItems.map((item) => (
                 <button
-                  key={item}
+                  key={item.label}
                   type="button"
-                  className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 font-medium text-white shadow-sm transition hover:border-white/30 hover:bg-white/10"
+                  draggable
+                  onDragStart={(event) => handleDragStart(event, item)}
+                  className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 font-medium text-white shadow-sm transition hover:border-emerald-300/40 hover:bg-white/15"
                 >
-                  {item}
+                  {item.label}
                 </button>
               ))}
             </div>

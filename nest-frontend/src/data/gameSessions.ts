@@ -18,6 +18,8 @@ export type GameSession = {
   participantTeamIds: string[];
   minPlayers: number;
   status: 'scheduled' | 'running' | 'paused' | 'completed';
+  infrastructureId?: number;
+  infrastructureStatus?: 'creating' | 'active' | 'destroying' | 'error';
 };
 
 const seededSessions: GameSession[] = [
@@ -35,6 +37,8 @@ const seededSessions: GameSession[] = [
     participantTeamIds: ['team-1'],
     minPlayers: 3,
     status: 'running',
+    infrastructureId: 1001,
+    infrastructureStatus: 'active',
   },
   {
     id: 'session-2',
@@ -139,6 +143,8 @@ export const scheduleGameSession = (
     visibility: GameVisibility;
     invitedTeamIds: string[];
     minPlayers: number;
+    infrastructureId?: number;
+    infrastructureStatus?: GameSession['infrastructureStatus'];
   }
 ): GameSession => {
   const newSession: GameSession = {
@@ -155,6 +161,8 @@ export const scheduleGameSession = (
     participantTeamIds: [],
     minPlayers: Math.max(1, options.minPlayers || 1),
     status: 'scheduled',
+    infrastructureId: options.infrastructureId,
+    infrastructureStatus: options.infrastructureStatus,
   };
 
   sessionsTable.push(updateStatus(newSession));
@@ -198,6 +206,28 @@ export const resumeSession = (sessionId: string): GameSession | undefined => {
   const session = sessionsTable.find((entry) => entry.id === sessionId);
   if (!session) return undefined;
   return updateStatus(session);
+};
+
+export const attachInfrastructure = (
+  sessionId: string,
+  infrastructureId: number,
+  status: GameSession['infrastructureStatus'] = 'creating'
+): GameSession | undefined => {
+  const session = sessionsTable.find((entry) => entry.id === sessionId);
+  if (!session) return undefined;
+  session.infrastructureId = infrastructureId;
+  session.infrastructureStatus = status;
+  return session;
+};
+
+export const updateInfrastructureStatus = (
+  sessionId: string,
+  status: GameSession['infrastructureStatus']
+): GameSession | undefined => {
+  const session = sessionsTable.find((entry) => entry.id === sessionId);
+  if (!session) return undefined;
+  session.infrastructureStatus = status;
+  return session;
 };
 
 export const shutdownSession = (sessionId: string): GameSession | undefined => {

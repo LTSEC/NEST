@@ -1,0 +1,167 @@
+{
+  "networks": [
+    {
+      "name": "External WAN",
+      "cidr": "10.20.T.0/16"
+    },
+    {
+      "name": "LOCAL",
+      "cidr": "172.30.255.0/24"
+    },
+    {
+      "name": "LOCAL-CLOSED",
+      "cidr": "172.32.255.0/24"
+    },
+    {
+      "name": "CLOUD1",
+      "cidr": "172.31.255.0/24"
+    }
+  ],
+  "devices": [
+    {
+      "name": "CompGatewayRouter",
+      "type": "Router",
+      "os": {
+        "id": 2,
+        "name": "VyOS 1.5"
+      },
+      "hostId": null,
+      "interfaces": {
+        "eth0": "Competition WAN",
+        "eth1": "10.20.0.1",
+        "link-Router1": "Connected to Router1",
+        "link-Router2": "Connected to Router2"
+      },
+      "services": null
+    },
+    {
+      "name": "Router1",
+      "type": "Router",
+      "os": {
+        "id": 2,
+        "name": "VyOS 1.5"
+      },
+      "hostId": 1,
+      "interfaces": {
+        "eth0": "External WAN",
+        "eth1": "172.30.255.1/24",
+        "eth2": "172.31.255.1/24"
+      },
+      "services": null
+    },
+    {
+      "name": "vm1",
+      "type": "Server",
+      "os": {
+        "id": 0,
+        "name": "Debian 12"
+      },
+      "hostId": null,
+      "router": "Router1",
+      "interface": "eth1",
+      "segment": "LOCAL",
+      "dhcp": true,
+      "services": {}
+    },
+    {
+      "name": "Router2",
+      "type": "Router",
+      "os": {
+        "id": 2,
+        "name": "VyOS 1.5"
+      },
+      "hostId": 2,
+      "interfaces": {
+        "eth0": "External WAN",
+        "eth1": "172.32.255.1/24"
+      },
+      "services": null
+    },
+    {
+      "name": "vm2",
+      "type": "Server",
+      "os": {
+        "id": 0,
+        "name": "Debian 12"
+      },
+      "hostId": null,
+      "router": "Router1",
+      "interface": "eth1",
+      "segment": "LOCAL",
+      "dhcp": true,
+      "services": {}
+    },
+    {
+      "name": "vm3",
+      "type": "Server",
+      "os": {
+        "id": 1,
+        "name": "Ubuntu 22.04 LTS"
+      },
+      "hostId": null,
+      "router": "Router1",
+      "interface": "eth2",
+      "segment": "CLOUD1",
+      "dhcp": true,
+      "services": {}
+    },
+    {
+      "name": "vm4",
+      "type": "Server",
+      "os": {
+        "id": 1,
+        "name": "Ubuntu 22.04 LTS"
+      },
+      "hostId": null,
+      "router": "Router1",
+      "interface": "eth1",
+      "segment": "LOCAL",
+      "dhcp": true,
+      "services": {}
+    },
+    {
+      "name": "vm5",
+      "type": "Server",
+      "os": {
+        "id": 0,
+        "name": "Debian 12"
+      },
+      "hostId": null,
+      "router": "Router2",
+      "interface": "eth1",
+      "segment": "LOCAL-CLOSED",
+      "dhcp": true,
+      "services": {}
+    },
+    {
+      "name": "vm6",
+      "type": "Server",
+      "os": {
+        "id": 1,
+        "name": "Ubuntu 22.04 LTS"
+      },
+      "hostId": null,
+      "router": "Router2",
+      "interface": "eth1",
+      "segment": "LOCAL-CLOSED",
+      "dhcp": true,
+      "services": {}
+    }
+  ],
+  "blackteamServices": [
+    {
+      "name": "Scoring Engine",
+      "templateId": 0,
+      "hostId": 2,
+      "ip": "10.20.0.2"
+    },
+    {
+      "name": "DNS",
+      "templateId": 0,
+      "hostId": 3,
+      "ip": "10.20.0.3"
+    }
+  ],
+  "applications": [],
+  "ldapZones": []
+}

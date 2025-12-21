@@ -11,6 +11,7 @@ const ResourceDrawer: React.FC<ResourceDrawerProps> = ({ open, onToggle, onStart
   const handleDragStart = (event: React.DragEvent<HTMLButtonElement>, item: NetworkItem) => {
     event.dataTransfer.setData('application/nest-node-kind', item.category);
     event.dataTransfer.setData('application/nest-node-label', item.label);
+    event.dataTransfer.setData('application/nest-node-image-id', item.id);
     event.dataTransfer.effectAllowed = 'copy';
     onStartDrag(item);
   };

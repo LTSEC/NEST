@@ -73,7 +73,7 @@ const sessionsTable: GameSession[] = [...seededSessions];
 const generateId = () => `session-${Math.random().toString(16).slice(2, 10)}`;
 
 const updateStatus = (session: GameSession): GameSession => {
-  if (session.status === 'paused') return session;
+    if (session.status === 'paused') return session;
 
   const now = Date.now();
   const start = new Date(session.startTime).getTime();

@@ -1164,6 +1164,22 @@ const NetworkEditor: React.FC = () => {
     setNodeBounds(bounds);
   }, [nodes, scale, offset]);
 
+  const nodeEdgePoint = (
+    rect: { x: number; y: number; width: number; height: number },
+    target: { x: number; y: number },
+  ) => {
+    const center = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+    const dx = target.x - center.x;
+    const dy = target.y - center.y;
+    if (dx === 0 && dy === 0) return center;
+    const halfW = rect.width / 2;
+    const halfH = rect.height / 2;
+    const scaleX = dx === 0 ? Number.POSITIVE_INFINITY : Math.abs(halfW / dx);
+    const scaleY = dy === 0 ? Number.POSITIVE_INFINITY : Math.abs(halfH / dy);
+    const t = Math.min(scaleX, scaleY);
+    return { x: center.x + dx * t, y: center.y + dy * t };
+  };
+
   return (
     <div className="h-screen w-screen bg-slate-950 text-white">
       <div
@@ -1389,6 +1405,9 @@ const NetworkEditor: React.FC = () => {
                 {nodes.map((node) => (
                   <div
                     key={node.id}
+                    ref={(element) => {
+                      nodeRefs.current[node.id] = element;
+                    }}
                     className="absolute"
                     style={{ left: node.x, top: node.y }}
                     ref={(element) => {

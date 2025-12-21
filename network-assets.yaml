@@ -1,11 +1,11 @@
 {
   "routers": [
     { "id": "-1", "label": "Blank" },
-    { "id": "2", "label": "VyOS" },
+    { "id": "2", "label": "VyOS" }
   ],
   "hosts": [
     { "id": "-2", "label": "Blank" },
     { "id": "0", "label": "Debian" },
-    { "id": "1", "label": "Ubuntu" },
+    { "id": "1", "label": "Ubuntu" }
   ]
 }

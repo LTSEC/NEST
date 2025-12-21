@@ -25,7 +25,6 @@ const GameEditor: React.FC = () => {
   const [name, setName] = useState(existingGame?.name ?? '');
   const [selectedTypes, setSelectedTypes] = useState<GameType[]>(existingGame?.types ?? []);
   const [selectedServices, setSelectedServices] = useState<RvbService[]>(existingGame?.rvbServices ?? []);
-  const [teamCount, setTeamCount] = useState(existingGame?.teamCount || 2);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -33,7 +32,6 @@ const GameEditor: React.FC = () => {
       setName(existingGame.name);
       setSelectedTypes(existingGame.types);
       setSelectedServices(existingGame.rvbServices);
-      setTeamCount(existingGame.teamCount || 2);
     }
   }, [existingGame]);
 
@@ -51,7 +49,6 @@ const GameEditor: React.FC = () => {
       const next = exists ? prev.filter((value) => value !== type) : [...prev, type];
       if (!next.includes('Red vs. Blue')) {
         setSelectedServices([]);
-        setTeamCount(2);
       }
       return next;
     });
@@ -78,18 +75,13 @@ const GameEditor: React.FC = () => {
       return;
     }
 
-    if (hasRvbSelected && teamCount < 1) {
-      setError('Enter at least one team.');
-      return;
-    }
-
     try {
       if (editing && existingGame) {
         updateGame(existingGame.id, user.id, {
           name,
           types: selectedTypes,
           rvbServices: selectedServices,
-          teamCount,
+          teamCount: existingGame.teamCount,
         });
       } else {
         createGame({
@@ -97,7 +89,7 @@ const GameEditor: React.FC = () => {
           developerId: user.id,
           types: selectedTypes,
           rvbServices: hasRvbSelected ? selectedServices : [],
-          teamCount: hasRvbSelected ? teamCount : 0,
+          teamCount: existingGame?.teamCount ?? 0,
         });
       }
       navigate('/my-games');
@@ -188,38 +180,25 @@ const GameEditor: React.FC = () => {
           </div>
 
           {hasRvbSelected && (
-            <div className="grid gap-6 rounded-xl bg-slate-50 p-4 md:grid-cols-2">
-              <div className="space-y-3">
-                <p className="text-sm font-semibold text-slate-800">Red vs. Blue services</p>
-                <div className="flex flex-col gap-2 text-sm text-slate-700">
-                  {rvbServices.map((service) => (
-                    <label key={service} className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                        checked={selectedServices.includes(service)}
-                        onChange={() => toggleService(service)}
-                      />
-                      {service}
-                    </label>
-                  ))}
-                </div>
+            <div className="space-y-3 rounded-xl bg-slate-50 p-4">
+              <p className="text-sm font-semibold text-slate-800">Red vs. Blue services</p>
+              <div className="flex flex-col gap-2 text-sm text-slate-700">
+                {rvbServices.map((service) => (
+                  <label key={service} className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                      checked={selectedServices.includes(service)}
+                      onChange={() => toggleService(service)}
+                    />
+                    {service}
+                  </label>
+                ))}
               </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-800" htmlFor="team-count">
-                  Number of teams
-                </label>
-                <input
-                  id="team-count"
-                  type="number"
-                  min={1}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm transition focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                  value={teamCount}
-                  onChange={(event) => setTeamCount(Number(event.target.value))}
-                  required
-                />
-              </div>
+              <p className="text-xs text-slate-600">
+                Team counts are chosen when hosting a Red vs. Blue game.
+              </p>
             </div>
           )}
 

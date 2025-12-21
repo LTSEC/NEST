@@ -14,6 +14,15 @@ export interface PersistedNode {
   kind: 'router' | 'host';
   position: { x: number; y: number };
   interfaces: PersistedInterface[];
+  services?: PersistedServiceInstance[];
+}
+
+export interface PersistedServiceInstance {
+  id: string;
+  serviceId: string;
+  protocol: 'tcp' | 'udp';
+  port: number;
+  customServiceId?: string;
 }
 
 export interface PersistedLinkEnd {
@@ -35,6 +44,14 @@ export interface NetworkSnapshot {
   nodes: PersistedNode[];
   links: PersistedLink[];
   metadata?: Record<string, unknown>;
+  customServices?: PersistedCustomService[];
+}
+
+export interface PersistedCustomService {
+  id: string;
+  definitionId: string;
+  roleBindings: Record<string, string | undefined>;
+  status: 'complete' | 'incomplete';
 }
 
 const inMemoryStore = new Map<string, NetworkSnapshot>();

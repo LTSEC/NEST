@@ -5,6 +5,7 @@ import { getGameById } from '../data/games';
 import { networkItemsByCategory } from '../data/networkItems';
 import { loadNetworkSnapshot, saveNetworkSnapshot } from '../data/networkStorage';
 import { useAuth } from '../providers/AuthProvider';
+import { customServiceCatalog, customServicesById, serviceCatalog, serviceDefinitionsById } from '../data/services';
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
@@ -22,6 +23,7 @@ interface NetworkNode {
   x: number;
   y: number;
   interfaces: NetworkInterface[];
+  services: ServiceInstance[];
 }
 
 interface NetworkInterface {
@@ -43,6 +45,28 @@ interface NetworkLink {
   from: NetworkLinkEnd;
   to: NetworkLinkEnd;
   networkCidr: string;
+}
+
+interface ServiceInstance {
+  id: string;
+  serviceId: string;
+  protocol: 'tcp' | 'udp';
+  port: number;
+  customServiceId?: string;
+}
+
+interface CustomServiceInstance {
+  id: string;
+  definitionId: string;
+  roleBindings: Record<string, string | undefined>;
+  status: 'complete' | 'incomplete';
+}
+
+interface ServiceLink {
+  id: string;
+  fromHostId: string;
+  toHostId: string;
+  customServiceId: string;
 }
 
 interface ContextMenuState {
@@ -92,6 +116,8 @@ const NetworkEditor: React.FC = () => {
   const [links, setLinks] = useState<NetworkLink[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedLinkId, setSelectedLinkId] = useState<string | null>(null);
+  const [customServices, setCustomServices] = useState<CustomServiceInstance[]>([]);
+  const [serviceLinks, setServiceLinks] = useState<ServiceLink[]>([]);
   const [anchorPositions, setAnchorPositions] = useState<Record<string, { x: number; y: number }>>({});
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
@@ -101,6 +127,8 @@ const NetworkEditor: React.FC = () => {
   const [gridSnapEnabled, setGridSnapEnabled] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [customServiceModal, setCustomServiceModal] = useState<string | null>(null);
+  const [customServiceModalError, setCustomServiceModalError] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const dragOrigin = useRef({ x: 0, y: 0 });
   const offsetOrigin = useRef({ x: 0, y: 0 });
@@ -164,9 +192,14 @@ const NetworkEditor: React.FC = () => {
         x: node.position.x,
         y: node.position.y,
         interfaces: node.interfaces.map((intf) => ({ ...intf })),
+        services: (node.services || []).map((service) => ({
+          ...service,
+          protocol: service.protocol === 'udp' ? 'udp' : 'tcp',
+        })),
       })),
     );
     setLinks(snapshot.links.map((link) => ({ ...link })));
+    setCustomServices(snapshot.customServices?.map((service) => ({ ...service })) || []);
 
     const nextScale =
       typeof snapshot.metadata?.scale === 'number' ? clamp(snapshot.metadata.scale, MIN_SCALE, MAX_SCALE) : scale;
@@ -277,6 +310,7 @@ const NetworkEditor: React.FC = () => {
         x: applyGridSnap(clamp(point.x, 0, MAP_WIDTH)),
         y: applyGridSnap(clamp(point.y, 0, MAP_HEIGHT)),
         interfaces: defaultInterfaces,
+        services: [],
       },
     ]);
     setContextMenu(null);
@@ -287,6 +321,84 @@ const NetworkEditor: React.FC = () => {
       event.preventDefault();
       event.dataTransfer.dropEffect = 'copy';
     }
+  };
+
+  const handleCustomServiceSelection = (definitionId: string) => {
+    setCustomServiceModal(definitionId);
+    setCustomServiceModalError(null);
+  };
+
+  const createCustomServiceEntry = (
+    definitionId: string,
+    roleBindings: Record<string, string | undefined>,
+    status: CustomServiceInstance['status'],
+  ) => {
+    setCustomServices((current) => {
+      if (current.some((service) => service.definitionId === definitionId)) return current;
+      return [...current, { id: createId(), definitionId, roleBindings, status }];
+    });
+  };
+
+  const handleAutoCreateCustomService = (definitionId: string) => {
+    const definition = customServicesById[definitionId];
+    if (!definition) return;
+    if (customServices.some((service) => service.definitionId === definitionId)) {
+      setCustomServiceModalError('Only one instance of a custom service can exist at a time.');
+      return;
+    }
+
+    const baseX = applyGridSnap(clamp(viewBox.x + viewBox.width / 2, 0, MAP_WIDTH));
+    const baseY = applyGridSnap(clamp(viewBox.y + viewBox.height / 2, 0, MAP_HEIGHT));
+    const roleBindings: Record<string, string | undefined> = {};
+    const createdNodes: NetworkNode[] = [];
+
+    (definition.requiredRoles ?? []).forEach((role, index) => {
+      const serviceDefinition = serviceDefinitionsById[role.serviceId];
+      const hostTemplate =
+        networkItemsByCategory.host.find((item) => item.id === role.hostImageId) || networkItemsByCategory.host[0];
+
+      const nodeId = createId();
+      const serviceInstance: ServiceInstance = {
+        id: createId(),
+        serviceId: role.serviceId,
+        protocol: serviceDefinition?.protocol === 'udp' ? 'udp' : 'tcp',
+        port: role.defaultPort ?? serviceDefinition?.defaultPort ?? 0,
+        customServiceId: definitionId,
+      };
+
+      createdNodes.push({
+        id: nodeId,
+        kind: 'host',
+        label: `${definition.name} ${role.role}`,
+        imageId: hostTemplate?.id ?? '-2',
+        x: applyGridSnap(clamp(baseX + index * 140, 0, MAP_WIDTH)),
+        y: applyGridSnap(clamp(baseY + index * 120, 0, MAP_HEIGHT)),
+        interfaces: [createInterface('eth0')],
+        services: [serviceInstance],
+      });
+
+      roleBindings[role.role] = nodeId;
+    });
+
+    setNodes((current) => [...current, ...createdNodes]);
+    createCustomServiceEntry(definitionId, roleBindings, resolveCustomServiceStatus(definitionId, roleBindings));
+    setCustomServiceModal(null);
+  };
+
+  const handleManualCustomServiceRegistration = (definitionId: string) => {
+    const definition = customServicesById[definitionId];
+    if (!definition) return;
+    if (customServices.some((service) => service.definitionId === definitionId)) {
+      setCustomServiceModalError('Only one instance of a custom service can exist at a time.');
+      return;
+    }
+
+    const bindings: Record<string, string | undefined> = {};
+    (definition.requiredRoles ?? []).forEach((role) => {
+      bindings[role.role] = undefined;
+    });
+    createCustomServiceEntry(definitionId, bindings, 'incomplete');
+    setCustomServiceModal(null);
   };
 
   const handleSaveNetwork = () => {
@@ -305,9 +417,11 @@ const NetworkEditor: React.FC = () => {
           kind: node.kind,
           position: { x: node.x, y: node.y },
           interfaces: node.interfaces.map((intf) => ({ ...intf })),
+          services: node.services.map((service) => ({ ...service })),
         })),
         links: links.map((link) => ({ ...link })),
         metadata: { offset, scale },
+        customServices: customServices.map((service) => ({ ...service })),
       };
 
       saveNetworkSnapshot(game?.id ?? null, snapshot);
@@ -340,6 +454,15 @@ const NetworkEditor: React.FC = () => {
   const deleteNode = (id: string) => {
     setLinks((current) => current.filter((link) => link.from.nodeId !== id && link.to.nodeId !== id));
     setNodes((current) => current.filter((node) => node.id !== id));
+    setCustomServices((current) =>
+      current.map((service) => {
+        const nextBindings = Object.fromEntries(
+          Object.entries(service.roleBindings).map(([role, hostId]) => [role, hostId === id ? undefined : hostId]),
+        );
+        const nextStatus = resolveCustomServiceStatus(service.definitionId, nextBindings);
+        return { ...service, roleBindings: nextBindings, status: nextStatus };
+      }),
+    );
     if (selectedNodeId === id) {
       setSelectedNodeId(null);
       setSelectedLinkId(null);
@@ -360,6 +483,10 @@ const NetworkEditor: React.FC = () => {
           ...intf,
           id: createId(),
           name: `${intf.name || 'eth'}${index}`,
+        })),
+        services: node.services.map((service) => ({
+          ...service,
+          id: createId(),
         })),
         label: `${node.label} copy`,
       };
@@ -600,6 +727,105 @@ const NetworkEditor: React.FC = () => {
     });
   }, [selectedNode]);
 
+  const servicePortConflicts = useMemo(() => {
+    const conflicts = new Set<string>();
+    nodes.forEach((node) => {
+      const seen = new Map<string, string>();
+      node.services.forEach((service) => {
+        const key = `${service.protocol}:${service.port}`;
+        if (seen.has(key)) {
+          conflicts.add(service.id);
+          conflicts.add(seen.get(key) as string);
+        } else {
+          seen.set(key, service.id);
+        }
+      });
+    });
+    return conflicts;
+  }, [nodes]);
+
+  const resolveCustomServiceStatus = (
+    definitionId: string,
+    bindings: Record<string, string | undefined>,
+  ): CustomServiceInstance['status'] => {
+    const definition = customServicesById[definitionId];
+    if (!definition) return 'incomplete';
+    const dependenciesMet = (definition.dependencies ?? []).every((dependencyId) =>
+      nodes.some((node) => node.services.some((service) => service.serviceId === dependencyId)),
+    );
+    if (!dependenciesMet) return 'incomplete';
+
+    const complete = (definition.requiredRoles ?? []).every((role) => {
+      const hostId = bindings[role.role];
+      if (!hostId) return false;
+      const host = nodes.find((node) => node.id === hostId);
+      return Boolean(host && host.services.some((service) => service.serviceId === role.serviceId));
+    });
+    return complete ? 'complete' : 'incomplete';
+  };
+
+  const updateNodeServices = (nodeId: string, updater: (services: ServiceInstance[]) => ServiceInstance[]) => {
+    setNodes((current) =>
+      current.map((node) =>
+        node.id === nodeId
+          ? {
+              ...node,
+              services: updater(node.services ?? []),
+            }
+          : node,
+      ),
+    );
+  };
+
+  const toggleServiceForNode = (nodeId: string, definitionId: string, enabled: boolean, customServiceId?: string) => {
+    const definition = serviceDefinitionsById[definitionId];
+    if (!definition) return;
+
+    if (enabled) {
+      updateNodeServices(nodeId, (services) => {
+        if (services.some((service) => service.serviceId === definitionId)) return services;
+        const defaultPort = Number.isFinite(definition.defaultPort) ? Number(definition.defaultPort) : 0;
+        return [
+          ...services,
+          {
+            id: createId(),
+            serviceId: definitionId,
+            protocol: definition.protocol === 'udp' ? 'udp' : 'tcp',
+            port: defaultPort,
+            customServiceId,
+          },
+        ];
+      });
+    } else {
+      updateNodeServices(nodeId, (services) => services.filter((service) => service.serviceId !== definitionId));
+    }
+  };
+
+  const updateServicePort = (nodeId: string, definitionId: string, value: number) => {
+    const normalized = Number.isNaN(value) ? 0 : value;
+    updateNodeServices(nodeId, (services) =>
+      services.map((service) =>
+        service.serviceId === definitionId
+          ? {
+              ...service,
+              port: normalized,
+            }
+          : service,
+      ),
+    );
+  };
+
+  const attachHostToCustomRole = (customServiceId: string, role: string, hostId: string) => {
+    setCustomServices((current) =>
+      current.map((item) => {
+        if (item.id !== customServiceId) return item;
+        const nextBindings = { ...item.roleBindings, [role]: hostId };
+        const nextStatus = resolveCustomServiceStatus(item.definitionId, nextBindings);
+        return { ...item, roleBindings: nextBindings, status: nextStatus };
+      }),
+    );
+  };
+
   const updateLink = (id: string, updater: (link: NetworkLink) => NetworkLink) => {
     setLinks((current) => current.map((link) => (link.id === id ? updater(link) : link)));
   };
@@ -687,6 +913,15 @@ const NetworkEditor: React.FC = () => {
       });
 
     setInvalidHostInterfaces(invalid);
+  }, [nodes]);
+
+  useEffect(() => {
+    setCustomServices((current) =>
+      current.map((service) => {
+        const nextStatus = resolveCustomServiceStatus(service.definitionId, service.roleBindings);
+        return nextStatus !== service.status ? { ...service, status: nextStatus } : service;
+      }),
+    );
   }, [nodes]);
 
   useEffect(() => {
@@ -798,6 +1033,31 @@ const NetworkEditor: React.FC = () => {
     });
   }, [nodes, routerNetworks]);
 
+  useEffect(() => {
+    const nextServiceLinks: ServiceLink[] = [];
+    customServices.forEach((service) => {
+      const definition = customServicesById[service.definitionId];
+      if (!definition || !definition.requiredRoles || definition.requiredRoles.length < 2) return;
+      const origin = definition.requiredRoles[0];
+      const originHostId = service.roleBindings[origin.role];
+
+      definition.requiredRoles.slice(1).forEach((role) => {
+        const targetHostId = service.roleBindings[role.role];
+        if (!originHostId || !targetHostId) return;
+        const originExists = nodes.some((node) => node.id === originHostId);
+        const targetExists = nodes.some((node) => node.id === targetHostId);
+        if (!originExists || !targetExists) return;
+        nextServiceLinks.push({
+          id: `${service.id}-${role.role}`,
+          fromHostId: originHostId,
+          toHostId: targetHostId,
+          customServiceId: service.id,
+        });
+      });
+    });
+    setServiceLinks(nextServiceLinks);
+  }, [customServices, nodes]);
+
   useLayoutEffect(() => {
     const container = canvasRef.current;
     if (!container) return;
@@ -854,19 +1114,52 @@ const NetworkEditor: React.FC = () => {
               {saveStatus === 'error' && 'Save failed'}
             </span>
           )}
-          {saveError && <span className="text-xs text-red-200">{saveError}</span>}
-          <div className="rounded-lg bg-white/5 px-3 py-2 text-xs font-medium text-slate-100 ring-1 ring-white/10">
-            {game ? `${game.name} network` : 'Network editor'}
+        {saveError && <span className="text-xs text-red-200">{saveError}</span>}
+        <div className="rounded-lg bg-white/5 px-3 py-2 text-xs font-medium text-slate-100 ring-1 ring-white/10">
+          {game ? `${game.name} network` : 'Network editor'}
+        </div>
+      </div>
+
+      <div className="pointer-events-auto absolute left-4 top-20 z-20 w-80 space-y-2">
+        <div className="rounded-lg border border-white/10 bg-slate-900/85 p-3 text-xs shadow-lg backdrop-blur">
+          <div className="mb-2 flex items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-slate-200">
+            <span>Custom services</span>
+            <span className="text-[10px] text-slate-400">{customServices.length} active</span>
+          </div>
+          <div className="space-y-2">
+            {customServices.length === 0 && <div className="text-[11px] text-slate-300">None registered</div>}
+            {customServices.map((service) => {
+              const definition = customServicesById[service.definitionId];
+              return (
+                <div
+                  key={service.id}
+                  className={`rounded border px-2 py-2 text-[11px] ${
+                    service.status === 'complete'
+                      ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-50'
+                      : 'border-amber-400/40 bg-amber-500/10 text-amber-50'
+                  }`}
+                >
+                  <div className="flex items-center justify-between font-semibold">
+                    <span>{definition?.name ?? service.definitionId}</span>
+                    <span className="uppercase tracking-wide">{service.status}</span>
+                  </div>
+                  {definition?.description && <div className="text-[10px] text-white/80">{definition.description}</div>}
+                </div>
+              );
+            })}
           </div>
         </div>
+      </div>
 
-        <ResourceDrawer
-          open={drawerOpen}
-          onToggle={() => setDrawerOpen((open) => !open)}
-          onStartDrag={(_item) => setContextMenu(null)}
-        />
+      <ResourceDrawer
+        open={drawerOpen}
+        onToggle={() => setDrawerOpen((open) => !open)}
+        onStartDrag={(_item) => setContextMenu(null)}
+        onSelectCustomService={handleCustomServiceSelection}
+        activeCustomServiceIds={customServices.map((service) => service.definitionId)}
+      />
 
-        <div className="pointer-events-none absolute right-4 top-4 z-20 flex items-center gap-2">
+      <div className="pointer-events-none absolute right-4 top-4 z-20 flex items-center gap-2">
           <button
             type="button"
             onClick={zoomOut}
@@ -907,6 +1200,42 @@ const NetworkEditor: React.FC = () => {
               />
               <div className="absolute inset-0">
                 <svg className="absolute inset-0 h-full w-full" viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`}>
+                  {serviceLinks.map((link) => {
+                    const fromNode = nodes.find((node) => node.id === link.fromHostId);
+                    const toNode = nodes.find((node) => node.id === link.toHostId);
+                    if (!fromNode || !toNode) return null;
+                    const start = { x: fromNode.x + 120, y: fromNode.y + 70 };
+                    const end = { x: toNode.x + 120, y: toNode.y + 70 };
+                    const dx = Math.max(Math.abs(end.x - start.x) * 0.25, 60);
+                    const path = `M ${start.x} ${start.y} C ${start.x + dx} ${start.y} ${end.x - dx} ${end.y} ${end.x} ${end.y}`;
+                    const customService = customServices.find((service) => service.id === link.customServiceId);
+                    const label = customService ? customServicesById[customService.definitionId]?.name ?? 'Service link' : 'Service link';
+                    const midX = (start.x + end.x) / 2;
+                    const midY = (start.y + end.y) / 2;
+
+                    return (
+                      <g key={link.id} className="pointer-events-none">
+                        <path
+                          d={path}
+                          fill="none"
+                          stroke="rgba(255, 200, 98, 0.9)"
+                          strokeDasharray="10 8"
+                          strokeWidth={3}
+                          opacity={0.85}
+                          className="drop-shadow-lg"
+                        />
+                        <text
+                          x={midX}
+                          y={midY - 8}
+                          textAnchor="middle"
+                          className="fill-amber-100 text-[10px] font-semibold drop-shadow"
+                          pointerEvents="none"
+                        >
+                          {label}
+                        </text>
+                      </g>
+                    );
+                  })}
                   {links.map((link) => {
                     const start = anchorPositions[anchorKey(link.from.nodeId, link.from.interfaceId)];
                     const end = anchorPositions[anchorKey(link.to.nodeId, link.to.interfaceId)];
@@ -1001,6 +1330,21 @@ const NetworkEditor: React.FC = () => {
                           );
                         })}
                       </div>
+                      {node.services.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1 text-[10px] font-semibold uppercase text-amber-100">
+                          {node.services.map((service) => {
+                            const definition = serviceDefinitionsById[service.serviceId];
+                            return (
+                              <span
+                                key={service.id}
+                                className="rounded bg-amber-500/20 px-2 py-1 text-amber-50 ring-1 ring-amber-400/50"
+                              >
+                                {definition?.name ?? service.serviceId} • {service.port}/{service.protocol.toUpperCase()}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -1237,6 +1581,105 @@ const NetworkEditor: React.FC = () => {
                 })}
               </div>
             </div>
+
+            {selectedNode.kind === 'host' && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-[11px] uppercase tracking-wide text-slate-400">
+                  <span>Services</span>
+                  <span className="text-[10px] text-slate-500">Ports configurable per host</span>
+                </div>
+                <div className="space-y-2">
+                  {serviceCatalog.map((service) => {
+                    const instance = selectedNode.services.find((item) => item.serviceId === service.id) || null;
+                    const assignments = customServices
+                      .map((custom) => {
+                        const definition = customServicesById[custom.definitionId];
+                        const role = definition?.requiredRoles?.find((item) => item.serviceId === service.id);
+                        return role ? { custom, role } : null;
+                      })
+                      .filter((item): item is { custom: CustomServiceInstance; role: { role: string } } => Boolean(item));
+                    const inConflict = instance ? servicePortConflicts.has(instance.id) : false;
+                    return (
+                      <div
+                        key={service.id}
+                        className={`rounded-lg border px-3 py-2 ${instance ? 'border-emerald-300/40 bg-emerald-500/10' : 'border-white/10 bg-white/5'}`}
+                      >
+                        <div className="flex items-center justify-between text-xs font-semibold text-slate-100">
+                          <div>
+                            <div>{service.name}</div>
+                            <div className="text-[11px] text-slate-300">{service.description}</div>
+                          </div>
+                          <label className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-slate-300">
+                            <span>{instance ? 'Enabled' : 'Disabled'}</span>
+                            <input
+                              type="checkbox"
+                              checked={Boolean(instance)}
+                              onChange={(event) => toggleServiceForNode(selectedNode.id, service.id, event.target.checked)}
+                              className="h-4 w-4 accent-emerald-400"
+                            />
+                          </label>
+                        </div>
+                        {instance && (
+                          <div className="mt-2 space-y-2 text-xs text-slate-200">
+                            <label className="flex flex-col gap-1">
+                              <span className="text-[11px] uppercase tracking-wide text-slate-400">Port / protocol</span>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="number"
+                                  value={instance.port}
+                                  onChange={(event) => updateServicePort(selectedNode.id, service.id, Number(event.target.value))}
+                                  className={`w-24 rounded border px-2 py-1 text-xs outline-none focus:border-emerald-400/60 ${
+                                    inConflict ? 'border-rose-400 bg-rose-500/10 text-rose-100' : 'border-white/10 bg-white/5'
+                                  }`}
+                                />
+                                <span className="rounded border border-white/10 bg-white/5 px-2 py-1 text-[11px] uppercase tracking-wide text-slate-200">
+                                  {instance.protocol.toUpperCase()}
+                                </span>
+                              </div>
+                              {inConflict && <span className="text-[11px] text-rose-200">Port conflict on this host</span>}
+                              {!inConflict && service.defaultPort && instance.port !== service.defaultPort && (
+                                <span className="text-[11px] text-slate-300">
+                                  Default {service.defaultPort}/{service.protocol?.toUpperCase() ?? 'TCP'}
+                                </span>
+                              )}
+                            </label>
+                            {assignments.length > 0 && (
+                              <div className="space-y-1 rounded border border-white/10 bg-white/5 p-2 text-[11px] text-slate-200">
+                                <div className="font-semibold uppercase tracking-wide text-slate-300">Custom service roles</div>
+                                {assignments.map(({ custom, role }) => {
+                                  const boundHostId = custom.roleBindings[role.role];
+                                  const isBoundHere = boundHostId === selectedNode.id;
+                                  const boundLabel = isBoundHere ? 'Assigned' : boundHostId ? 'Assigned elsewhere' : 'Unassigned';
+                                  return (
+                                    <div key={`${custom.id}-${role.role}`} className="flex items-center justify-between gap-2">
+                                      <span>{customServicesById[custom.definitionId]?.name ?? custom.definitionId} • {role.role}</span>
+                                      <button
+                                        type="button"
+                                        disabled={Boolean(boundHostId && !isBoundHere)}
+                                        onClick={() => attachHostToCustomRole(custom.id, role.role, selectedNode.id)}
+                                        className={`rounded px-2 py-1 text-[11px] font-semibold uppercase tracking-wide ${
+                                          isBoundHere
+                                            ? 'bg-emerald-500/20 text-emerald-50 ring-1 ring-emerald-400/60'
+                                            : boundHostId
+                                            ? 'cursor-not-allowed bg-white/5 text-slate-400 ring-1 ring-white/10'
+                                            : 'bg-amber-500/20 text-amber-50 ring-1 ring-amber-400/60 hover:bg-amber-500/30'
+                                        }`}
+                                      >
+                                        {boundLabel}
+                                      </button>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1273,6 +1716,91 @@ const NetworkEditor: React.FC = () => {
               >
                 Delete link
               </button>
+            </div>
+          </div>
+        )}
+
+        {customServiceModal && (
+          <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4">
+            <div className="w-full max-w-xl space-y-4 rounded-lg border border-white/10 bg-slate-900/95 p-6 text-sm shadow-2xl">
+              {(() => {
+                const definition = customServicesById[customServiceModal];
+                if (!definition) {
+                  return <div className="text-white">Unknown service</div>;
+                }
+                return (
+                  <>
+                    <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-slate-200">
+                      <span>Configure {definition.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => setCustomServiceModal(null)}
+                        className="rounded px-2 py-1 text-white/70 transition hover:bg-white/10 hover:text-white"
+                      >
+                        Close
+                      </button>
+                    </div>
+                    <div className="space-y-2 text-slate-100">
+                      <div className="text-base font-semibold">{definition.name}</div>
+                      {definition.description && <div className="text-slate-200">{definition.description}</div>}
+                      {(definition.dependencies?.length ?? 0) > 0 && (
+                        <div className="rounded border border-white/10 bg-white/5 p-2 text-[11px] text-slate-100">
+                          <div className="mb-1 font-semibold uppercase tracking-wide text-slate-300">Dependencies</div>
+                          <ul className="list-inside list-disc">
+                            {definition.dependencies?.map((dependency) => (
+                              <li key={dependency}>{serviceDefinitionsById[dependency]?.name ?? dependency}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      <div className="rounded border border-white/10 bg-white/5 p-3 text-[11px] text-slate-100">
+                        <div className="mb-1 font-semibold uppercase tracking-wide text-slate-300">Required roles</div>
+                        <div className="space-y-1">
+                          {(definition.requiredRoles ?? []).map((role) => {
+                            const serviceDef = serviceDefinitionsById[role.serviceId];
+                            return (
+                              <div key={role.role} className="flex items-center justify-between rounded bg-black/20 px-2 py-1">
+                                <div>
+                                  <div className="font-semibold">{role.role}</div>
+                                  <div className="text-slate-200">{serviceDef?.name ?? role.serviceId}</div>
+                                </div>
+                                <div className="text-right text-slate-300">
+                                  Default {role.defaultPort ?? serviceDef?.defaultPort ?? 'N/A'} /{' '}
+                                  {(serviceDef?.protocol || 'tcp').toUpperCase()}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                    {customServiceModalError && <div className="text-[11px] text-rose-200">{customServiceModalError}</div>}
+                    <div className="flex flex-wrap justify-end gap-2 text-[11px] font-semibold uppercase tracking-wide">
+                      <button
+                        type="button"
+                        onClick={() => handleAutoCreateCustomService(definition.id)}
+                        className="rounded bg-emerald-500/80 px-3 py-2 text-white transition hover:bg-emerald-500"
+                      >
+                        Auto create & connect
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleManualCustomServiceRegistration(definition.id)}
+                        className="rounded bg-amber-500/80 px-3 py-2 text-white transition hover:bg-amber-500"
+                      >
+                        Register manually
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCustomServiceModal(null)}
+                        className="rounded bg-white/10 px-3 py-2 text-white transition hover:bg-white/20"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </div>
         )}

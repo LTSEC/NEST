@@ -359,6 +359,18 @@ const NetworkEditor: React.FC = () => {
     );
   };
 
+  const routerNetworks = useMemo(() => {
+    const mapping: Record<string, string | undefined> = {};
+    nodes
+      .filter((node) => node.kind === 'router')
+      .forEach((node) => {
+        node.interfaces.forEach((intf) => {
+          mapping[anchorKey(node.id, intf.id)] = intf.networkCidr;
+        });
+      });
+    return mapping;
+  }, [nodes]);
+
   const viewBox = useMemo(() => {
     const rect = canvasRef.current?.getBoundingClientRect();
     const width = rect ? rect.width / scale : 0;
@@ -509,6 +521,15 @@ const NetworkEditor: React.FC = () => {
 
   const selectedNode = nodes.find((node) => node.id === selectedNodeId) ?? null;
   const selectedLink = links.find((link) => link.id === selectedLinkId) ?? null;
+  const vmImageOptions = useMemo(() => {
+    if (!selectedNode) return [];
+    const seen = new Set<string>();
+    return networkItemsByCategory[selectedNode.kind].filter((item) => {
+      if (seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    });
+  }, [selectedNode]);
 
   const updateLink = (id: string, updater: (link: NetworkLink) => NetworkLink) => {
     setLinks((current) => current.map((link) => (link.id === id ? updater(link) : link)));
@@ -600,15 +621,6 @@ const NetworkEditor: React.FC = () => {
   }, [nodes]);
 
   useEffect(() => {
-    const routerNetworks: Record<string, string | undefined> = {};
-    nodes
-      .filter((node) => node.kind === 'router')
-      .forEach((node) => {
-        node.interfaces.forEach((intf) => {
-          routerNetworks[anchorKey(node.id, intf.id)] = intf.networkCidr;
-        });
-      });
-
     let changed = false;
     const nextNodes = nodes.map((node) => {
       if (node.kind !== 'host') return node;
@@ -629,7 +641,93 @@ const NetworkEditor: React.FC = () => {
     if (changed) {
       setNodes(nextNodes);
     }
-  }, [nodes]);
+  }, [nodes, routerNetworks]);
+
+  useEffect(() => {
+    const hostTargets = new Map<string, string>();
+    nodes
+      .filter((node) => node.kind === 'host')
+      .forEach((node) => {
+        node.interfaces.forEach((intf) => {
+          if (intf.targetRouterInterfaceId) {
+            hostTargets.set(anchorKey(node.id, intf.id), intf.targetRouterInterfaceId);
+          }
+        });
+      });
+
+    setLinks((current) => {
+      let changed = false;
+      const nextLinks: NetworkLink[] = [];
+
+      current.forEach((link) => {
+        const fromAnchor = anchorKey(link.from.nodeId, link.from.interfaceId);
+        const toAnchor = anchorKey(link.to.nodeId, link.to.interfaceId);
+        const fromResolved = resolveAnchor(fromAnchor);
+        const toResolved = resolveAnchor(toAnchor);
+
+        if (!fromResolved || !toResolved) {
+          changed = true;
+          return;
+        }
+
+        if (fromResolved.node.kind === 'host') {
+          const expectedTarget = hostTargets.get(fromAnchor);
+          if (!expectedTarget || expectedTarget !== toAnchor) {
+            changed = true;
+            return;
+          }
+        }
+
+        if (toResolved.node.kind === 'host') {
+          const expectedTarget = hostTargets.get(toAnchor);
+          if (!expectedTarget || expectedTarget !== fromAnchor) {
+            changed = true;
+            return;
+          }
+        }
+
+        if (fromResolved.node.kind === 'host' && toResolved.node.kind === 'host') {
+          changed = true;
+          return;
+        }
+
+        const routerNetwork = routerNetworks[fromAnchor] ?? routerNetworks[toAnchor];
+        const adjustedLink =
+          routerNetwork && routerNetwork !== link.networkCidr ? { ...link, networkCidr: routerNetwork } : link;
+        if (adjustedLink !== link) {
+          changed = true;
+        }
+        nextLinks.push(adjustedLink);
+      });
+
+      hostTargets.forEach((routerAnchorId, hostAnchorId) => {
+        const existing = nextLinks.some(
+          (link) =>
+            (anchorKey(link.from.nodeId, link.from.interfaceId) === hostAnchorId &&
+              anchorKey(link.to.nodeId, link.to.interfaceId) === routerAnchorId) ||
+            (anchorKey(link.to.nodeId, link.to.interfaceId) === hostAnchorId &&
+              anchorKey(link.from.nodeId, link.from.interfaceId) === routerAnchorId),
+        );
+
+        if (existing) return;
+
+        const hostEndpoint = resolveAnchor(hostAnchorId);
+        const routerEndpoint = resolveAnchor(routerAnchorId);
+        if (!hostEndpoint || !routerEndpoint) return;
+
+        const networkCidr = routerNetworks[routerAnchorId] ?? hostEndpoint.intf.networkCidr ?? '172.27.0.0/24';
+        nextLinks.push({
+          id: createId(),
+          from: { nodeId: hostEndpoint.node.id, interfaceId: hostEndpoint.intf.id },
+          to: { nodeId: routerEndpoint.node.id, interfaceId: routerEndpoint.intf.id },
+          networkCidr,
+        });
+        changed = true;
+      });
+
+      return changed ? nextLinks : current;
+    });
+  }, [nodes, routerNetworks]);
 
   useLayoutEffect(() => {
     const container = canvasRef.current;
@@ -887,7 +985,7 @@ const NetworkEditor: React.FC = () => {
                 value={selectedNode.imageId}
                 onChange={(event) => {
                   const nextImageId = event.target.value;
-                  const replacement = networkItemsByCategory[selectedNode.kind].find((item) => item.id === nextImageId);
+                  const replacement = vmImageOptions.find((item) => item.id === nextImageId);
                   if (!replacement) return;
                   setNodes((current) =>
                     current.map((node) =>
@@ -902,7 +1000,7 @@ const NetworkEditor: React.FC = () => {
                 }}
                 className="w-full rounded border border-white/10 bg-white/5 px-2 py-1 text-sm text-white outline-none focus:border-sky-400/60"
               >
-                {networkItemsByCategory[selectedNode.kind].map((item) => (
+                {vmImageOptions.map((item) => (
                   <option key={item.id} value={item.id} className="bg-slate-900 text-slate-100">
                     {item.label} (ID: {item.id})
                   </option>
@@ -942,7 +1040,7 @@ const NetworkEditor: React.FC = () => {
                               updateInterface(selectedNode.id, intf.id, (current) => ({
                                 ...current,
                                 targetRouterInterfaceId: targetId,
-                                networkCidr: target?.intf.networkCidr ?? current.networkCidr,
+                                networkCidr: target?.intf.networkCidr,
                               }));
                             }}
                             className="w-44 rounded border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-100 outline-none focus:border-emerald-400/60"

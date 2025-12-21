@@ -2,6 +2,7 @@ import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 're
 import { useNavigate, useParams } from 'react-router-dom';
 import ResourceDrawer from '../components/ResourceDrawer';
 import { getGameById } from '../data/games';
+import { networkItemsByCategory } from '../data/networkItems';
 import { useAuth } from '../providers/AuthProvider';
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
@@ -14,6 +15,7 @@ const MAX_SCALE = 2.5;
 interface NetworkNode {
   id: string;
   label: string;
+  imageId: string;
   kind: 'router' | 'host';
   x: number;
   y: number;
@@ -25,6 +27,7 @@ interface NetworkInterface {
   name: string;
   ip?: string;
   networkCidr?: string;
+  targetRouterInterfaceId?: string;
 }
 
 interface NetworkLinkEnd {
@@ -89,6 +92,7 @@ const NetworkEditor: React.FC = () => {
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
   const [linkInProgress, setLinkInProgress] = useState<{ anchorId: string; point: { x: number; y: number } } | null>(null);
   const [overlappingInterfaces, setOverlappingInterfaces] = useState<Set<string>>(new Set());
+  const [invalidHostInterfaces, setInvalidHostInterfaces] = useState<Set<string>>(new Set());
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const dragOrigin = useRef({ x: 0, y: 0 });
   const offsetOrigin = useRef({ x: 0, y: 0 });
@@ -215,7 +219,8 @@ const NetworkEditor: React.FC = () => {
     event.preventDefault();
     const kind = event.dataTransfer.getData('application/nest-node-kind') as NetworkNode['kind'];
     const label = event.dataTransfer.getData('application/nest-node-label');
-    if (!kind || !label) return;
+    const imageId = event.dataTransfer.getData('application/nest-node-image-id');
+    if (!kind || !label || !imageId) return;
 
     const point = screenToWorld(event.clientX, event.clientY);
     const defaultInterfaces =
@@ -227,6 +232,7 @@ const NetworkEditor: React.FC = () => {
       {
         id: createId(),
         kind,
+        imageId,
         label,
         x: clamp(point.x, 0, MAP_WIDTH),
         y: clamp(point.y, 0, MAP_HEIGHT),
@@ -315,7 +321,25 @@ const NetworkEditor: React.FC = () => {
         node.id === nodeId
           ? {
               ...node,
-              interfaces: node.interfaces.map((intf) => (intf.id === interfaceId ? updater(intf) : intf)),
+              interfaces: node.interfaces.map((intf) => {
+                if (intf.id !== interfaceId) return intf;
+                const updated = updater(intf);
+                if (node.kind === 'router') {
+                  const cidrIp = updated.networkCidr?.split('/')[0];
+                  const octets = cidrIp?.split('.');
+                  if (octets && octets.length === 4) {
+                    octets[3] = '1';
+                    updated.ip = octets.join('.');
+                  } else if (updated.ip) {
+                    const ipParts = updated.ip.split('.');
+                    if (ipParts.length === 4) {
+                      ipParts[3] = '1';
+                      updated.ip = ipParts.join('.');
+                    }
+                  }
+                }
+                return updated;
+              }),
             }
           : node,
       ),
@@ -378,6 +402,19 @@ const NetworkEditor: React.FC = () => {
     };
   }, [nodes, viewBox]);
 
+  const routerInterfaceOptions = useMemo(
+    () =>
+      nodes
+        .filter((node) => node.kind === 'router')
+        .flatMap((node) =>
+          node.interfaces.map((intf) => ({
+            value: anchorKey(node.id, intf.id),
+            label: `${node.label} • ${intf.name}`,
+          })),
+        ),
+    [nodes],
+  );
+
   const mapTransform = {
     transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
     width: MAP_WIDTH,
@@ -397,6 +434,7 @@ const NetworkEditor: React.FC = () => {
     const target = resolveAnchor(targetAnchorId);
     if (!source || !target) return;
     if (source.node.id === target.node.id) return;
+    if (source.node.kind === 'host' && target.node.kind === 'host') return;
 
     const alreadyExists = links.some(
       (link) =>
@@ -495,6 +533,51 @@ const NetworkEditor: React.FC = () => {
     }
 
     setOverlappingInterfaces(overlaps);
+  }, [nodes]);
+
+  useEffect(() => {
+    const invalid = new Set<string>();
+    const routerAddresses = new Map<string, Set<string>>();
+    nodes
+      .filter((node) => node.kind === 'router')
+      .forEach((node) => {
+        node.interfaces.forEach((intf) => {
+          if (!intf.networkCidr || !intf.ip) return;
+          const routerSet = routerAddresses.get(intf.networkCidr) ?? new Set<string>();
+          routerSet.add(intf.ip);
+          routerAddresses.set(intf.networkCidr, routerSet);
+        });
+      });
+
+    const seenHosts = new Map<string, Set<string>>();
+    nodes
+      .filter((node) => node.kind === 'host')
+      .forEach((node) => {
+        node.interfaces.forEach((intf) => {
+          if (!intf.networkCidr || !intf.ip) return;
+          const octets = intf.ip.split('.');
+          const anchor = anchorKey(node.id, intf.id);
+          if (octets.length === 4) {
+            const last = Number(octets[3]);
+            if (Number.isNaN(last) || last === 0 || last === 1) {
+              invalid.add(anchor);
+            }
+          }
+
+          const rangeSeen = seenHosts.get(intf.networkCidr) ?? new Set<string>();
+          if (rangeSeen.has(intf.ip)) {
+            invalid.add(anchor);
+          }
+          rangeSeen.add(intf.ip);
+          seenHosts.set(intf.networkCidr, rangeSeen);
+
+          if (routerAddresses.get(intf.networkCidr)?.has(intf.ip)) {
+            invalid.add(anchor);
+          }
+        });
+      });
+
+    setInvalidHostInterfaces(invalid);
   }, [nodes]);
 
   useLayoutEffect(() => {
@@ -642,6 +725,7 @@ const NetworkEditor: React.FC = () => {
                         <span>{node.label}</span>
                         <span className="text-[11px] font-medium text-white/80">{node.interfaces.length} ports</span>
                       </div>
+                      <div className="text-[10px] font-medium uppercase tracking-wide text-white/70">VM image ID: {node.imageId}</div>
 
                       <div className="mt-2 space-y-2 text-xs font-normal">
                         {node.interfaces.map((intf, index) => {
@@ -721,9 +805,9 @@ const NetworkEditor: React.FC = () => {
 
         {selectedNode && (
           <div className="pointer-events-auto absolute right-4 top-20 z-30 w-80 space-y-3 rounded-lg border border-white/10 bg-slate-900/85 p-4 text-sm shadow-xl backdrop-blur">
-            <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-slate-200">
-              <span>{selectedNode.kind} configuration</span>
-              <button
+          <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-slate-200">
+            <span>{selectedNode.kind} configuration</span>
+            <button
                 type="button"
                 onClick={() => setSelectedNodeId(null)}
                 className="rounded px-2 py-1 text-white/70 transition hover:bg-white/10 hover:text-white"
@@ -732,40 +816,90 @@ const NetworkEditor: React.FC = () => {
               </button>
             </div>
 
-            <div>
-              <div className="text-[11px] uppercase tracking-wide text-slate-400">Label</div>
-              <input
-                value={selectedNode.label}
-                onChange={(event) =>
-                  setNodes((current) =>
-                    current.map((node) => (node.id === selectedNode.id ? { ...node, label: event.target.value } : node)),
-                  )
-                }
-                className="mt-1 w-full rounded border border-white/10 bg-white/5 px-2 py-1 text-sm text-white outline-none focus:border-sky-400/60"
-              />
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-slate-400">Node ID</div>
+            <div className="mt-1 rounded border border-white/10 bg-white/5 px-2 py-1 text-sm text-slate-100">
+              {selectedNode.id}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <div className="text-[11px] uppercase tracking-wide text-slate-400">VM image</div>
+            <select
+              value={selectedNode.imageId}
+              onChange={(event) => {
+                const nextImageId = event.target.value;
+                const replacement = networkItemsByCategory[selectedNode.kind].find((item) => item.id === nextImageId);
+                if (!replacement) return;
+                setNodes((current) =>
+                  current.map((node) =>
+                    node.id === selectedNode.id
+                      ? {
+                          ...node,
+                          imageId: nextImageId,
+                          label: replacement.label,
+                        }
+                      : node,
+                  ),
+                );
+              }}
+              className="w-full rounded border border-white/10 bg-white/5 px-2 py-1 text-sm text-white outline-none focus:border-sky-400/60"
+            >
+              {networkItemsByCategory[selectedNode.kind].map((item) => (
+                <option key={item.id} value={item.id} className="bg-slate-900 text-slate-100">
+                  {item.label} (ID: {item.id})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-[11px] uppercase tracking-wide text-slate-400">
+              <span>Interfaces</span>
+              <button
+                type="button"
+                onClick={() => addInterface(selectedNode)}
+                className="rounded bg-white/10 px-2 py-1 text-xs font-semibold text-white transition hover:bg-white/20"
+              >
+                + Add {selectedNode.kind === 'router' ? 'port' : 'interface'}
+              </button>
             </div>
 
             <div className="space-y-2">
-              <div className="flex items-center justify-between text-[11px] uppercase tracking-wide text-slate-400">
-                <span>Interfaces</span>
-                {selectedNode.kind === 'router' && (
-                  <button
-                    type="button"
-                    onClick={() => addInterface(selectedNode)}
-                    className="rounded bg-white/10 px-2 py-1 text-xs font-semibold text-white transition hover:bg-white/20"
+              {selectedNode.interfaces.map((intf) => {
+                const key = anchorKey(selectedNode.id, intf.id);
+                const overlapping = overlappingInterfaces.has(key);
+                const invalidHost = invalidHostInterfaces.has(key);
+                return (
+                  <div
+                    key={intf.id}
+                    className={`rounded-lg border px-3 py-2 ${overlapping || invalidHost ? 'border-rose-400/50 bg-rose-500/10' : 'border-white/10 bg-white/5'}`}
                   >
-                    + Add port
-                  </button>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                {selectedNode.interfaces.map((intf) => {
-                  const key = anchorKey(selectedNode.id, intf.id);
-                  const overlapping = overlappingInterfaces.has(key);
-                  return (
-                    <div key={intf.id} className={`rounded-lg border px-3 py-2 ${overlapping ? 'border-rose-400/50 bg-rose-500/10' : 'border-white/10 bg-white/5'}`}>
-                      <div className="mb-1 flex items-center justify-between text-xs font-semibold text-slate-100">
+                    <div className="mb-1 flex items-center justify-between text-xs font-semibold text-slate-100">
+                      {selectedNode.kind === 'host' ? (
+                        <select
+                          value={intf.targetRouterInterfaceId || ''}
+                          onChange={(event) => {
+                            const targetId = event.target.value || undefined;
+                            const selectedOption = routerInterfaceOptions.find((option) => option.value === targetId);
+                            updateInterface(selectedNode.id, intf.id, (current) => ({
+                              ...current,
+                              targetRouterInterfaceId: targetId,
+                              name: selectedOption?.label || current.name,
+                            }));
+                          }}
+                          className="w-44 rounded border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-100 outline-none focus:border-emerald-400/60"
+                        >
+                          <option value="" className="bg-slate-900 text-slate-100">
+                            Select router interface
+                          </option>
+                          {routerInterfaceOptions.map((option) => (
+                            <option key={option.value} value={option.value} className="bg-slate-900 text-slate-100">
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
                         <input
                           value={intf.name}
                           onChange={(event) =>
@@ -773,10 +907,11 @@ const NetworkEditor: React.FC = () => {
                           }
                           className="w-32 rounded border border-white/10 bg-white/5 px-2 py-1 text-xs outline-none focus:border-sky-400/60"
                         />
-                        {selectedNode.kind === 'router' && selectedNode.interfaces.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => removeInterface(selectedNode.id, intf.id)}
+                      )}
+                      {selectedNode.interfaces.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeInterface(selectedNode.id, intf.id)}
                             className="text-[11px] text-rose-200 transition hover:text-rose-100"
                           >
                             Remove
@@ -794,6 +929,7 @@ const NetworkEditor: React.FC = () => {
                             }
                             className="rounded border border-white/10 bg-white/5 px-2 py-1 text-xs outline-none focus:border-sky-400/60"
                           />
+                          {invalidHost && <span className="text-[11px] text-rose-200">Reserved or duplicate IP</span>}
                         </label>
                         <label className="flex flex-col gap-1">
                           <span className="text-[11px] uppercase tracking-wide text-slate-400">Network (CIDR)</span>
@@ -842,6 +978,16 @@ const NetworkEditor: React.FC = () => {
                 Connected: {resolveAnchor(anchorKey(selectedLink.from.nodeId, selectedLink.from.interfaceId))?.node.label} ⇄{' '}
                 {resolveAnchor(anchorKey(selectedLink.to.nodeId, selectedLink.to.interfaceId))?.node.label}
               </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setLinks((current) => current.filter((link) => link.id !== selectedLink.id));
+                  setSelectedLinkId(null);
+                }}
+                className="mt-2 w-full rounded bg-rose-600/80 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-white transition hover:bg-rose-500"
+              >
+                Delete link
+              </button>
             </div>
           </div>
         )}

@@ -1,13 +1,22 @@
 import React from 'react';
 import { NetworkItem, networkItemsByCategory } from '../data/networkItems';
+import { customServiceCatalog } from '../data/services';
 
 interface ResourceDrawerProps {
   open: boolean;
   onToggle: () => void;
   onStartDrag: (item: NetworkItem) => void;
+  onSelectCustomService: (serviceId: string) => void;
+  activeCustomServiceIds: string[];
 }
 
-const ResourceDrawer: React.FC<ResourceDrawerProps> = ({ open, onToggle, onStartDrag }) => {
+const ResourceDrawer: React.FC<ResourceDrawerProps> = ({
+  open,
+  onToggle,
+  onStartDrag,
+  onSelectCustomService,
+  activeCustomServiceIds,
+}) => {
   const handleDragStart = (event: React.DragEvent<HTMLButtonElement>, item: NetworkItem) => {
     event.dataTransfer.setData('application/nest-node-kind', item.category);
     event.dataTransfer.setData('application/nest-node-label', item.label);
@@ -62,6 +71,31 @@ const ResourceDrawer: React.FC<ResourceDrawerProps> = ({ open, onToggle, onStart
                   <div className="text-[10px] font-medium uppercase tracking-wide text-slate-400">ID: {item.id}</div>
                 </button>
               ))}
+            </div>
+          </div>
+          <div className="space-y-2">
+            <div className="text-xs uppercase tracking-wide text-slate-400">Custom services</div>
+            <div className="flex flex-wrap gap-2">
+              {customServiceCatalog.map((service) => {
+                const exists = activeCustomServiceIds.includes(service.id);
+                return (
+                  <button
+                    key={service.id}
+                    type="button"
+                    onClick={() => onSelectCustomService(service.id)}
+                    disabled={exists}
+                    className={`rounded-lg border px-3 py-2 text-left font-medium shadow-sm transition ${
+                      exists
+                        ? 'cursor-not-allowed border-white/10 bg-white/5 text-slate-400'
+                        : 'border-white/10 bg-white/5 text-white hover:border-white/30 hover:bg-white/10'
+                    }`}
+                  >
+                    <div className="text-sm font-semibold">{service.name}</div>
+                    <div className="text-[10px] font-medium uppercase tracking-wide text-slate-400">{service.id}</div>
+                    <div className="text-[11px] text-slate-300">{service.description}</div>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>

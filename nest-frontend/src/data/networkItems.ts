@@ -1,4 +1,4 @@
-import rawRegistry from "../assets/network-assets.yaml?raw";
+import { NetworkAssetsRegistry, networkAssets } from './networkAssets';
 
 export type NetworkCategory = 'router' | 'host';
 
@@ -11,11 +11,6 @@ export interface NetworkItem {
 interface RegistryEntry {
   id: string;
   label: string;
-}
-
-interface RegistrySource {
-  routers?: RegistryEntry[] | Record<string, string>;
-  hosts?: RegistryEntry[] | Record<string, string>;
 }
 
 const normalizeEntries = (
@@ -35,14 +30,7 @@ const normalizeEntries = (
     .map(([label, id]) => ({ id: String(id), label, category }));
 };
 
-const parsedRegistry = ((): RegistrySource => {
-  try {
-    return (JSON.parse(rawRegistry) as RegistrySource) ?? {};
-  } catch (error) {
-    console.error('Failed to parse network assets registry', error);
-    return {};
-  }
-})();
+const parsedRegistry: NetworkAssetsRegistry = networkAssets;
 
 export const networkItems: NetworkItem[] = [
   ...normalizeEntries(parsedRegistry.routers, 'router'),

@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import AppNav from '../components/AppNav';
+import NavBar from '../components/NavBar';
 import { useAuth } from '../providers/AuthProvider';
 
 const Profile: React.FC = () => {
-  const { user, updateUserName } = useAuth();
+  const { user, updateUserName, logout } = useAuth();
+  const isDeveloper = user?.role === 'developer';
   const [username, setUsername] = useState(user?.name ?? '');
   const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [error, setError] = useState<string>('');
@@ -38,7 +40,7 @@ const Profile: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <AppNav />
+      {isDeveloper ? <NavBar role="developer" userName={user?.name} onLogout={logout} /> : <AppNav />}
       <main className="mx-auto max-w-4xl px-6 py-10 space-y-8" aria-label="Profile settings">
         <header className="space-y-2">
           <p className="text-sm font-semibold uppercase tracking-wider text-indigo-600">Account</p>

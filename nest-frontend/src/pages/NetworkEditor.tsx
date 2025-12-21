@@ -119,6 +119,7 @@ const NetworkEditor: React.FC = () => {
   const [customServices, setCustomServices] = useState<CustomServiceInstance[]>([]);
   const [serviceLinks, setServiceLinks] = useState<ServiceLink[]>([]);
   const [anchorPositions, setAnchorPositions] = useState<Record<string, { x: number; y: number }>>({});
+  const [nodeRects, setNodeRects] = useState<Record<string, { x: number; y: number; width: number; height: number }>>({});
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
   const [linkInProgress, setLinkInProgress] = useState<{ anchorId: string; point: { x: number; y: number } } | null>(null);
@@ -135,6 +136,7 @@ const NetworkEditor: React.FC = () => {
   const nodeDragOrigin = useRef({ x: 0, y: 0 });
   const nodeStart = useRef({ x: 0, y: 0 });
   const anchorRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const nodeRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const createInterface = (name: string): NetworkInterface => ({
     id: createId(),
@@ -399,6 +401,31 @@ const NetworkEditor: React.FC = () => {
     });
     createCustomServiceEntry(definitionId, bindings, 'incomplete');
     setCustomServiceModal(null);
+  };
+
+  const removeCustomService = (id: string) => {
+    const keepHostServices = window.confirm(
+      'Remove this custom service? Select OK to keep underlying host services enabled or Cancel to disable them.',
+    );
+
+    setNodes((current) =>
+      current.map((node) => {
+        if (keepHostServices) {
+          let changed = false;
+          const nextServices = node.services.map((service) => {
+            if (service.customServiceId !== id) return service;
+            changed = true;
+            return { ...service, customServiceId: undefined };
+          });
+          return changed ? { ...node, services: nextServices } : node;
+        }
+
+        const filtered = node.services.filter((service) => service.customServiceId !== id);
+        return filtered.length === node.services.length ? node : { ...node, services: filtered };
+      }),
+    );
+
+    setCustomServices((current) => current.filter((service) => service.id !== id));
   };
 
   const handleSaveNetwork = () => {
@@ -764,6 +791,41 @@ const NetworkEditor: React.FC = () => {
     return complete ? 'complete' : 'incomplete';
   };
 
+  const customServiceIssues = (service: CustomServiceInstance) => {
+    const definition = customServicesById[service.definitionId];
+    if (!definition) return ['Unknown service definition'];
+
+    const issues: string[] = [];
+    const missingDependencies = (definition.dependencies ?? []).filter(
+      (dependencyId) => !nodes.some((node) => node.services.some((svc) => svc.serviceId === dependencyId)),
+    );
+
+    if (missingDependencies.length > 0) {
+      issues.push(`Missing dependencies: ${missingDependencies.map((dep) => serviceDefinitionsById[dep]?.name ?? dep).join(', ')}`);
+    }
+
+    (definition.requiredRoles ?? []).forEach((role) => {
+      const hostId = service.roleBindings[role.role];
+      if (!hostId) {
+        issues.push(`Role ${role.role} not assigned`);
+        return;
+      }
+      const host = nodes.find((node) => node.id === hostId);
+      if (!host) {
+        issues.push(`Role ${role.role} host missing`);
+        return;
+      }
+      const hasService = host.services.some((svc) => svc.serviceId === role.serviceId);
+      if (!hasService) {
+        issues.push(
+          `${role.role} missing ${serviceDefinitionsById[role.serviceId]?.name ?? role.serviceId} service on host ${host.label}`,
+        );
+      }
+    });
+
+    return issues;
+  };
+
   const updateNodeServices = (nodeId: string, updater: (services: ServiceInstance[]) => ServiceInstance[]) => {
     setNodes((current) =>
       current.map((node) =>
@@ -1063,6 +1125,7 @@ const NetworkEditor: React.FC = () => {
     if (!container) return;
     const rect = container.getBoundingClientRect();
     const positions: Record<string, { x: number; y: number }> = {};
+    const bounds: Record<string, { x: number; y: number; width: number; height: number }> = {};
 
     Object.entries(anchorRefs.current).forEach(([key, element]) => {
       if (!element) return;
@@ -1075,8 +1138,36 @@ const NetworkEditor: React.FC = () => {
       };
     });
 
+    Object.entries(nodeRefs.current).forEach(([key, element]) => {
+      if (!element) return;
+      const nodeRect = element.getBoundingClientRect();
+      bounds[key] = {
+        x: (nodeRect.left - rect.left - offset.x) / scale,
+        y: (nodeRect.top - rect.top - offset.y) / scale,
+        width: nodeRect.width / scale,
+        height: nodeRect.height / scale,
+      };
+    });
+
     setAnchorPositions(positions);
+    setNodeRects(bounds);
   }, [nodes, scale, offset]);
+
+  const nodeEdgePoint = (
+    rect: { x: number; y: number; width: number; height: number },
+    target: { x: number; y: number },
+  ) => {
+    const center = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+    const dx = target.x - center.x;
+    const dy = target.y - center.y;
+    if (dx === 0 && dy === 0) return center;
+    const halfW = rect.width / 2;
+    const halfH = rect.height / 2;
+    const scaleX = dx === 0 ? Number.POSITIVE_INFINITY : Math.abs(halfW / dx);
+    const scaleY = dy === 0 ? Number.POSITIVE_INFINITY : Math.abs(halfH / dy);
+    const t = Math.min(scaleX, scaleY);
+    return { x: center.x + dx * t, y: center.y + dy * t };
+  };
 
   return (
     <div className="h-screen w-screen bg-slate-950 text-white">
@@ -1130,6 +1221,7 @@ const NetworkEditor: React.FC = () => {
             {customServices.length === 0 && <div className="text-[11px] text-slate-300">None registered</div>}
             {customServices.map((service) => {
               const definition = customServicesById[service.definitionId];
+              const issues = customServiceIssues(service);
               return (
                 <div
                   key={service.id}
@@ -1140,10 +1232,32 @@ const NetworkEditor: React.FC = () => {
                   }`}
                 >
                   <div className="flex items-center justify-between font-semibold">
-                    <span>{definition?.name ?? service.definitionId}</span>
-                    <span className="uppercase tracking-wide">{service.status}</span>
+                    <div className="flex flex-col">
+                      <span>{definition?.name ?? service.definitionId}</span>
+                      {service.status === 'incomplete' && issues.length > 0 && (
+                        <span className="text-[10px] font-normal text-white/80">{issues[0]}</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="uppercase tracking-wide">{service.status}</span>
+                      <button
+                        type="button"
+                        aria-label={`Remove ${definition?.name ?? service.definitionId}`}
+                        onClick={() => removeCustomService(service.id)}
+                        className="rounded bg-white/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white transition hover:bg-white/20"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
                   {definition?.description && <div className="text-[10px] text-white/80">{definition.description}</div>}
+                  {service.status === 'incomplete' && issues.length > 1 && (
+                    <ul className="mt-1 list-inside list-disc space-y-0.5 text-[10px] text-white/80">
+                      {issues.slice(1).map((issue) => (
+                        <li key={issue}>{issue}</li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               );
             })}
@@ -1204,8 +1318,18 @@ const NetworkEditor: React.FC = () => {
                     const fromNode = nodes.find((node) => node.id === link.fromHostId);
                     const toNode = nodes.find((node) => node.id === link.toHostId);
                     if (!fromNode || !toNode) return null;
-                    const start = { x: fromNode.x + 120, y: fromNode.y + 70 };
-                    const end = { x: toNode.x + 120, y: toNode.y + 70 };
+                    const fromRect = nodeRects[fromNode.id];
+                    const toRect = nodeRects[toNode.id];
+                    const fallbackStart = { x: fromNode.x + 120, y: fromNode.y + 70 };
+                    const fallbackEnd = { x: toNode.x + 120, y: toNode.y + 70 };
+                    const endCenter = toRect
+                      ? { x: toRect.x + toRect.width / 2, y: toRect.y + toRect.height / 2 }
+                      : fallbackEnd;
+                    const startCenter = fromRect
+                      ? { x: fromRect.x + fromRect.width / 2, y: fromRect.y + fromRect.height / 2 }
+                      : fallbackStart;
+                    const start = fromRect ? nodeEdgePoint(fromRect, endCenter) : startCenter;
+                    const end = toRect ? nodeEdgePoint(toRect, startCenter) : endCenter;
                     const dx = Math.max(Math.abs(end.x - start.x) * 0.25, 60);
                     const path = `M ${start.x} ${start.y} C ${start.x + dx} ${start.y} ${end.x - dx} ${end.y} ${end.x} ${end.y}`;
                     const customService = customServices.find((service) => service.id === link.customServiceId);
@@ -1275,6 +1399,9 @@ const NetworkEditor: React.FC = () => {
                 {nodes.map((node) => (
                   <div
                     key={node.id}
+                    ref={(element) => {
+                      nodeRefs.current[node.id] = element;
+                    }}
                     className="absolute"
                     style={{ left: node.x, top: node.y }}
                     onMouseDown={(event) => handleNodeMouseDown(event, node)}
@@ -1388,7 +1515,11 @@ const NetworkEditor: React.FC = () => {
         </div>
 
         {selectedNode && (
-          <div className="pointer-events-auto absolute right-4 top-20 z-30 w-80 space-y-3 rounded-lg border border-white/10 bg-slate-900/85 p-4 text-sm shadow-xl backdrop-blur">
+          <div
+            className="pointer-events-auto absolute right-4 top-20 z-30 w-80 space-y-3 overflow-y-auto rounded-lg border border-white/10 bg-slate-900/85 p-4 text-sm shadow-xl backdrop-blur"
+            style={{ maxHeight: '80vh' }}
+            onWheel={(event) => event.stopPropagation()}
+          >
             <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-slate-200">
               <span>{selectedNode.kind} configuration</span>
               <button
@@ -1722,7 +1853,11 @@ const NetworkEditor: React.FC = () => {
 
         {customServiceModal && (
           <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4">
-            <div className="w-full max-w-xl space-y-4 rounded-lg border border-white/10 bg-slate-900/95 p-6 text-sm shadow-2xl">
+            <div
+              className="w-full max-w-xl space-y-4 overflow-y-auto rounded-lg border border-white/10 bg-slate-900/95 p-6 text-sm shadow-2xl"
+              style={{ maxHeight: '85vh' }}
+              onWheel={(event) => event.stopPropagation()}
+            >
               {(() => {
                 const definition = customServicesById[customServiceModal];
                 if (!definition) {

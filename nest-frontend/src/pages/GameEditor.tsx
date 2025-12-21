@@ -25,6 +25,7 @@ const GameEditor: React.FC = () => {
   const [name, setName] = useState(existingGame?.name ?? '');
   const [selectedTypes, setSelectedTypes] = useState<GameType[]>(existingGame?.types ?? []);
   const [selectedServices, setSelectedServices] = useState<RvbService[]>(existingGame?.rvbServices ?? []);
+  const [credentials, setCredentials] = useState(existingGame?.credentials?.join('\n') ?? 'root:changeme');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -32,6 +33,7 @@ const GameEditor: React.FC = () => {
       setName(existingGame.name);
       setSelectedTypes(existingGame.types);
       setSelectedServices(existingGame.rvbServices);
+      setCredentials(existingGame.credentials.join('\n'));
     }
   }, [existingGame]);
 
@@ -81,6 +83,7 @@ const GameEditor: React.FC = () => {
           name,
           types: selectedTypes,
           rvbServices: selectedServices,
+          credentials: hasRvbSelected ? credentials.split('\n').map((line) => line.trim()).filter(Boolean) : [],
           teamCount: existingGame.teamCount,
         });
       } else {
@@ -89,6 +92,12 @@ const GameEditor: React.FC = () => {
           developerId: user.id,
           types: selectedTypes,
           rvbServices: hasRvbSelected ? selectedServices : [],
+          credentials: hasRvbSelected
+            ? credentials
+                .split('\n')
+                .map((line) => line.trim())
+                .filter(Boolean)
+            : [],
           teamCount: existingGame?.teamCount ?? 0,
         });
       }
@@ -199,6 +208,20 @@ const GameEditor: React.FC = () => {
               <p className="text-xs text-slate-600">
                 Team counts are chosen when hosting a Red vs. Blue game.
               </p>
+
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-800" htmlFor="credential-list">
+                  Credentials (shared with players)
+                </label>
+                <textarea
+                  id="credential-list"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm transition focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                  rows={3}
+                  value={credentials}
+                  onChange={(event) => setCredentials(event.target.value)}
+                />
+                <p className="text-xs text-slate-600">Defaults to root:changeme unless overridden.</p>
+              </div>
             </div>
           )}
 

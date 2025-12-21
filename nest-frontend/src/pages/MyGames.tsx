@@ -1,8 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import NavBar from '../components/NavBar';
-import { HostedGameStatus, hostGameInstance } from '../data/gameHosting';
 import { Game, deleteGame, listGamesForDeveloper } from '../data/games';
+import {
+  GameVisibility,
+  GameSession,
+  inviteTeamToSession,
+  listDeveloperSessions,
+  scheduleGameSession,
+} from '../data/gameSessions';
+import { listTeams } from '../data/teams';
 import { useAuth } from '../providers/AuthProvider';
 import ComingSoon from './partials/ComingSoon';
 
@@ -15,13 +22,19 @@ const MyGames: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [hostingGameId, setHostingGameId] = useState<string | null>(null);
   const [hostingError, setHostingError] = useState<string | null>(null);
-  const [activeHostedGames, setActiveHostedGames] = useState<HostedGameStatus[]>([]);
+  const [sessions, setSessions] = useState<GameSession[]>([]);
   const [pendingHostGame, setPendingHostGame] = useState<Game | null>(null);
   const [teamCountInput, setTeamCountInput] = useState('2');
+  const [startTimeInput, setStartTimeInput] = useState('');
+  const [endTimeInput, setEndTimeInput] = useState('');
+  const [visibility, setVisibility] = useState<GameVisibility>('public');
+  const [minPlayersInput, setMinPlayersInput] = useState('3');
+  const [invitedTeams, setInvitedTeams] = useState<string[]>([]);
 
   useEffect(() => {
     if (user && isDeveloper) {
       setGames(listGamesForDeveloper(user.id));
+      setSessions(listDeveloperSessions(user.id));
     }
   }, [isDeveloper, user]);
 
@@ -32,8 +45,8 @@ const MyGames: React.FC = () => {
   );
 
   const activeHostedCount = useMemo(
-    () => activeHostedGames.filter((session) => session.status !== 'stopped').length,
-    [activeHostedGames],
+    () => sessions.filter((session) => session.status === 'running').length,
+    [sessions],
   );
 
   const handleDelete = (gameId: string) => {
@@ -42,28 +55,51 @@ const MyGames: React.FC = () => {
     setGames(listGamesForDeveloper(user.id));
   };
 
-  const startHostingGame = async (game: Game, teams?: number) => {
+  const startHostingGame = (game: Game, teams?: number) => {
     setHostingGameId(game.id);
     setHostingError(null);
 
     try {
-      const hosted = await hostGameInstance(game, { teamCount: teams });
-      setActiveHostedGames((previous) => [hosted, ...previous.filter((entry) => entry.id !== hosted.id)]);
+      const start = startTimeInput ? new Date(startTimeInput) : new Date();
+      const end = endTimeInput ? new Date(endTimeInput) : new Date(start.getTime() + 60 * 60 * 1000);
+
+      if (end <= start) {
+        setHostingError('End time must be after start time.');
+        setHostingGameId(null);
+        return;
+      }
+
+      const minPlayers = Number(minPlayersInput);
+      const safeMinPlayers = Number.isFinite(minPlayers) && minPlayers > 0 ? Math.floor(minPlayers) : 1;
+      const effectiveMinimum = teams ? Math.max(safeMinPlayers, teams) : safeMinPlayers;
+
+      scheduleGameSession(game, { id: user!.id, name: user!.name }, {
+        startTime: start.toISOString(),
+        endTime: end.toISOString(),
+        visibility,
+        invitedTeamIds: invitedTeams,
+        minPlayers: effectiveMinimum,
+      });
+
+      setSessions(listDeveloperSessions(user!.id));
     } catch (error) {
       setHostingError(error instanceof Error ? error.message : 'Failed to host game.');
-    } finally {
-      setHostingGameId(null);
     }
+
+    setHostingGameId(null);
   };
 
   const handleHostClick = (game: Game) => {
-    if (game.types.includes('Red vs. Blue')) {
-      setPendingHostGame(game);
-      setTeamCountInput(String(Math.max(1, game.teamCount || 2)));
-      return;
-    }
-
-    startHostingGame(game);
+    const now = new Date();
+    const defaultStart = new Date(now.getTime() + 15 * 60 * 1000);
+    const defaultEnd = new Date(defaultStart.getTime() + 60 * 60 * 1000);
+    setPendingHostGame(game);
+    setTeamCountInput(String(Math.max(1, game.teamCount || 2)));
+    setStartTimeInput(defaultStart.toISOString().slice(0, 16));
+    setEndTimeInput(defaultEnd.toISOString().slice(0, 16));
+    setVisibility('public');
+    setMinPlayersInput(String(Math.max(1, game.teamCount || 3)));
+    setInvitedTeams([]);
   };
 
   const confirmTeamSelection = () => {
@@ -135,7 +171,7 @@ const MyGames: React.FC = () => {
             </div>
           )}
 
-          {activeHostedGames.length > 0 && (
+          {sessions.length > 0 && (
             <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-sm font-semibold text-slate-800">Active game sessions</p>
@@ -145,16 +181,50 @@ const MyGames: React.FC = () => {
               </div>
 
               <div className="mt-3 space-y-2 text-sm text-slate-700">
-                {activeHostedGames.map((session) => (
+                {sessions.map((session) => (
                   <div
                     key={session.id}
-                    className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 ring-1 ring-slate-100"
+                    className="flex flex-col gap-2 rounded-lg bg-slate-50 px-3 py-2 ring-1 ring-slate-100"
                   >
-                    <div>
-                      <p className="font-semibold text-slate-800">{session.name}</p>
-                      <p className="text-xs text-slate-500">Status: {session.status}</p>
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="font-semibold text-slate-800">{session.gameName}</p>
+                        <p className="text-xs text-slate-500">Status: {session.status}</p>
+                        <p className="text-[11px] text-slate-500">
+                          {new Date(session.startTime).toLocaleString()} - {new Date(session.endTime).toLocaleString()}
+                        </p>
+                        <p className="text-[11px] text-slate-500">Visibility: {session.visibility}</p>
+                        <p className="text-[11px] text-slate-500">Minimum players: {session.minPlayers}</p>
+                        {session.invitedTeamIds.length > 0 && (
+                          <p className="text-[11px] text-slate-500">
+                            Invited:{' '}
+                            {listTeams()
+                              .filter((team) => session.invitedTeamIds.includes(team.id))
+                              .map((team) => team.name)
+                              .join(', ')}
+                          </p>
+                        )}
+                      </div>
+                      <span className="text-xs font-semibold text-indigo-700">#{session.id}</span>
                     </div>
-                    <span className="text-xs font-semibold text-indigo-700">#{session.id}</span>
+                    {session.status === 'scheduled' && (
+                      <div className="flex flex-wrap gap-2 text-[11px] text-slate-600">
+                        {listTeams().map((team) => (
+                          <button
+                            key={team.id}
+                            type="button"
+                            onClick={() => inviteTeamToSession(session.id, team.id)}
+                            className={`rounded-full px-3 py-1 ring-1 transition ${
+                              session.invitedTeamIds.includes(team.id)
+                                ? 'bg-indigo-600 text-white ring-indigo-500'
+                                : 'bg-white text-slate-700 ring-slate-200 hover:bg-slate-50'
+                            }`}
+                          >
+                            {session.invitedTeamIds.includes(team.id) ? 'Invited' : 'Invite'} {team.name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -246,22 +316,104 @@ const MyGames: React.FC = () => {
           <div className="fixed inset-0 z-10 flex items-center justify-center bg-slate-900/50 p-4">
             <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl ring-1 ring-slate-200">
               <h2 className="text-lg font-semibold text-slate-900">Host {pendingHostGame.name}</h2>
-              <p className="mt-1 text-sm text-slate-600">
-                Choose the number of teams before hosting this Red vs. Blue game.
-              </p>
+              <p className="mt-1 text-sm text-slate-600">Choose the schedule, visibility, and invited teams.</p>
 
-              <div className="mt-4 space-y-2">
-                <label className="text-sm font-medium text-slate-700" htmlFor="team-count-selection">
-                  Number of teams
-                </label>
-                <input
-                  id="team-count-selection"
-                  type="number"
-                  min={1}
-                  value={teamCountInput}
-                  onChange={(event) => setTeamCountInput(event.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm transition focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                />
+              <div className="mt-4 space-y-3">
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-slate-700" htmlFor="start-time-input">
+                    Start time
+                  </label>
+                  <input
+                    id="start-time-input"
+                    type="datetime-local"
+                    value={startTimeInput}
+                    onChange={(event) => setStartTimeInput(event.target.value)}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm transition focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-slate-700" htmlFor="end-time-input">
+                    End time
+                  </label>
+                  <input
+                    id="end-time-input"
+                    type="datetime-local"
+                    value={endTimeInput}
+                    onChange={(event) => setEndTimeInput(event.target.value)}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm transition focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-700" htmlFor="visibility-choice">Visibility</label>
+                  <select
+                    id="visibility-choice"
+                    value={visibility}
+                    onChange={(event) => setVisibility(event.target.value as GameVisibility)}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm"
+                  >
+                    <option value="public">Public — any team can request to join before start</option>
+                    <option value="private">Private — invite-only</option>
+                  </select>
+                </div>
+
+                {pendingHostGame.types.includes('Red vs. Blue') && (
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium text-slate-700" htmlFor="team-count-selection">
+                      Number of teams
+                    </label>
+                    <input
+                      id="team-count-selection"
+                      type="number"
+                      min={1}
+                      value={teamCountInput}
+                      onChange={(event) => setTeamCountInput(event.target.value)}
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm transition focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-slate-700" htmlFor="min-players-input">
+                    Minimum players required per team
+                  </label>
+                  <input
+                    id="min-players-input"
+                    type="number"
+                    min={1}
+                    value={minPlayersInput}
+                    onChange={(event) => setMinPlayersInput(event.target.value)}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm transition focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-slate-700">Invite teams</p>
+                  <div className="flex max-h-36 flex-col gap-2 overflow-y-auto rounded-lg border border-slate-200 p-2">
+                    {listTeams().map((team) => {
+                      const checked = invitedTeams.includes(team.id);
+                      return (
+                        <label key={team.id} className="flex items-center gap-2 text-sm text-slate-700">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(event) => {
+                              if (event.target.checked) {
+                                setInvitedTeams((prev) => Array.from(new Set([...prev, team.id])));
+                              } else {
+                                setInvitedTeams((prev) => prev.filter((id) => id !== team.id));
+                              }
+                            }}
+                            className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                          />
+                          <span className="flex-1">{team.name}</span>
+                          <span className="text-[11px] text-slate-500">{team.members.length} members</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
 
               <div className="mt-6 flex justify-end gap-2">

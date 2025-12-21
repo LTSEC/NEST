@@ -11,9 +11,8 @@ import {
   resumeSession,
   shutdownSession,
 } from '../data/gameSessions';
-import { listPreviousGamesForGame } from '../data/previousGames';
 import { listServiceHealthForSession, listServiceHealthTeams } from '../data/serviceHealth';
-import { getTeamById } from '../data/teams';
+import { getTeamById, getTeamForUser } from '../data/teams';
 import { useAuth } from '../providers/AuthProvider';
 
 const sampleCtfCategories = [
@@ -40,7 +39,7 @@ const sampleCtfCategories = [
   },
 ];
 
-type TabId = 'overview' | 'injects' | 'ctfs' | 'credentials' | 'services' | 'history';
+type TabId = 'overview' | 'injects' | 'ctfs' | 'credentials' | 'services';
 
 const GameSessionView: React.FC = () => {
   const { sessionId } = useParams();
@@ -53,8 +52,23 @@ const GameSessionView: React.FC = () => {
   );
 
   const game = useMemo(() => (session ? getGameById(session.gameId) : undefined), [session]);
-  const previousGames = useMemo(() => (game ? listPreviousGamesForGame(game.id) : []), [game]);
-  const serviceTeams = useMemo(() => (session ? listServiceHealthTeams(session.id) : []), [session]);
+  const playerTeam = useMemo(
+    () => (user && !isDeveloper ? getTeamForUser(user.id) : undefined),
+    [isDeveloper, user]
+  );
+  const serviceTeams = useMemo(() => {
+    if (!session) return [];
+    const trackedTeams = listServiceHealthTeams(session.id);
+    const participantTeams = session.participantTeamIds
+      .map((teamId) => getTeamById(teamId))
+      .filter(Boolean)
+      .map((team) => ({ teamId: team!.id, teamName: team!.name }));
+
+    const combined = [...trackedTeams, ...participantTeams];
+    return combined.filter(
+      (team, index) => combined.findIndex((entry) => entry.teamId === team.teamId) === index
+    );
+  }, [session]);
   const [selectedServiceTeam, setSelectedServiceTeam] = useState<string | null>(null);
 
   useEffect(() => {
@@ -64,10 +78,15 @@ const GameSessionView: React.FC = () => {
   }, [sessionId]);
 
   useEffect(() => {
+    if (playerTeam && !isDeveloper) {
+      setSelectedServiceTeam(playerTeam.id);
+      return;
+    }
+
     if (serviceTeams.length && !selectedServiceTeam) {
       setSelectedServiceTeam(serviceTeams[0]?.teamId ?? null);
     }
-  }, [serviceTeams, selectedServiceTeam]);
+  }, [isDeveloper, playerTeam, serviceTeams, selectedServiceTeam]);
 
   const availableTabs: { id: TabId; label: string; enabled: boolean }[] = useMemo(
     () => [
@@ -78,11 +97,12 @@ const GameSessionView: React.FC = () => {
       {
         id: 'services',
         label: 'Services',
-        enabled: isDeveloper && (session?.types.includes('Red vs. Blue') ?? false),
+        enabled:
+          (session?.types.includes('Red vs. Blue') ?? false) &&
+          (isDeveloper || (!!playerTeam && session?.status === 'running')),
       },
-      { id: 'history', label: 'Previous games', enabled: previousGames.length > 0 },
     ],
-    [isDeveloper, previousGames.length, session?.types?.join(',')]
+    [isDeveloper, playerTeam, session?.status, session?.types]
   );
 
   const firstTab = availableTabs.find((tab) => tab.enabled)?.id ?? 'overview';
@@ -348,111 +368,101 @@ const GameSessionView: React.FC = () => {
             <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold text-slate-800">Service health per team</p>
+                  <p className="text-sm font-semibold text-slate-800">Service health</p>
                   <p className="text-xs text-slate-600">
-                    Review uptime percentages and live statuses for the team you are supporting.
+                    View current status, uptime, and the last 10 checks for tracked services.
                   </p>
                 </div>
-                <select
-                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm"
-                  value={selectedServiceTeam ?? ''}
-                  onChange={(event) => setSelectedServiceTeam(event.target.value)}
-                  disabled={!serviceTeams.length}
-                >
-                  {!serviceTeams.length && <option value="">No teams being tracked</option>}
-                  {serviceTeams.map((team) => (
-                    <option key={team.teamId} value={team.teamId}>
-                      {team.teamName}
-                    </option>
-                  ))}
-                </select>
+                {isDeveloper && (
+                  <select
+                    className="rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm"
+                    value={selectedServiceTeam ?? ''}
+                    onChange={(event) => setSelectedServiceTeam(event.target.value)}
+                  >
+                    {!serviceTeams.length && <option value="">No teams being tracked</option>}
+                    {serviceTeams.map((team) => (
+                      <option key={team.teamId} value={team.teamId}>
+                        {team.teamName}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {!isDeveloper && playerTeam && (
+                  <div className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700">
+                    Team {playerTeam.name}
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2 text-sm text-slate-700">
-                {listServiceHealthForSession(session.id, selectedServiceTeam ?? undefined).map((service) => {
+                {listServiceHealthForSession(
+                  session.id,
+                  isDeveloper ? selectedServiceTeam ?? undefined : playerTeam?.id
+                ).map((service) => {
                   const tone =
                     service.status === 'up'
                       ? 'bg-emerald-50 text-emerald-700 ring-emerald-100'
-                      : service.status === 'degraded'
-                      ? 'bg-amber-50 text-amber-700 ring-amber-100'
-                      : 'bg-red-50 text-red-700 ring-red-100';
+                      : service.status === 'down'
+                      ? 'bg-red-50 text-red-700 ring-red-100'
+                      : 'bg-slate-100 text-slate-700 ring-slate-200';
+
+                  const uptimeColor =
+                    service.uptimePercentage >= 80
+                      ? 'bg-emerald-500'
+                      : service.uptimePercentage >= 60
+                      ? 'bg-amber-400'
+                      : 'bg-red-500';
 
                   return (
-                    <div key={service.name} className="rounded-lg border border-slate-200 p-3 shadow-sm">
+                    <div key={service.name} className="space-y-3 rounded-lg border border-slate-200 p-3 shadow-sm">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div>
                           <p className="font-semibold text-slate-800">{service.name}</p>
-                          <p className="text-[11px] text-slate-500">SLA tier {service.slaTier}</p>
+                          <p className="text-[11px] text-slate-500">SLAs: {service.slaCount}</p>
                         </div>
                         <span className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${tone}`}>
                           {service.status === 'up'
                             ? 'Up'
-                            : service.status === 'degraded'
-                            ? 'Degraded'
-                            : 'Down'}
+                            : service.status === 'down'
+                            ? 'Down'
+                            : 'Unknown'}
                         </span>
                       </div>
-                      <div className="mt-2 flex flex-wrap items-center gap-4 text-xs text-slate-600">
-                        <span className="font-semibold text-slate-800">
-                          Uptime {service.uptimePercentage.toFixed(2)}%
-                        </span>
-                        <span className="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
-                          SLA tier {service.slaTier} target
-                        </span>
+
+                      <div className="space-y-2">
+                        <div className="relative h-8 overflow-hidden rounded-lg bg-slate-100 ring-1 ring-slate-200">
+                          <div
+                            className={`h-full ${uptimeColor}`}
+                            style={{ width: `${service.uptimePercentage}%` }}
+                          />
+                          <div className="absolute inset-0 flex items-center justify-center text-xs font-semibold text-white drop-shadow">
+                            {service.uptimePercentage.toFixed(1)}%
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-600">
+                          <span className="font-semibold text-slate-800">Last 10 checks:</span>
+                          <div className="flex flex-wrap items-center gap-1">
+                            {service.lastTenStatuses.map((status, index) => {
+                              const dotColor =
+                                status === 'up' ? 'bg-emerald-500' : status === 'down' ? 'bg-red-500' : 'bg-slate-400';
+                              return <span key={`${service.name}-${index}`} className={`h-3 w-3 rounded-full ${dotColor}`} />;
+                            })}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   );
                 })}
 
-                {!listServiceHealthForSession(session.id, selectedServiceTeam ?? undefined).length && (
+                {!listServiceHealthForSession(
+                  session.id,
+                  isDeveloper ? selectedServiceTeam ?? undefined : playerTeam?.id
+                ).length && (
                   <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600 ring-1 ring-slate-200">
                     Service telemetry has not been reported for this team yet.
                   </p>
                 )}
               </div>
-            </div>
-          )}
-
-          {activeTab === 'history' && (
-            <div className="space-y-3">
-              <p className="text-sm font-semibold text-slate-800">Previous games</p>
-              {previousGames.map((record) => (
-                <article
-                  key={record.id}
-                  className="space-y-2 rounded-xl border border-slate-200 bg-white p-4 text-sm shadow-sm"
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div>
-                      <p className="text-base font-semibold text-slate-900">{record.sessionName}</p>
-                      <p className="text-[11px] text-slate-500">
-                        {new Date(record.startedAt).toLocaleString()} — {new Date(record.endedAt).toLocaleString()}
-                      </p>
-                    </div>
-                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
-                      Archived
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-600">{record.networkSummary}</p>
-                  <div className="space-y-1">
-                    {record.results.map((result) => (
-                      <div
-                        key={`${record.id}-${result.teamId}`}
-                        className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2 ring-1 ring-slate-200"
-                      >
-                        <div>
-                          <p className="font-semibold text-slate-800">
-                            Position {result.position}: {getTeamById(result.teamId)?.name ?? result.teamId}
-                          </p>
-                          <p className="text-[11px] text-slate-600">
-                            Participants: {result.participants.join(', ') || 'Unavailable'}
-                          </p>
-                        </div>
-                        <span className="text-xs font-semibold text-indigo-700">Score {result.score}</span>
-                      </div>
-                    ))}
-                  </div>
-                </article>
-              ))}
             </div>
           )}
         </section>

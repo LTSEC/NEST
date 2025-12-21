@@ -9,6 +9,8 @@ import {
   listDeveloperSessions,
   scheduleGameSession,
   shutdownSession,
+  startSessionImmediately,
+  cancelScheduledSession,
   updateInfrastructureStatus,
 } from '../data/gameSessions';
 import { destroyHostedGame, hostGameInstance, readTerraformConsole } from '../data/gameHosting';
@@ -82,7 +84,9 @@ const MyGames: React.FC = () => {
   const activeHostedCount = useMemo(
     () =>
       sessions.filter(
-        (session) => session.status === 'running' || session.infrastructureStatus === 'creating'
+        (session) =>
+          !!session.infrastructureId &&
+          (session.status === 'running' || session.infrastructureStatus === 'active')
       ).length,
     [sessions],
   );
@@ -171,6 +175,11 @@ const MyGames: React.FC = () => {
 
   const handleDestroySession = async (session: GameSession) => {
     if (!user) return;
+    if (session.status === 'scheduled' && !session.infrastructureId) {
+      cancelScheduledSession(session.id);
+      setSessions(listDeveloperSessions(user.id));
+      return;
+    }
     if (!session.infrastructureId) {
       setHostingError('No infrastructure deployment was recorded for this game.');
       return;
@@ -195,6 +204,14 @@ const MyGames: React.FC = () => {
     }
 
     setDestroyingSessionId(null);
+  };
+
+  const handleStartNow = (session: GameSession) => {
+    if (!user) return;
+    const updated = startSessionImmediately(session.id);
+    if (updated) {
+      setSessions(listDeveloperSessions(user.id));
+    }
   };
 
   if (!user) return null;
@@ -312,13 +329,26 @@ const MyGames: React.FC = () => {
                       >
                         View terraform console
                       </button>
+                      {session.status === 'scheduled' && !session.infrastructureId && (
+                        <button
+                          type="button"
+                          onClick={() => handleStartNow(session)}
+                          className="rounded-lg bg-emerald-600 px-3 py-1 text-white shadow-sm transition hover:bg-emerald-500"
+                        >
+                          Start Game Now
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => handleDestroySession(session)}
                         disabled={destroyingSessionId === session.id}
                         className="rounded-lg bg-red-600 px-3 py-1 text-white shadow-sm transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-70"
                       >
-                        {destroyingSessionId === session.id ? 'Destroying...' : 'Destroy game'}
+                        {session.status === 'scheduled' && !session.infrastructureId
+                          ? 'Remove game'
+                          : destroyingSessionId === session.id
+                          ? 'Destroying...'
+                          : 'Destroy game'}
                       </button>
                     </div>
                     {session.status === 'scheduled' && (

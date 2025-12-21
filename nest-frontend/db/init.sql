@@ -34,13 +34,3 @@ CREATE TABLE IF NOT EXISTS games (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Seed a sample Red vs. Blue game for the developer account
-INSERT INTO games (name, developer_id, types, rvb_services, team_count)
-VALUES (
-  'Sample Red vs Blue',
-  (SELECT id FROM users WHERE username = 'Developer'),
-  ARRAY['Red vs. Blue'],
-  ARRAY['Scoring Engine', 'DNS'],
-  4
-)
-ON CONFLICT DO NOTHING;

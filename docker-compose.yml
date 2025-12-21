@@ -12,6 +12,16 @@ services:
       NODE_ENV: ${NODE_ENV:-development}
     depends_on:
       - db
+      - backend
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "${BACKEND_PORT:-4000}:${BACKEND_PORT:-4000}"
+    environment:
+      PORT: ${BACKEND_PORT:-4000}
 
   db:
     image: postgres:16

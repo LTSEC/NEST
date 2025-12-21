@@ -22,38 +22,8 @@ export type TeamInvitation = {
   invitedBy: string;
 };
 
-const seededTeams: Team[] = [
-  {
-    id: 'team-1',
-    name: 'Blue Raptors',
-    minPlayers: 3,
-    members: [
-      { id: '1', name: 'Test', role: 'captain' },
-      { id: '5', name: 'Casey', role: 'co-captain' },
-      { id: '6', name: 'Robin', role: 'coach' },
-      { id: '7', name: 'Quinn', role: 'player' },
-      { id: '8', name: 'Taylor', role: 'player' },
-    ],
-  },
-  {
-    id: 'team-2',
-    name: 'Signal Owls',
-    minPlayers: 2,
-    members: [
-      { id: '9', name: 'Jordan', role: 'captain' },
-      { id: '10', name: 'Avery', role: 'player' },
-      { id: '11', name: 'Kai', role: 'player' },
-    ],
-  },
-];
-
-const seededInvitations: TeamInvitation[] = [
-  { id: 'invite-1', teamId: 'team-2', userId: '1', invitedBy: 'Jordan' },
-  { id: 'invite-2', teamId: 'team-3', userId: '1', invitedBy: 'Scheduler' },
-];
-
-const teamsTable: Team[] = [...seededTeams];
-const invitationsTable: TeamInvitation[] = [...seededInvitations];
+const teamsTable: Team[] = [];
+const invitationsTable: TeamInvitation[] = [];
 
 const generateId = (prefix: string) => `${prefix}-${Math.random().toString(16).slice(2, 10)}`;
 

@@ -1405,9 +1405,6 @@ const NetworkEditor: React.FC = () => {
                 {nodes.map((node) => (
                   <div
                     key={node.id}
-                    ref={(element) => {
-                      nodeRefs.current[node.id] = element;
-                    }}
                     className="absolute"
                     style={{ left: node.x, top: node.y }}
                     ref={(element) => {

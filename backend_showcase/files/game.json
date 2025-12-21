@@ -1,167 +1,88 @@
 {
-  "networks": [
-    {
-      "name": "External WAN",
-      "cidr": "10.20.T.0/16"
-    },
-    {
-      "name": "LOCAL",
-      "cidr": "172.30.255.0/24"
-    },
-    {
-      "name": "LOCAL-CLOSED",
-      "cidr": "172.32.255.0/24"
-    },
-    {
-      "name": "CLOUD1",
-      "cidr": "172.31.255.0/24"
-    }
-  ],
-  "devices": [
-    {
-      "name": "CompGatewayRouter",
-      "type": "Router",
-      "os": {
-        "id": 2,
-        "name": "VyOS 1.5"
-      },
-      "hostId": null,
-      "interfaces": {
-        "eth0": "Competition WAN",
-        "eth1": "10.20.0.1",
-        "link-Router1": "Connected to Router1",
-        "link-Router2": "Connected to Router2"
-      },
-      "services": null
-    },
-    {
-      "name": "Router1",
-      "type": "Router",
-      "os": {
-        "id": 2,
-        "name": "VyOS 1.5"
-      },
-      "hostId": 1,
-      "interfaces": {
-        "eth0": "External WAN",
-        "eth1": "172.30.255.1/24",
-        "eth2": "172.31.255.1/24"
-      },
-      "services": null
-    },
-    {
-      "name": "vm1",
-      "type": "Server",
-      "os": {
-        "id": 0,
-        "name": "Debian 12"
-      },
-      "hostId": null,
-      "router": "Router1",
-      "interface": "eth1",
-      "segment": "LOCAL",
-      "dhcp": true,
-      "services": {}
-    },
-    {
-      "name": "Router2",
-      "type": "Router",
-      "os": {
-        "id": 2,
-        "name": "VyOS 1.5"
-      },
-      "hostId": 2,
-      "interfaces": {
-        "eth0": "External WAN",
-        "eth1": "172.32.255.1/24"
-      },
-      "services": null
-    },
-    {
-      "name": "vm2",
-      "type": "Server",
-      "os": {
-        "id": 0,
-        "name": "Debian 12"
-      },
-      "hostId": null,
-      "router": "Router1",
-      "interface": "eth1",
-      "segment": "LOCAL",
-      "dhcp": true,
-      "services": {}
-    },
-    {
-      "name": "vm3",
-      "type": "Server",
-      "os": {
-        "id": 1,
-        "name": "Ubuntu 22.04 LTS"
-      },
-      "hostId": null,
-      "router": "Router1",
-      "interface": "eth2",
-      "segment": "CLOUD1",
-      "dhcp": true,
-      "services": {}
-    },
-    {
-      "name": "vm4",
-      "type": "Server",
-      "os": {
-        "id": 1,
-        "name": "Ubuntu 22.04 LTS"
-      },
-      "hostId": null,
-      "router": "Router1",
-      "interface": "eth1",
-      "segment": "LOCAL",
-      "dhcp": true,
-      "services": {}
-    },
-    {
-      "name": "vm5",
-      "type": "Server",
-      "os": {
-        "id": 0,
-        "name": "Debian 12"
-      },
-      "hostId": null,
-      "router": "Router2",
-      "interface": "eth1",
-      "segment": "LOCAL-CLOSED",
-      "dhcp": true,
-      "services": {}
-    },
-    {
-      "name": "vm6",
-      "type": "Server",
-      "os": {
-        "id": 1,
-        "name": "Ubuntu 22.04 LTS"
-      },
-      "hostId": null,
-      "router": "Router2",
-      "interface": "eth1",
-      "segment": "LOCAL-CLOSED",
-      "dhcp": true,
-      "services": {}
-    }
-  ],
+  "networks": [],
+  "devices": [],
   "blackteamServices": [
     {
       "name": "Scoring Engine",
-      "templateId": 0,
-      "hostId": 2,
-      "ip": "10.20.0.2"
+      "templateId": 1,
+      "hostId": 1,
+      "ip": "10.0.0.10"
     },
     {
       "name": "DNS",
-      "templateId": 0,
-      "hostId": 3,
-      "ip": "10.20.0.3"
+      "templateId": 2,
+      "hostId": 2,
+      "ip": "10.0.0.11"
     }
   ],
-  "applications": [],
-  "ldapZones": []
+  "applications": [
+    {
+      "name": "Sample Red vs Blue - Red vs. Blue",
+      "servers": [],
+      "services": [],
+      "color": "#E11D48"
+    }
+  ],
+  "ldapZones": [
+    {
+      "name": "Team 1",
+      "server": "team1.ldap.local",
+      "users": [
+        {
+          "username": "team1-captain",
+          "password": "changeme!"
+        },
+        {
+          "username": "team1-member",
+          "password": "changeme!"
+        }
+      ],
+      "connectedServers": []
+    },
+    {
+      "name": "Team 2",
+      "server": "team2.ldap.local",
+      "users": [
+        {
+          "username": "team2-captain",
+          "password": "changeme!"
+        },
+        {
+          "username": "team2-member",
+          "password": "changeme!"
+        }
+      ],
+      "connectedServers": []
+    },
+    {
+      "name": "Team 3",
+      "server": "team3.ldap.local",
+      "users": [
+        {
+          "username": "team3-captain",
+          "password": "changeme!"
+        },
+        {
+          "username": "team3-member",
+          "password": "changeme!"
+        }
+      ],
+      "connectedServers": []
+    },
+    {
+      "name": "Team 4",
+      "server": "team4.ldap.local",
+      "users": [
+        {
+          "username": "team4-captain",
+          "password": "changeme!"
+        },
+        {
+          "username": "team4-member",
+          "password": "changeme!"
+        }
+      ],
+      "connectedServers": []
+    }
+  ]
 }

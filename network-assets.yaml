@@ -2,13 +2,10 @@
   "routers": [
     { "id": "-1", "label": "Blank" },
     { "id": "2", "label": "VyOS" },
-    { "id": "-1", "label": "MikroTik" }
   ],
   "hosts": [
-    { "id": "-1", "label": "Blank" },
+    { "id": "-2", "label": "Blank" },
     { "id": "0", "label": "Debian" },
     { "id": "1", "label": "Ubuntu" },
-    { "id": "-1", "label": "Ubuntu VNC" },
-    { "id": "-1", "label": "Kali VNC" }
   ]
 }

@@ -4,9 +4,17 @@ import { networkItemsByCategory } from '../data/networkItems';
 interface ResourceDrawerProps {
   open: boolean;
   onToggle: () => void;
+  onStartDrag: (item: ResourceItem) => void;
 }
 
-const ResourceDrawer: React.FC<ResourceDrawerProps> = ({ open, onToggle }) => {
+const ResourceDrawer: React.FC<ResourceDrawerProps> = ({ open, onToggle, onStartDrag }) => {
+  const handleDragStart = (event: React.DragEvent<HTMLButtonElement>, item: ResourceItem) => {
+    event.dataTransfer.setData('application/nest-node-kind', item.kind);
+    event.dataTransfer.setData('application/nest-node-label', item.label);
+    event.dataTransfer.effectAllowed = 'copy';
+    onStartDrag(item);
+  };
+
   return (
     <div className="pointer-events-auto absolute bottom-0 left-0 right-0 z-30 flex justify-center">
       <div

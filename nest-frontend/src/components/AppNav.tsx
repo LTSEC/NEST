@@ -2,9 +2,10 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../providers/AuthProvider';
 import { mainNavItems } from '../navigation/navItems';
+import ProfileMenu from './ProfileMenu';
 
 const AppNav: React.FC = () => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const location = useLocation();
 
   const initial = user?.name?.trim()[0]?.toUpperCase() ?? '?';
@@ -36,13 +37,15 @@ const AppNav: React.FC = () => {
           </div>
         </div>
 
-        <Link
-          to="/profile"
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-600 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700"
-          aria-label="Profile"
-        >
-          {initial}
-        </Link>
+        {user && (
+          <ProfileMenu
+            initial={initial}
+            items={[
+              { label: 'Edit Profile', to: '/profile' },
+              { label: 'Sign out', onClick: logout },
+            ]}
+          />
+        )}
       </div>
     </nav>
   );

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import ResourceDrawer from '../components/ResourceDrawer';
 import { getGameById } from '../data/games';
 import { networkItemsByCategory } from '../data/networkItems';
+import { loadNetworkSnapshot, saveNetworkSnapshot } from '../data/networkStorage';
 import { useAuth } from '../providers/AuthProvider';
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
@@ -11,6 +12,7 @@ const MAP_WIDTH = 3200;
 const MAP_HEIGHT = 2400;
 const MIN_SCALE = 0.5;
 const MAX_SCALE = 2.5;
+const GRID_SIZE = 40;
 
 interface NetworkNode {
   id: string;
@@ -50,6 +52,8 @@ interface ContextMenuState {
 }
 
 const createId = () => (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2, 10));
+
+const snapToGrid = (value: number) => Math.round(value / GRID_SIZE) * GRID_SIZE;
 
 const ipv4ToInt = (ip: string) => {
   const octets = ip.split('.');
@@ -94,6 +98,9 @@ const NetworkEditor: React.FC = () => {
   const [linkInProgress, setLinkInProgress] = useState<{ anchorId: string; point: { x: number; y: number } } | null>(null);
   const [overlappingInterfaces, setOverlappingInterfaces] = useState<Set<string>>(new Set());
   const [invalidHostInterfaces, setInvalidHostInterfaces] = useState<Set<string>>(new Set());
+  const [gridSnapEnabled, setGridSnapEnabled] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [saveError, setSaveError] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const dragOrigin = useRef({ x: 0, y: 0 });
   const offsetOrigin = useRef({ x: 0, y: 0 });
@@ -143,6 +150,36 @@ const NetworkEditor: React.FC = () => {
     }
   }, [isDeveloper, navigate]);
 
+  useEffect(() => {
+    const snapshot = loadNetworkSnapshot(game?.id ?? null);
+    if (!snapshot) return;
+
+    setGridSnapEnabled(Boolean(snapshot.gridSnapEnabled));
+    setNodes(
+      snapshot.nodes.map((node) => ({
+        id: node.id,
+        label: node.label,
+        imageId: node.imageId,
+        kind: node.kind,
+        x: node.position.x,
+        y: node.position.y,
+        interfaces: node.interfaces.map((intf) => ({ ...intf })),
+      })),
+    );
+    setLinks(snapshot.links.map((link) => ({ ...link })));
+
+    const nextScale =
+      typeof snapshot.metadata?.scale === 'number' ? clamp(snapshot.metadata.scale, MIN_SCALE, MAX_SCALE) : scale;
+    setScale(nextScale);
+
+    if (snapshot.metadata && typeof (snapshot.metadata as Record<string, unknown>).offset === 'object') {
+      const offsetValue = (snapshot.metadata as { offset?: { x: number; y: number } }).offset;
+      if (offsetValue && typeof offsetValue.x === 'number' && typeof offsetValue.y === 'number') {
+        setOffset(constrainOffset({ x: offsetValue.x, y: offsetValue.y }, nextScale));
+      }
+    }
+  }, [game?.id]);
+
   const screenToWorld = (clientX: number, clientY: number) => {
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return { x: 0, y: 0 };
@@ -151,6 +188,8 @@ const NetworkEditor: React.FC = () => {
       y: clamp((clientY - rect.top - offset.y) / scale, 0, MAP_HEIGHT),
     };
   };
+
+  const applyGridSnap = (value: number) => (gridSnapEnabled ? snapToGrid(value) : value);
 
   const handleCanvasMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
@@ -180,8 +219,8 @@ const NetworkEditor: React.FC = () => {
           node.id === draggingNodeId
             ? {
                 ...node,
-                x: clamp(nodeStart.current.x + dx, 0, MAP_WIDTH),
-                y: clamp(nodeStart.current.y + dy, 0, MAP_HEIGHT),
+                x: applyGridSnap(clamp(nodeStart.current.x + dx, 0, MAP_WIDTH)),
+                y: applyGridSnap(clamp(nodeStart.current.y + dy, 0, MAP_HEIGHT)),
               }
             : node,
         ),
@@ -235,8 +274,8 @@ const NetworkEditor: React.FC = () => {
         kind,
         imageId,
         label,
-        x: clamp(point.x, 0, MAP_WIDTH),
-        y: clamp(point.y, 0, MAP_HEIGHT),
+        x: applyGridSnap(clamp(point.x, 0, MAP_WIDTH)),
+        y: applyGridSnap(clamp(point.y, 0, MAP_HEIGHT)),
         interfaces: defaultInterfaces,
       },
     ]);
@@ -247,6 +286,36 @@ const NetworkEditor: React.FC = () => {
     if (event.dataTransfer.types.includes('application/nest-node-kind')) {
       event.preventDefault();
       event.dataTransfer.dropEffect = 'copy';
+    }
+  };
+
+  const handleSaveNetwork = () => {
+    setSaveStatus('saving');
+    setSaveError(null);
+
+    try {
+      const snapshot = {
+        gameId: game?.id ?? null,
+        savedAt: new Date().toISOString(),
+        gridSnapEnabled,
+        nodes: nodes.map((node) => ({
+          id: node.id,
+          label: node.label,
+          imageId: node.imageId,
+          kind: node.kind,
+          position: { x: node.x, y: node.y },
+          interfaces: node.interfaces.map((intf) => ({ ...intf })),
+        })),
+        links: links.map((link) => ({ ...link })),
+        metadata: { offset, scale },
+      };
+
+      saveNetworkSnapshot(game?.id ?? null, snapshot);
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 2000);
+    } catch (error) {
+      setSaveStatus('error');
+      setSaveError(error instanceof Error ? error.message : 'Failed to save network');
     }
   };
 
@@ -771,6 +840,21 @@ const NetworkEditor: React.FC = () => {
           >
             ← Back
           </button>
+          <button
+            type="button"
+            onClick={handleSaveNetwork}
+            className="rounded-lg bg-emerald-500 px-3 py-2 text-sm font-semibold text-white shadow-sm ring-1 ring-emerald-400 transition hover:bg-emerald-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-200"
+          >
+            Save
+          </button>
+          {saveStatus !== 'idle' && (
+            <span className="rounded-lg bg-white/10 px-2 py-1 text-xs font-medium text-white ring-1 ring-white/10">
+              {saveStatus === 'saving' && 'Saving...'}
+              {saveStatus === 'saved' && 'Saved'}
+              {saveStatus === 'error' && 'Save failed'}
+            </span>
+          )}
+          {saveError && <span className="text-xs text-red-200">{saveError}</span>}
           <div className="rounded-lg bg-white/5 px-3 py-2 text-xs font-medium text-slate-100 ring-1 ring-white/10">
             {game ? `${game.name} network` : 'Network editor'}
           </div>
@@ -803,6 +887,13 @@ const NetworkEditor: React.FC = () => {
             className="pointer-events-auto rounded-lg bg-white/10 px-3 py-2 text-sm font-semibold text-white shadow-sm ring-1 ring-white/20 transition hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
           >
             Reset
+          </button>
+          <button
+            type="button"
+            onClick={() => setGridSnapEnabled((enabled) => !enabled)}
+            className={`pointer-events-auto rounded-lg px-3 py-2 text-sm font-semibold shadow-sm ring-1 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 ${gridSnapEnabled ? 'bg-emerald-500 text-white ring-emerald-400 hover:bg-emerald-400 focus-visible:outline-emerald-200' : 'bg-white/10 text-white ring-white/20 hover:bg-white/20 focus-visible:outline-white'}`}
+          >
+            {gridSnapEnabled ? 'Snap: On' : 'Snap: Off'}
           </button>
           <span className="rounded-lg bg-white/10 px-2 py-1 text-xs font-medium text-white ring-1 ring-white/20">{Math.round(scale * 100)}%</span>
         </div>

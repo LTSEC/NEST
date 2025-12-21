@@ -43,6 +43,36 @@ export const listGamesForDeveloper = (developerId: VerifiedUser['id']): Game[] =
 
 export const getGameById = (gameId: string): Game | undefined => gamesTable.find((game) => game.id === gameId);
 
+export const updateGame = (gameId: string, developerId: VerifiedUser['id'], updates: Partial<Omit<Game, 'id' | 'developerId' | 'createdAt'>>): Game => {
+  const game = gamesTable.find((entry) => entry.id === gameId && entry.developerId === developerId);
+  if (!game) {
+    throw new Error('Game not found');
+  }
+
+  const trimmedName = updates.name?.trim() ?? game.name;
+  if (!trimmedName) {
+    throw new Error('Game name is required');
+  }
+
+  const types = updates.types?.filter((type) => isValidGameType(type)) ?? game.types;
+  if (!types.length) {
+    throw new Error('At least one game type is required');
+  }
+
+  const includesRvb = types.includes('Red vs. Blue');
+  const services = includesRvb
+    ? (updates.rvbServices ?? game.rvbServices).filter((service) => isValidService(service))
+    : [];
+  const teamCount = includesRvb ? Math.max(0, updates.teamCount ?? game.teamCount ?? 0) : 0;
+
+  game.name = trimmedName;
+  game.types = types;
+  game.rvbServices = services;
+  game.teamCount = teamCount;
+
+  return game;
+};
+
 export const createGame = (params: {
   name: string;
   developerId: VerifiedUser['id'];

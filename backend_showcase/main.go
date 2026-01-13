@@ -186,6 +186,7 @@ func main() {
 	// Allow CORS
 	apiHost.Use(middleware.CORSWithConfig(middleware.CORSConfig{
 		AllowOrigins: []string{"http://localhost:5173"}, // Vite dev server origin
+		// TODO: change dynamically?
 		AllowMethods: []string{http.MethodGet, http.MethodPost, http.MethodOptions},
 		AllowHeaders: []string{
 			echo.HeaderOrigin,

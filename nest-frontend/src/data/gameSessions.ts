@@ -1,5 +1,6 @@
 import { VerifiedUser } from '../auth';
 import { Game } from './games';
+import { archiveGameSession } from './archivedGames';
 import { getTeamById, getTeamForUser, listTeams } from './teams';
 
 export type GameVisibility = 'public' | 'private';
@@ -22,57 +23,7 @@ export type GameSession = {
   infrastructureStatus?: 'creating' | 'active' | 'destroying' | 'error';
 };
 
-const seededSessions: GameSession[] = [
-  {
-    id: 'session-1',
-    gameId: '100',
-    gameName: 'Sample Red vs Blue',
-    developerId: '2',
-    developerName: 'Developer',
-    types: ['Red vs. Blue'],
-    startTime: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
-    endTime: new Date(Date.now() + 90 * 60 * 1000).toISOString(),
-    visibility: 'public',
-    invitedTeamIds: [],
-    participantTeamIds: ['team-1'],
-    minPlayers: 3,
-    status: 'running',
-    infrastructureId: 1001,
-    infrastructureStatus: 'active',
-  },
-  {
-    id: 'session-2',
-    gameId: '200',
-    gameName: 'Web Exploit Mini CTF',
-    developerId: '3',
-    developerName: 'Guest Developer',
-    types: ['CTFs'],
-    startTime: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
-    endTime: new Date(Date.now() + 40 * 60 * 1000).toISOString(),
-    visibility: 'public',
-    invitedTeamIds: [],
-    participantTeamIds: ['team-2'],
-    minPlayers: 2,
-    status: 'running',
-  },
-  {
-    id: 'session-3',
-    gameId: '300',
-    gameName: 'Upcoming Red v Blue',
-    developerId: '2',
-    developerName: 'Developer',
-    types: ['Red vs. Blue'],
-    startTime: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
-    endTime: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString(),
-    visibility: 'private',
-    invitedTeamIds: ['team-1'],
-    participantTeamIds: [],
-    minPlayers: 4,
-    status: 'scheduled',
-  },
-];
-
-const sessionsTable: GameSession[] = [...seededSessions];
+const sessionsTable: GameSession[] = [];
 
 const generateId = () => `session-${Math.random().toString(16).slice(2, 10)}`;
 
@@ -124,6 +75,7 @@ export const listSessionsForTeam = (teamId: string): GameSession[] =>
     sessionsTable
       .filter((session) => session.invitedTeamIds.includes(teamId) || session.participantTeamIds.includes(teamId))
       .map(updateStatus)
+      .filter((session) => session.status !== 'completed')
   );
 
 export const listSessionsForPlayer = (userId: string): GameSession[] => {
@@ -234,7 +186,28 @@ export const shutdownSession = (sessionId: string): GameSession | undefined => {
   const session = sessionsTable.find((entry) => entry.id === sessionId);
   if (!session) return undefined;
   session.status = 'completed';
+  archiveGameSession(session);
   return session;
+};
+
+export const startSessionImmediately = (sessionId: string): GameSession | undefined => {
+  const session = sessionsTable.find((entry) => entry.id === sessionId);
+  if (!session) return undefined;
+
+  session.startTime = new Date().toISOString();
+  session.status = 'running';
+  session.infrastructureStatus = 'active';
+  session.infrastructureId = session.infrastructureId ?? Math.floor(Math.random() * 10_000);
+  return session;
+};
+
+export const cancelScheduledSession = (sessionId: string): boolean => {
+  const index = sessionsTable.findIndex(
+    (entry) => entry.id === sessionId && entry.status === 'scheduled' && !entry.infrastructureId
+  );
+  if (index === -1) return false;
+  sessionsTable.splice(index, 1);
+  return true;
 };
 
 export const removeTeamFromSession = (sessionId: string, teamId: string): GameSession | undefined => {

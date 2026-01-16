@@ -23,6 +23,7 @@ const navItemsByRole: Record<UserRole, NavItem[]> = {
   developer: [
     { label: 'Dashboard', to: '/developer' },
     { label: 'My Games', to: '/my-games' },
+    { label: 'Archives', to: '/archives' },
     { label: 'Game List', to: '/games' },
     { label: 'Team List', to: '/teams' },
     { label: 'My CTFs', to: '/ctfs' },

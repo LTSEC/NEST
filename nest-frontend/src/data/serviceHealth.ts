@@ -1,49 +1,40 @@
 import { listTeams } from './teams';
 
-export type ServiceStatus = 'up' | 'down' | 'degraded';
+export type ServiceStatus = 'up' | 'down' | 'unknown';
+
+export type ServiceHealthEntry = {
+  name: string;
+  slaCount: number;
+  uptimePercentage: number;
+  status: ServiceStatus;
+  lastTenStatuses: ServiceStatus[];
+};
 
 export type ServiceHealth = {
   sessionId: string;
   teamId: string;
-  services: {
-    name: string;
-    slaTier: number;
-    uptimePercentage: number;
-    status: ServiceStatus;
-  }[];
+  services: ServiceHealthEntry[];
 };
 
-const sampleHealth: ServiceHealth[] = [
-  {
-    sessionId: 'session-1',
-    teamId: 'team-1',
-    services: [
-      { name: 'Web', slaTier: 1, uptimePercentage: 99.1, status: 'up' },
-      { name: 'DNS', slaTier: 2, uptimePercentage: 97.4, status: 'degraded' },
-      { name: 'Database', slaTier: 3, uptimePercentage: 95.2, status: 'up' },
-    ],
-  },
-  {
-    sessionId: 'session-1',
-    teamId: 'team-2',
-    services: [
-      { name: 'Web', slaTier: 1, uptimePercentage: 96.5, status: 'down' },
-      { name: 'DNS', slaTier: 2, uptimePercentage: 93.3, status: 'down' },
-      { name: 'Database', slaTier: 3, uptimePercentage: 98.8, status: 'up' },
-    ],
-  },
-  {
-    sessionId: 'session-2',
-    teamId: 'team-2',
-    services: [
-      { name: 'Challenge API', slaTier: 1, uptimePercentage: 99.9, status: 'up' },
-    ],
-  },
-];
+const serviceHealthTable: ServiceHealth[] = [];
 
-export const listServiceHealthTeams = (sessionId: string) => {
+const normalizeStatuses = (statuses: ServiceStatus[]): ServiceStatus[] => {
+  const safeStatuses = statuses.map((status) => (['up', 'down', 'unknown'] as const).includes(status) ? status : 'unknown');
+  if (safeStatuses.length >= 10) return safeStatuses.slice(-10);
+  return [...safeStatuses, ...Array(10 - safeStatuses.length).fill('unknown')];
+};
+
+const normalizeServiceEntry = (entry: ServiceHealthEntry): ServiceHealthEntry => ({
+  ...entry,
+  slaCount: Math.max(0, entry.slaCount),
+  uptimePercentage: Math.max(0, Math.min(100, entry.uptimePercentage)),
+  status: (['up', 'down', 'unknown'] as const).includes(entry.status) ? entry.status : 'unknown',
+  lastTenStatuses: normalizeStatuses(entry.lastTenStatuses),
+});
+
+export const listServiceHealthTeams = (sessionId: string): { teamId: string; teamName: string }[] => {
   const teams = listTeams();
-  return sampleHealth
+  return serviceHealthTable
     .filter((entry) => entry.sessionId === sessionId)
     .map((entry) => ({
       teamId: entry.teamId,
@@ -51,7 +42,31 @@ export const listServiceHealthTeams = (sessionId: string) => {
     }));
 };
 
-export const listServiceHealthForSession = (sessionId: string, teamId?: string): ServiceHealth['services'] => {
-  const matching = sampleHealth.find((entry) => entry.sessionId === sessionId && (!teamId || entry.teamId === teamId));
-  return matching?.services ?? [];
+export const listServiceHealthForSession = (
+  sessionId: string,
+  teamId?: string
+): ServiceHealthEntry[] => {
+  const record = serviceHealthTable.find(
+    (entry) => entry.sessionId === sessionId && (!teamId || entry.teamId === teamId)
+  );
+
+  if (!record) return [];
+
+  return record.services.map(normalizeServiceEntry);
+};
+
+export const upsertServiceHealth = (sessionId: string, teamId: string, services: ServiceHealthEntry[]): ServiceHealth => {
+  const normalized = services.map(normalizeServiceEntry);
+  const existingIndex = serviceHealthTable.findIndex(
+    (entry) => entry.sessionId === sessionId && entry.teamId === teamId
+  );
+
+  const payload: ServiceHealth = { sessionId, teamId, services: normalized };
+  if (existingIndex === -1) {
+    serviceHealthTable.push(payload);
+  } else {
+    serviceHealthTable.splice(existingIndex, 1, payload);
+  }
+
+  return payload;
 };

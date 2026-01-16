@@ -27,20 +27,7 @@ const generateId = () =>
     ? crypto.randomUUID()
     : `game-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
 
-const seededGames: Game[] = [
-  {
-    id: '100',
-    name: 'Sample Red vs Blue',
-    developerId: '2',
-    types: ['Red vs. Blue'],
-    rvbServices: ['Scoring Engine', 'DNS'],
-    credentials: [{ username: 'root', password: 'changeme' }],
-    teamCount: 4,
-    createdAt: new Date().toISOString(),
-  },
-];
-
-const gamesTable: Game[] = [...seededGames];
+const gamesTable: Game[] = [];
 
 const isValidGameType = (type: string): type is GameType => allowedGameTypes.includes(type as GameType);
 const isValidService = (service: string): service is RvbService => allowedRvbServices.includes(service as RvbService);

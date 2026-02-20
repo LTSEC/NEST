@@ -17,6 +17,7 @@ export type Game = {
   credentials: Credential[];
   teamCount: number;
   createdAt: string;
+  presetId?: string;
 };
 
 const allowedGameTypes: GameType[] = ['Injects', 'CTFs', 'Red vs. Blue'];
@@ -65,6 +66,9 @@ export const updateGame = (gameId: string, developerId: VerifiedUser['id'], upda
   game.rvbServices = services;
   game.credentials = credentials;
   game.teamCount = teamCount;
+  if ('presetId' in updates) {
+    game.presetId = updates.presetId;
+  }
 
   return game;
 };
@@ -76,6 +80,7 @@ export const createGame = (params: {
   rvbServices?: RvbService[];
   credentials?: Credential[];
   teamCount?: number;
+  presetId?: string;
 }): Game => {
   const trimmedName = params.name.trim();
   if (!trimmedName) {
@@ -105,6 +110,7 @@ export const createGame = (params: {
     credentials,
     teamCount,
     createdAt: new Date().toISOString(),
+    presetId: params.presetId,
   };
 
   gamesTable.unshift(newGame);

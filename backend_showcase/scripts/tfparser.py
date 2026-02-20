@@ -200,6 +200,8 @@ def Parse_device_JSON(data : json, network_map: dict, wan_network: list) -> tupl
     server_vms = {}
     infra_server_vms = {}
     
+    network_context = ""
+
     for vm in data["devices"]:
         name = vm["name"]
         template_id = vm["os"]["id"]
@@ -221,6 +223,7 @@ def Parse_device_JSON(data : json, network_map: dict, wan_network: list) -> tupl
                         ip = eth_ip.split("/")[0]
                         network_name = map_ip_to_network(ip, network_map)
                     eth[eth_name] = {"ip": ip, "network": network_name}
+                    network_context = network_name
             
             # If the hostId is none, then it is considered the "Competition" router
             if vm["hostId"] == None:
@@ -228,19 +231,26 @@ def Parse_device_JSON(data : json, network_map: dict, wan_network: list) -> tupl
                 infra_router[name] = {"interfaces": eth,
                                       "template_id": template_id,
                                       "host_id": host_id,
-                                      "network": network_name}
+                                      "network": network_context}
             else:
                 host_id = vm["os"]["id"]
                 router_vms[name] = {"interfaces": eth,
                                     "template_id": template_id,
                                     "host_id": host_id,
-                                    "network": network_name}
+                                    "network": network_context}
         if vm["type"] == "Server":
-            dhcp = vm["dhcp"]
-            ip = "" if dhcp else vm["ip"]
+            dhcp = vm.get("dhcp", False)
+            ip = "" if dhcp else vm.get("ip", "")
+
+            server_network = network_context
+            if ip:
+                found_network = map_ip_to_network(ip, network_map)
+                if found_network:
+                    server_network = found_network
+
             server_vms[name] = {"template_id": template_id,
                                 "dhcp": ip,
-                                "network": network_name}
+                                "network": server_network}
             
     for vm in data["blackteamServices"]:
         name = vm["name"]

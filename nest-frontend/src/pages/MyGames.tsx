@@ -102,7 +102,17 @@ const MyGames: React.FC = () => {
     setGames(listGamesForDeveloper(user.id));
   };
 
-  const startHostingGame = async (game: Game, teams?: number) => {
+  const startHostingGame = async (
+    game: Game,
+    teams?: number,
+    overrides?: {
+      startTime?: string;
+      endTime?: string;
+      visibility?: GameVisibility;
+      minPlayers?: string;
+      invitedTeamIds?: string[];
+    },
+  ) => {
     if (!user) return;
     if (activeHostedCount > 0) {
       setHostingError('You can only host one game at a time.');
@@ -117,8 +127,14 @@ const MyGames: React.FC = () => {
     setConsoleVisible(true);
 
     try {
-      const start = startTimeInput ? new Date(startTimeInput) : new Date();
-      const end = endTimeInput ? new Date(endTimeInput) : new Date(start.getTime() + 60 * 60 * 1000);
+      const effectiveStartTime = overrides?.startTime ?? startTimeInput;
+      const effectiveEndTime = overrides?.endTime ?? endTimeInput;
+      const effectiveVisibility = overrides?.visibility ?? visibility;
+      const effectiveMinPlayersInput = overrides?.minPlayers ?? minPlayersInput;
+      const effectiveInvitedTeams = overrides?.invitedTeamIds ?? invitedTeams;
+
+      const start = effectiveStartTime ? new Date(effectiveStartTime) : new Date();
+      const end = effectiveEndTime ? new Date(effectiveEndTime) : new Date(start.getTime() + 60 * 60 * 1000);
 
       if (end <= start) {
         setHostingError('End time must be after start time.');
@@ -127,7 +143,7 @@ const MyGames: React.FC = () => {
         return;
       }
 
-      const minPlayers = Number(minPlayersInput);
+      const minPlayers = Number(effectiveMinPlayersInput);
       const safeMinPlayers = Number.isFinite(minPlayers) && minPlayers > 0 ? Math.floor(minPlayers) : 1;
       const effectiveMinimum = teams ? Math.max(safeMinPlayers, teams) : safeMinPlayers;
 
@@ -139,8 +155,8 @@ const MyGames: React.FC = () => {
       const session = scheduleGameSession(game, { id: user.id, name: user.name }, {
         startTime: start.toISOString(),
         endTime: end.toISOString(),
-        visibility,
-        invitedTeamIds: invitedTeams,
+        visibility: effectiveVisibility,
+        invitedTeamIds: effectiveInvitedTeams,
         minPlayers: effectiveMinimum,
         infrastructureId: hosted.id,
         infrastructureStatus: hosted.status === 'running' ? 'active' : 'creating',
@@ -155,6 +171,17 @@ const MyGames: React.FC = () => {
     }
 
     setHostingGameId(null);
+  };
+
+  const handleTestNow = (game: Game) => {
+    const teamCount = Math.max(1, game.teamCount || 2);
+    void startHostingGame(game, teamCount, {
+      startTime: '',
+      endTime: '',
+      visibility: 'private',
+      minPlayers: '1',
+      invitedTeamIds: [],
+    });
   };
 
   const handleHostClick = (game: Game) => {
@@ -434,6 +461,14 @@ const MyGames: React.FC = () => {
                   )}
 
                   <div className="flex flex-wrap items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleTestNow(game)}
+                      disabled={hostingGameId === game.id || activeHostedCount > 0}
+                      className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500"
+                    >
+                      {hostingGameId === game.id ? 'Starting...' : 'Test Now'}
+                    </button>
                     <button
                       type="button"
                       onClick={() => handleHostClick(game)}

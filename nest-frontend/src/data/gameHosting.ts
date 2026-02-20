@@ -123,7 +123,6 @@ const buildPayloadFromNetwork = (
   }
 
   // Fallback: no network configured, send minimal payload
-  const safeTeamCount = Math.max(1, Math.floor(teamCount));
   return {
     networks: [],
     devices: [],
@@ -139,18 +138,6 @@ const buildPayloadFromNetwork = (
       services: [],
       color: ['#E11D48', '#2563EB', '#10B981'][index % 3],
     })),
-    ldapZones: Array.from({ length: safeTeamCount }, (_, index) => {
-      const teamNumber = index + 1;
-      return {
-        name: `Team ${teamNumber}`,
-        server: `team${teamNumber}.ldap.local`,
-        users: (game.credentials || []).map((cred) => ({
-          username: `team${teamNumber}-${cred.username}`,
-          password: cred.password,
-        })),
-        connectedServers: [],
-      };
-    }),
   };
 };
 
@@ -186,24 +173,9 @@ export const hostGameInstance = async (
       color: ['#E11D48', '#2563EB', '#10B981'][index % 3],
     }));
 
-    const safeTeamCount = Math.max(1, Math.floor(teamCount));
-    const ldapZones = Array.from({ length: safeTeamCount }, (_, index) => {
-      const teamNumber = index + 1;
-      return {
-        name: `Team ${teamNumber}`,
-        server: `team${teamNumber}.ldap.local`,
-        users: (game.credentials || []).map((cred) => ({
-          username: `team${teamNumber}-${cred.username}`,
-          password: cred.password,
-        })),
-        connectedServers: serverNames,
-      };
-    });
-
     payload = {
       ...preset,
       applications,
-      ldapZones,
     };
   } else {
     payload = buildPayloadFromNetwork(game, teamCount);

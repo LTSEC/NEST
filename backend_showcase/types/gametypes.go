@@ -39,20 +39,6 @@ type Network struct {
 	CIDR string `json:"cidr"`
 }
 
-// LDAPUser is a user entry in an LDAP zone.
-type LDAPUser struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-}
-
-// LDAPZone defines authentication zones and their relationships.
-type LDAPZone struct {
-	Name             string     `json:"name"`
-	Server           string     `json:"server"`
-	Users            []LDAPUser `json:"users"`
-	ConnectedServers []string   `json:"connectedServers"`
-}
-
 // Application represents a multi-server logical application.
 type Application struct {
 	Name     string   `json:"name"`
@@ -88,7 +74,6 @@ type Device struct {
 	DHCP       bool              `json:"dhcp,omitempty"`
 	IP         string            `json:"ip,omitempty"`
 	Services   map[string]int    `json:"services"`
-	LDAPZone   string            `json:"ldapZone,omitempty"`
 }
 
 // CyberGame represents the full exported network definition from the frontend.
@@ -97,5 +82,4 @@ type CyberGame struct {
 	Devices           []Device           `json:"devices"`
 	BlackteamServices []BlackteamService `json:"blackteamServices"`
 	Applications      []Application      `json:"applications"`
-	LDAPZones         []LDAPZone         `json:"ldapZones"`
 }

@@ -236,52 +236,12 @@ const NetworkEditor: React.FC = () => {
 
       if (!snapshot) return;
 
-      if (game?.blackTeamCidr) {
-        const compRouterId = 'competition-router';
-        const existingCompRouter = snapshot.nodes.find((n) => n.id === compRouterId);
-
-        // Ensure competition router exists and has correct interfaces
-        const [ip, prefix] = game.blackTeamCidr.split('/');
-        const internalIp = ip ? `${ip.split('.').slice(0, 3).join('.')}.254` : undefined;
-
-        if (!existingCompRouter) {
-          snapshot.nodes.push({
-            id: compRouterId,
-            label: 'Competition Router',
-            imageId: '-100', // Distinct ID
-            kind: 'router',
-            position: { x: MAP_WIDTH / 2 - 100, y: 100 },
-            interfaces: [
-              { id: createId(), name: 'eth0', dhcpEnabled: true, networkCidr: 'External WAN' },
-              { id: createId(), name: 'eth1', ip: internalIp, networkCidr: game.blackTeamCidr },
-            ],
-            services: [],
-          });
-        } else {
-          // If it exists, ensure it has the right structure (e.g. if loaded from older save)
-          const eth0 = existingCompRouter.interfaces.find((i) => i.name === 'eth0');
-          if (!eth0) {
-            existingCompRouter.interfaces.unshift({
-              id: createId(),
-              name: 'eth0',
-              dhcpEnabled: true,
-              networkCidr: 'External WAN',
-            });
-          }
-          const eth1 = existingCompRouter.interfaces.find((i) => i.name === 'eth1');
-          if (!eth1) {
-            existingCompRouter.interfaces.push({
-              id: createId(),
-              name: 'eth1',
-              ip: internalIp,
-              networkCidr: game.blackTeamCidr,
-            });
-          } else if (eth1.networkCidr !== game.blackTeamCidr) {
-            eth1.networkCidr = game.blackTeamCidr;
-            eth1.ip = internalIp;
-          }
-        }
-      }
+      // Strip any competition-router node that may have been persisted by older saves —
+      // the comp router is backend infrastructure and must never appear on the canvas.
+      snapshot.nodes = snapshot.nodes.filter((n) => n.id !== 'competition-router');
+      snapshot.links = snapshot.links.filter(
+        (l) => l.from.nodeId !== 'competition-router' && l.to.nodeId !== 'competition-router',
+      );
 
       setGridSnapEnabled(Boolean(snapshot.gridSnapEnabled));
       setNodes(
@@ -399,9 +359,17 @@ const NetworkEditor: React.FC = () => {
     if (!kind || !label || !imageId) return;
 
     const point = screenToWorld(event.clientX, event.clientY);
+
+    // When a router is dropped and a competition network is defined, pre-assign eth0 to that
+    // network. The backend will substitute the team-specific IP — no comp-router node needed.
     const defaultInterfaces =
       kind === 'router'
-        ? [createInterface('eth0'), createInterface('eth1')]
+        ? [
+            game?.blackTeamCidr
+              ? { ...createInterface('eth0'), networkCidr: game.blackTeamCidr }
+              : createInterface('eth0'),
+            createInterface('eth1'),
+          ]
         : [createInterface('eth0')];
 
     const newNodeId = createId();
@@ -416,59 +384,7 @@ const NetworkEditor: React.FC = () => {
       services: [],
     };
 
-    setNodes((current) => {
-      const nextNodes = [...current, newNode];
-      return nextNodes;
-    });
-
-    if (kind === 'router' && game?.blackTeamCidr) {
-      const compRouter = nodes.find((n) => n.id === 'competition-router');
-      if (compRouter) {
-        // Schedule link creation after node state update
-        setTimeout(() => {
-          setLinks((currentLinks) => {
-            // Connect NewRouter:eth0 -> CompRouter:eth1 (internal)
-            const compRouterIntf = compRouter.interfaces.find((i) => i.name === 'eth1');
-            const newNodeIntf = newNode.interfaces.find((i) => i.name === 'eth0');
-
-            if (!compRouterIntf || !newNodeIntf) return currentLinks;
-
-            // Check if link already exists (unlikely for new node)
-            const exists = currentLinks.some(
-              (l) =>
-                (l.from.nodeId === newNode.id && l.to.nodeId === compRouter.id) ||
-                (l.to.nodeId === newNode.id && l.from.nodeId === compRouter.id),
-            );
-            if (exists) return currentLinks;
-
-            return [
-              ...currentLinks,
-              {
-                id: createId(),
-                from: { nodeId: newNode.id, interfaceId: newNodeIntf.id },
-                to: { nodeId: compRouter.id, interfaceId: compRouterIntf.id },
-                networkCidr: game.blackTeamCidr || '10.20.0.0/16',
-              },
-            ];
-          });
-
-          // Also update the interface on the new node to inherit the black team CIDR
-          setNodes((current) =>
-            current.map((node) => {
-              if (node.id === newNode.id) {
-                return {
-                  ...node,
-                  interfaces: node.interfaces.map((intf) =>
-                    intf.name === 'eth0' ? { ...intf, networkCidr: game.blackTeamCidr } : intf,
-                  ),
-                };
-              }
-              return node;
-            }),
-          );
-        }, 50);
-      }
-    }
+    setNodes((current) => [...current, newNode]);
     setContextMenu(null);
   };
 
@@ -536,7 +452,41 @@ const NetworkEditor: React.FC = () => {
       roleBindings[role.role] = nodeId;
     });
 
+    // Auto-connect created VMs to the first available LAN router interface (non-comp-network).
+    // This wires the VMs so they appear connected and have a valid networkCidr.
+    const lanResult = (() => {
+      for (const node of nodes) {
+        if (node.kind !== 'router') continue;
+        const intf = node.interfaces.find(
+          (i) => i.networkCidr && i.networkCidr !== game?.blackTeamCidr,
+        );
+        if (intf) return { routerNode: node, intf };
+      }
+      return null;
+    })();
+
+    if (lanResult) {
+      createdNodes.forEach((hostNode) => {
+        const hostIntf = hostNode.interfaces[0];
+        hostIntf.networkCidr = lanResult.intf.networkCidr;
+        hostIntf.targetRouterInterfaceId = anchorKey(lanResult.routerNode.id, lanResult.intf.id);
+      });
+    }
+
     setNodes((current) => [...current, ...createdNodes]);
+
+    if (lanResult) {
+      setLinks((current) => [
+        ...current,
+        ...createdNodes.map((hostNode) => ({
+          id: createId(),
+          from: { nodeId: hostNode.id, interfaceId: hostNode.interfaces[0].id },
+          to: { nodeId: lanResult.routerNode.id, interfaceId: lanResult.intf.id },
+          networkCidr: lanResult.intf.networkCidr!,
+        })),
+      ]);
+    }
+
     createCustomServiceEntry(definitionId, roleBindings, resolveCustomServiceStatus(definitionId, roleBindings));
     setCustomServiceModal(null);
   };
@@ -620,7 +570,6 @@ const NetworkEditor: React.FC = () => {
   };
 
   const deleteNode = (id: string) => {
-    if (id === 'competition-router') return; // Prevent deletion of competition router
     setLinks((current) => current.filter((link) => link.from.nodeId !== id && link.to.nodeId !== id));
     setNodes((current) => current.filter((node) => node.id !== id));
     setCustomServices((current) =>
@@ -733,16 +682,18 @@ const NetworkEditor: React.FC = () => {
                 if (intf.id !== interfaceId) return intf;
                 const updated = updater(intf);
                 if (node.kind === 'router') {
-                  const cidrIp = updated.networkCidr?.split('/')[0];
-                  const octets = cidrIp?.split('.');
-                  if (octets && octets.length === 4) {
-                    octets[3] = '1';
-                    updated.ip = octets.join('.');
-                  } else if (updated.ip) {
-                    const ipParts = updated.ip.split('.');
-                    if (ipParts.length === 4) {
-                      ipParts[3] = '1';
-                      updated.ip = ipParts.join('.');
+                  const isCompNetwork =
+                    Boolean(game?.blackTeamCidr) && updated.networkCidr === game?.blackTeamCidr;
+                  if (isCompNetwork) {
+                    // Backend substitutes the team-specific uplink IP — never hardcode one here.
+                    updated.ip = undefined;
+                  } else if (!updated.ip) {
+                    // Only auto-assign .1 when the field is currently blank (never overwrite user edits).
+                    const cidrIp = updated.networkCidr?.split('/')[0];
+                    const octets = cidrIp?.split('.');
+                    if (octets && octets.length === 4) {
+                      octets[3] = '1';
+                      updated.ip = octets.join('.');
                     }
                   }
                 } else if (updated.dhcpEnabled) {
@@ -883,43 +834,18 @@ const NetworkEditor: React.FC = () => {
     };
 
     setLinks((current) => [...current, newLink]);
-    // Logic for Router-to-Router connections:
-    // If one router has a network defined and the other doesn't (or is just created), the new one inherits.
-    // If the link involves the Competition Router, the other router MUST inherit.
+    // Router-to-Router: only propagate CIDR to the specific linked interface that lacks one.
+    // Never touch other interfaces on either router to prevent network bleed.
     if (routerEndpoints.length === 2) {
-      const compRouterEndpoint = routerEndpoints.find((ep) => ep.node.id === 'competition-router');
-      const otherRouterEndpoint = routerEndpoints.find((ep) => ep.node.id !== 'competition-router');
-
-      if (compRouterEndpoint && otherRouterEndpoint) {
-        // Enforce inheritance from Comp Router
-        const compCidr = compRouterEndpoint.intf.networkCidr;
-        if (compCidr) {
-          updateInterface(otherRouterEndpoint.node.id, otherRouterEndpoint.intf.id, (intf) => ({
-            ...intf,
-            networkCidr: compCidr,
-          }));
-          newLink.networkCidr = compCidr;
-        }
-      } else {
-        // Normal router-to-router (e.g. Router 1 -> Router 2)
-        // Heuristic: If source has CIDR and target doesn't, target inherits.
-        const sourceHasCidr = Boolean(source.intf.networkCidr);
-        const targetHasCidr = Boolean(target.intf.networkCidr);
-
-        if (sourceHasCidr && !targetHasCidr) {
-          updateInterface(target.node.id, target.intf.id, (intf) => ({
-            ...intf,
-            networkCidr: source.intf.networkCidr,
-          }));
-          newLink.networkCidr = source.intf.networkCidr!;
-        } else if (targetHasCidr && !sourceHasCidr) {
-          updateInterface(source.node.id, source.intf.id, (intf) => ({
-            ...intf,
-            networkCidr: target.intf.networkCidr,
-          }));
-          newLink.networkCidr = target.intf.networkCidr!;
-        }
+      const [epA, epB] = routerEndpoints;
+      if (epA.intf.networkCidr && !epB.intf.networkCidr) {
+        updateInterface(epB.node.id, epB.intf.id, (intf) => ({ ...intf, networkCidr: epA.intf.networkCidr }));
+        newLink.networkCidr = epA.intf.networkCidr!;
+      } else if (epB.intf.networkCidr && !epA.intf.networkCidr) {
+        updateInterface(epA.node.id, epA.intf.id, (intf) => ({ ...intf, networkCidr: epB.intf.networkCidr }));
+        newLink.networkCidr = epB.intf.networkCidr!;
       }
+      // If both or neither have a CIDR, leave as-is.
     } else {
       // Single router (Router <-> Host) logic remains
       routerEndpoints.forEach((endpoint) => {
@@ -1851,6 +1777,12 @@ const NetworkEditor: React.FC = () => {
                       nodes.find(n => n.id === (l.from.nodeId === selectedNode.id ? l.to.nodeId : l.from.nodeId))?.kind === 'router'
                   );
 
+                  // Detect if this interface is locked to the competition network (backend assigns the IP)
+                  const isCompNetworkIntf =
+                    selectedNode.kind === 'router' &&
+                    Boolean(game?.blackTeamCidr) &&
+                    intf.networkCidr === game?.blackTeamCidr;
+
                   return (
                     <div
                       key={intf.id}
@@ -1934,6 +1866,44 @@ const NetworkEditor: React.FC = () => {
                               <div className="rounded border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-100">
                                 {intf.networkCidr || 'No router selected'}
                               </div>
+                            </div>
+                            {game?.blackTeamCidr && intf.networkCidr !== game.blackTeamCidr && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  updateInterface(selectedNode.id, intf.id, (current) => ({
+                                    ...current,
+                                    networkCidr: game.blackTeamCidr,
+                                    dhcpEnabled: false,
+                                    targetRouterInterfaceId: undefined,
+                                  }))
+                                }
+                                className="rounded border border-sky-400/40 bg-sky-500/10 px-2 py-1 text-[11px] font-semibold text-sky-200 transition hover:bg-sky-500/20"
+                              >
+                                Connect to Comp Network ({game.blackTeamCidr})
+                              </button>
+                            )}
+                          </>
+                        ) : isCompNetworkIntf ? (
+                          // Comp-network interface: locked — backend assigns the team-specific IP
+                          <>
+                            <div className="flex flex-col gap-1">
+                              <span className="text-[11px] uppercase tracking-wide text-slate-400">Network (CIDR)</span>
+                              <div className="flex items-center gap-1 rounded border border-sky-400/40 bg-sky-500/10 px-2 py-1 text-xs text-sky-200">
+                                <span className="font-semibold">{intf.networkCidr}</span>
+                                <span className="ml-auto rounded bg-sky-500/30 px-1 text-[9px] font-bold uppercase tracking-wide text-sky-100">
+                                  Comp Network
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                              <span className="text-[11px] uppercase tracking-wide text-slate-400">IP address</span>
+                              <div className="rounded border border-white/10 bg-white/5 px-2 py-1 text-xs italic text-slate-400">
+                                Backend-assigned (10.20.T.1)
+                              </div>
+                              <span className="text-[10px] text-slate-500">
+                                The backend substitutes the team-specific uplink IP at deploy time.
+                              </span>
                             </div>
                           </>
                         ) : (
@@ -2130,23 +2100,16 @@ const NetworkEditor: React.FC = () => {
                 Connected: {resolveAnchor(anchorKey(selectedLink.from.nodeId, selectedLink.from.interfaceId))?.node.label} ⇄{' '}
                 {resolveAnchor(anchorKey(selectedLink.to.nodeId, selectedLink.to.interfaceId))?.node.label}
               </div>
-              {selectedLink.from.nodeId !== 'competition-router' && selectedLink.to.nodeId !== 'competition-router' && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setLinks((current) => current.filter((link) => link.id !== selectedLink.id));
-                    setSelectedLinkId(null);
-                  }}
-                  className="mt-2 w-full rounded bg-rose-600/80 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-white transition hover:bg-rose-500"
-                >
-                  Delete link
-                </button>
-              )}
-              {(selectedLink.from.nodeId === 'competition-router' || selectedLink.to.nodeId === 'competition-router') && (
-                <div className="mt-2 rounded bg-white/5 px-2 py-1 text-center text-[10px] text-slate-400">
-                  Competition links cannot be deleted.
-                </div>
-              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setLinks((current) => current.filter((link) => link.id !== selectedLink.id));
+                  setSelectedLinkId(null);
+                }}
+                className="mt-2 w-full rounded bg-rose-600/80 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-white transition hover:bg-rose-500"
+              >
+                Delete link
+              </button>
             </div>
           </div>
         )}

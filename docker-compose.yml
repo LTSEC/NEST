@@ -20,6 +20,8 @@ services:
       - "${BACKEND_PORT:-4545}:${BACKEND_PORT:-4545}"
     environment:
       PORT: ${BACKEND_PORT:-4545}
+    env_file:
+      - .secrets
 
   db:
     image: postgres:16

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import NavBar from '../components/NavBar';
 import { Credential, Game, GameType, RvbService, createGame, getGameById, updateGame } from '../data/games';
+import { fetchPresets } from '../data/presets';
 import { useAuth } from '../providers/AuthProvider';
 import ComingSoon from './partials/ComingSoon';
 
@@ -30,6 +31,20 @@ const GameEditor: React.FC = () => {
   );
   const [error, setError] = useState<string | null>(null);
 
+  const [presets, setPresets] = useState<string[]>([]);
+  const [creationMode, setCreationMode] = useState<'scratch' | 'preset'>('scratch');
+  const [selectedPreset, setSelectedPreset] = useState<string>('');
+
+  useEffect(() => {
+    fetchPresets().then((data) => {
+      const keys = Object.keys(data);
+      setPresets(keys);
+      if (keys.length > 0) {
+        setSelectedPreset(keys[0]);
+      }
+    }).catch((err) => console.error('Failed to fetch presets', err));
+  }, []);
+
   useEffect(() => {
     if (existingGame) {
       setName(existingGame.name);
@@ -38,6 +53,10 @@ const GameEditor: React.FC = () => {
       setCredentials(existingGame.credentials.length
         ? existingGame.credentials
         : [{ username: 'root', password: 'changeme' }]);
+      if (existingGame.presetId) {
+        setCreationMode('preset');
+        setSelectedPreset(existingGame.presetId);
+      }
     }
   }, [existingGame]);
 
@@ -76,28 +95,38 @@ const GameEditor: React.FC = () => {
       return;
     }
 
-    if (hasRvbSelected && !selectedServices.length) {
-      setError('Choose at least one Red vs. Blue service.');
-      return;
+    if (hasRvbSelected) {
+      if (creationMode === 'preset' && !selectedPreset) {
+        setError('Select a preset.');
+        return;
+      }
+      if (creationMode === 'scratch' && !selectedServices.length) {
+        setError('Choose at least one Red vs. Blue service.');
+        return;
+      }
     }
 
     try {
+      const isPreset = hasRvbSelected && creationMode === 'preset';
+
       if (editing && existingGame) {
         updateGame(existingGame.id, user.id, {
           name,
           types: selectedTypes,
-          rvbServices: selectedServices,
+          rvbServices: isPreset ? [] : selectedServices,
           credentials: hasRvbSelected ? credentials : [],
           teamCount: existingGame.teamCount,
+          presetId: isPreset ? selectedPreset : undefined,
         });
       } else {
         createGame({
           name,
           developerId: user.id,
           types: selectedTypes,
-          rvbServices: hasRvbSelected ? selectedServices : [],
+          rvbServices: hasRvbSelected && !isPreset ? selectedServices : [],
           credentials: hasRvbSelected ? credentials : [],
           teamCount: existingGame?.teamCount ?? 0,
+          presetId: isPreset ? selectedPreset : undefined,
         });
       }
       navigate('/my-games');
@@ -189,20 +218,70 @@ const GameEditor: React.FC = () => {
 
           {hasRvbSelected && (
             <div className="space-y-3 rounded-xl bg-slate-50 p-4">
-              <p className="text-sm font-semibold text-slate-800">Red vs. Blue services</p>
-              <div className="flex flex-col gap-2 text-sm text-slate-700">
-                {rvbServices.map((service) => (
-                  <label key={service} className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                      checked={selectedServices.includes(service)}
-                      onChange={() => toggleService(service)}
-                    />
-                    {service}
-                  </label>
-                ))}
+              <p className="text-sm font-semibold text-slate-800">Red vs. Blue configuration</p>
+
+              <div className="flex items-center gap-4 text-sm text-slate-700">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="creationMode"
+                    value="scratch"
+                    checked={creationMode === 'scratch'}
+                    onChange={() => setCreationMode('scratch')}
+                    className="h-4 w-4 border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  Create from scratch
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="creationMode"
+                    value="preset"
+                    checked={creationMode === 'preset'}
+                    onChange={() => setCreationMode('preset')}
+                    className="h-4 w-4 border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  Use a preset
+                </label>
               </div>
+
+              {creationMode === 'scratch' ? (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-slate-700">Services to include</p>
+                  <div className="flex flex-col gap-2 text-sm text-slate-700">
+                    {rvbServices.map((service) => (
+                      <label key={service} className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                          checked={selectedServices.includes(service)}
+                          onChange={() => toggleService(service)}
+                        />
+                        {service}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <label htmlFor="preset-select" className="text-sm font-medium text-slate-700">
+                    Select a preset
+                  </label>
+                  <select
+                    id="preset-select"
+                    value={selectedPreset}
+                    onChange={(e) => setSelectedPreset(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                  >
+                    {presets.length === 0 && <option value="">Loading presets...</option>}
+                    {presets.map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <p className="text-xs text-slate-600">
                 Team counts are chosen when hosting a Red vs. Blue game.

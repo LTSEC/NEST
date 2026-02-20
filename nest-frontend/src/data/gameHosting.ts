@@ -1,6 +1,7 @@
 import { Game } from './games';
 import { loadNetworkSnapshot } from './networkStorage';
-import { CyberGamePayload, serializeNetworkToCyberGame } from './networkSerializer';
+import { CyberGamePayload, serializeNetworkToCyberGame, CyberGameDevice } from './networkSerializer';
+import { fetchPresets } from './presets';
 
 const API_BASE = 'http://localhost:4545';
 
@@ -164,7 +165,49 @@ export const hostGameInstance = async (
   options?: { teamCount?: number },
 ): Promise<HostedGameStatus> => {
   const teamCount = options?.teamCount ?? game.teamCount ?? 2;
-  const payload = buildPayloadFromNetwork(game, teamCount);
+
+  let payload: CyberGamePayload;
+
+  if (game.presetId) {
+    const presets = await fetchPresets();
+    const preset = presets[game.presetId];
+    if (!preset) {
+      throw new Error(`Preset "${game.presetId}" not found.`);
+    }
+
+    const serverNames = preset.devices
+      .filter((d: CyberGameDevice) => d.type === 'Server')
+      .map((d: CyberGameDevice) => d.name);
+
+    const applications = game.types.map((type, index) => ({
+      name: `${game.name} - ${type}`,
+      servers: serverNames,
+      services: [],
+      color: ['#E11D48', '#2563EB', '#10B981'][index % 3],
+    }));
+
+    const safeTeamCount = Math.max(1, Math.floor(teamCount));
+    const ldapZones = Array.from({ length: safeTeamCount }, (_, index) => {
+      const teamNumber = index + 1;
+      return {
+        name: `Team ${teamNumber}`,
+        server: `team${teamNumber}.ldap.local`,
+        users: (game.credentials || []).map((cred) => ({
+          username: `team${teamNumber}-${cred.username}`,
+          password: cred.password,
+        })),
+        connectedServers: serverNames,
+      };
+    });
+
+    payload = {
+      ...preset,
+      applications,
+      ldapZones,
+    };
+  } else {
+    payload = buildPayloadFromNetwork(game, teamCount);
+  }
 
   const response = await fetch(`${API_BASE}/api/games`, {
     method: 'POST',

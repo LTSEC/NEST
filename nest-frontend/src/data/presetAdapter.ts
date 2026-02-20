@@ -76,15 +76,30 @@ export const presetToSnapshot = (preset: CyberGamePayload, gameId: string | null
         const routerIntfId = routerInterfaceMap.get(`${device.router}:${device.interface}`);
 
         if (routerNode && routerIntfId) {
-          targetRouterInterfaceId = `${routerNode.id}:${routerIntfId}`;
           const routerIntf = routerNode.interfaces.find(i => i.id === routerIntfId);
           networkCidr = routerIntf?.networkCidr;
+
+          // If the named interface has no CIDR (e.g. it's the External WAN / comp-network uplink),
+          // fall back to the first LAN-side interface that does have a CIDR so the host has
+          // a valid network context and the link is not created with an empty networkCidr.
+          let effectiveIntfId = routerIntfId;
+          if (!networkCidr) {
+            const fallbackIntf = routerNode.interfaces.find(
+              (i) => i.id !== routerIntfId && i.networkCidr,
+            );
+            if (fallbackIntf) {
+              networkCidr = fallbackIntf.networkCidr;
+              effectiveIntfId = fallbackIntf.id;
+            }
+          }
+
+          targetRouterInterfaceId = `${routerNode.id}:${effectiveIntfId}`;
 
           // Create Link
           links.push({
             id: createId(),
             from: { nodeId: nodeId, interfaceId: interfaceId },
-            to: { nodeId: routerNode.id, interfaceId: routerIntfId },
+            to: { nodeId: routerNode.id, interfaceId: effectiveIntfId },
             networkCidr: networkCidr || '',
           });
         }

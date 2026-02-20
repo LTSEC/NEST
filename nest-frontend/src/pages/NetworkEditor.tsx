@@ -6,6 +6,8 @@ import { networkItemsByCategory } from '../data/networkItems';
 import { loadNetworkSnapshot, saveNetworkSnapshot } from '../data/networkStorage';
 import { useAuth } from '../providers/AuthProvider';
 import { customServiceCatalog, customServicesById, serviceCatalog, serviceDefinitionsById } from '../data/services';
+import { fetchPresets } from '../data/presets';
+import { presetToSnapshot } from '../data/presetAdapter';
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
@@ -205,39 +207,85 @@ const NetworkEditor: React.FC = () => {
   }, [isDeveloper, navigate]);
 
   useEffect(() => {
-    const snapshot = loadNetworkSnapshot(game?.id ?? null);
-    if (!snapshot) return;
+    const loadData = async () => {
+      let snapshot = loadNetworkSnapshot(game?.id ?? null);
 
-    setGridSnapEnabled(Boolean(snapshot.gridSnapEnabled));
-    setNodes(
-      snapshot.nodes.map((node) => ({
-        id: node.id,
-        label: node.label,
-        imageId: node.imageId,
-        kind: node.kind,
-        x: node.position.x,
-        y: node.position.y,
-        interfaces: node.interfaces.map((intf) => ({ ...intf })),
-        services: (node.services || []).map((service) => ({
-          ...service,
-          protocol: service.protocol === 'udp' ? 'udp' : 'tcp',
-        })),
-      })),
-    );
-    setLinks(snapshot.links.map((link) => ({ ...link })));
-    setCustomServices(snapshot.customServices?.map((service) => ({ ...service })) || []);
-
-    const nextScale =
-      typeof snapshot.metadata?.scale === 'number' ? clamp(snapshot.metadata.scale, MIN_SCALE, MAX_SCALE) : scale;
-    setScale(nextScale);
-
-    if (snapshot.metadata && typeof (snapshot.metadata as Record<string, unknown>).offset === 'object') {
-      const offsetValue = (snapshot.metadata as { offset?: { x: number; y: number } }).offset;
-      if (offsetValue && typeof offsetValue.x === 'number' && typeof offsetValue.y === 'number') {
-        setOffset(constrainOffset({ x: offsetValue.x, y: offsetValue.y }, nextScale));
+      if (!snapshot && game?.presetId) {
+        try {
+          const presets = await fetchPresets();
+          const preset = presets[game.presetId];
+          if (preset) {
+            snapshot = presetToSnapshot(preset, game.id);
+          }
+        } catch (e) {
+          console.error('Failed to load preset', e);
+        }
       }
-    }
-  }, [game?.id]);
+
+      if (!snapshot && game?.blackTeamCidr) {
+        // Create empty snapshot if starting fresh with black team CIDR
+        snapshot = {
+          gameId: game.id,
+          savedAt: new Date().toISOString(),
+          gridSnapEnabled: true,
+          nodes: [],
+          links: [],
+          customServices: [],
+        };
+      }
+
+      if (!snapshot) return;
+
+      if (game?.blackTeamCidr) {
+        const compRouterId = 'competition-router';
+        if (!snapshot.nodes.find((n) => n.id === compRouterId)) {
+          const [ip, prefix] = game.blackTeamCidr.split('/');
+          const routerIp = ip ? `${ip.split('.').slice(0, 3).join('.')}.254` : undefined;
+
+          snapshot.nodes.push({
+            id: compRouterId,
+            label: 'Competition Router',
+            imageId: '-100', // Distinct ID
+            kind: 'router',
+            position: { x: MAP_WIDTH / 2 - 100, y: 100 },
+            interfaces: [{ id: createId(), name: 'eth0', ip: routerIp, networkCidr: game.blackTeamCidr }],
+            services: [],
+          });
+        }
+      }
+
+      setGridSnapEnabled(Boolean(snapshot.gridSnapEnabled));
+      setNodes(
+        snapshot.nodes.map((node) => ({
+          id: node.id,
+          label: node.label,
+          imageId: node.imageId,
+          kind: node.kind,
+          x: node.position.x,
+          y: node.position.y,
+          interfaces: node.interfaces.map((intf) => ({ ...intf })),
+          services: (node.services || []).map((service) => ({
+            ...service,
+            protocol: service.protocol === 'udp' ? 'udp' : 'tcp',
+          })),
+        })),
+      );
+      setLinks(snapshot.links.map((link) => ({ ...link })));
+      setCustomServices(snapshot.customServices?.map((service) => ({ ...service })) || []);
+
+      const nextScale =
+        typeof snapshot.metadata?.scale === 'number' ? clamp(snapshot.metadata.scale, MIN_SCALE, MAX_SCALE) : scale;
+      setScale(nextScale);
+
+      if (snapshot.metadata && typeof (snapshot.metadata as Record<string, unknown>).offset === 'object') {
+        const offsetValue = (snapshot.metadata as { offset?: { x: number; y: number } }).offset;
+        if (offsetValue && typeof offsetValue.x === 'number' && typeof offsetValue.y === 'number') {
+          setOffset(constrainOffset({ x: offsetValue.x, y: offsetValue.y }, nextScale));
+        }
+      }
+    };
+    loadData();
+  }, [game?.id, game?.presetId, game?.blackTeamCidr]);
 
   const screenToWorld = (clientX: number, clientY: number) => {
     const rect = canvasRef.current?.getBoundingClientRect();
@@ -326,19 +374,58 @@ const NetworkEditor: React.FC = () => {
       kind === 'router'
         ? [createInterface('eth0'), createInterface('eth1')]
         : [createInterface('eth0')];
-    setNodes((current) => [
-      ...current,
-      {
-        id: createId(),
-        kind,
-        imageId,
-        label,
-        x: applyGridSnap(clamp(point.x, 0, MAP_WIDTH)),
-        y: applyGridSnap(clamp(point.y, 0, MAP_HEIGHT)),
-        interfaces: defaultInterfaces,
-        services: [],
-      },
-    ]);
+
+    const newNodeId = createId();
+    const newNode: NetworkNode = {
+      id: newNodeId,
+      kind,
+      imageId,
+      label,
+      x: applyGridSnap(clamp(point.x, 0, MAP_WIDTH)),
+      y: applyGridSnap(clamp(point.y, 0, MAP_HEIGHT)),
+      interfaces: defaultInterfaces,
+      services: [],
+    };
+
+    setNodes((current) => {
+      const nextNodes = [...current, newNode];
+      return nextNodes;
+    });
+
+    if (kind === 'router' && game?.blackTeamCidr) {
+      const compRouter = nodes.find((n) => n.id === 'competition-router');
+      if (compRouter) {
+        // Schedule link creation after node state update
+        setTimeout(() => {
+          setLinks((currentLinks) => {
+            const compRouterIntf = compRouter.interfaces[0]; // Assuming eth0 or first interface
+            const newNodeIntf = newNode.interfaces[0]; // eth0
+
+            if (!compRouterIntf || !newNodeIntf) return currentLinks;
+
+            return [...currentLinks, {
+              id: createId(),
+              from: { nodeId: newNode.id, interfaceId: newNodeIntf.id },
+              to: { nodeId: compRouter.id, interfaceId: compRouterIntf.id },
+              networkCidr: game.blackTeamCidr || '10.20.0.0/16',
+            }];
+          });
+
+          // Also update the interface on the new node
+          setNodes((current) => current.map(node => {
+            if (node.id === newNode.id) {
+               return {
+                 ...node,
+                 interfaces: node.interfaces.map(intf =>
+                   intf.name === 'eth0' ? { ...intf, networkCidr: game.blackTeamCidr } : intf
+                 )
+               };
+            }
+            return node;
+          }));
+        }, 50);
+      }
+    }
     setContextMenu(null);
   };
 

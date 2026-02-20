@@ -143,9 +143,10 @@ module \"team-networks\" {{\n\
 }}\n"
     return network_team_template
 
-def team_routers_module(has_infra_network: bool) -> str:
+def team_routers_module(has_infra_network: bool, infra_network_name: str = "External WAN") -> str:
     if has_infra_network:
-        network_id_line = "nic.value.network == \"External WAN\" ? module.infra-networks.id : module.team-networks[\"${each.value.team_name}-${nic.value.network}\"].id"
+        # Use the provided infra_network_name for comparison
+        network_id_line = f"nic.value.network == \"{infra_network_name}\" ? module.infra-networks.id : module.team-networks[\"${{each.value.team_name}}-${{nic.value.network}}\"].id"
     else:
         network_id_line = "module.team-networks[\"${each.value.team_name}-${nic.value.network}\"].id"
 
@@ -200,7 +201,7 @@ resource \"opennebula_virtual_machine\" \"team-servers\" {{\n\
 }}\n"
     return server_vm_template
 
-def Parse_device_JSON(data : json, network_map: dict, wan_network: list) -> tuple[dict, dict, dict]:
+def Parse_device_JSON(data : json, network_map: dict, wan_network: list, infra_network_name: str) -> tuple[dict, dict, dict, dict]:
     infra_router = {}
     router_vms = {}
     server_vms = {}
@@ -210,36 +211,59 @@ def Parse_device_JSON(data : json, network_map: dict, wan_network: list) -> tupl
 
     for vm in data["devices"]:
         name = vm["name"]
-        template_id = vm["os"]["id"]
+        template_id = vm["os"].get("id")
+        if template_id is None:
+             template_id = 2 # Default to VyOS (ID 2) if missing
+
         eth = {}
 
         if vm["type"] == "Router":
             interfaces = vm["interfaces"]
             for eth_name, eth_ip in interfaces.items():
                 if "eth" in eth_name and eth_ip != None:
-                    if "eth0" in eth_name and wan_network:
-                        if vm["hostId"] != None:
-                            network = wan_network
-                            network[3] = str(vm["hostId"] or 0)
-                            ip = ".".join(str(octet) for octet in network)
-                        else:
-                            ip = ""
-                        network_name = interfaces["eth0"]
+                    # Check if this interface matches the identified infra/WAN network
+                    # Condition 1: eth0 and we have a known wan_network (legacy T detection)
+                    # Condition 2: The network name matches the identified infra_network_name
+                    if (infra_network_name and interfaces.get(eth_name) == infra_network_name) or ("eth0" in eth_name and wan_network):
+                         # If it's a team router connecting to the infra network
+                         if vm.get("hostId") is not None:
+                             if wan_network: # Reconstruct IP from octets if T-parsing was used
+                                 network = wan_network
+                                 network[3] = str(vm["hostId"] or 0)
+                                 ip = ".".join(str(octet) for octet in network)
+                             else:
+                                 # Standard IP (likely has a T in it from the JSON)
+                                 ip = eth_ip.split("/")[0]
+
+                             network_name = infra_network_name if infra_network_name else interfaces["eth0"]
+                         else:
+                             # Infra/Competition router
+                             ip = ""
+                             network_name = interfaces.get(eth_name)
                     else:
                         ip = eth_ip.split("/")[0]
-                        network_name = map_ip_to_network(ip, network_map)
+                        if "T" in ip and infra_network_name:
+                            # Sanitize T to 0 for mapping purposes if we know the infra network name
+                            sanitized_ip = ip.replace("T", "0")
+                            network_name = map_ip_to_network(sanitized_ip, network_map)
+                            if network_name != infra_network_name:
+                                # Fallback if mapping fails or mismatches (shouldn't happen if T logic is consistent)
+                                network_name = map_ip_to_network(ip, network_map)
+                        else:
+                            network_name = map_ip_to_network(ip, network_map)
+
                     eth[eth_name] = {"ip": ip, "network": network_name}
                     network_context = network_name
             
             # If the hostId is none, then it is considered the "Competition" router
-            if vm["hostId"] == None:
-                host_id = vm["os"]["id"]
+            if vm.get("hostId") is None:
+                host_id = vm["os"].get("id")
                 infra_router[name] = {"interfaces": eth,
                                       "template_id": template_id,
                                       "host_id": host_id,
                                       "network": network_context}
             else:
-                host_id = vm["os"]["id"]
+                host_id = vm["os"].get("id")
                 router_vms[name] = {"interfaces": eth,
                                     "template_id": template_id,
                                     "host_id": host_id,
@@ -258,7 +282,7 @@ def Parse_device_JSON(data : json, network_map: dict, wan_network: list) -> tupl
                                 "dhcp": ip,
                                 "network": server_network}
             
-    for vm in data["blackteamServices"]:
+    for vm in data.get("blackteamServices", []):
         name = vm["name"]
         template_id = vm["templateId"]
         ip = vm["ip"]
@@ -274,6 +298,9 @@ def CreateTerraform(data: json) -> None:
     number_of_teams = 2
     wan_network = []
     
+    infra_network_name = ""
+
+    # First pass: Identify networks and check for explicit 'T'
     for network in data["networks"]:
         name = network["name"]
         cidr = network["cidr"]
@@ -290,6 +317,7 @@ def CreateTerraform(data: json) -> None:
                                 "mask": mask, 
                                 "cluster_id": 0,
                                 "size": size}
+            infra_network_name = name
         else:
             octets = [int(o) for o in ip.split('.')]
             team_networks[name] = {"octets": octets, 
@@ -300,13 +328,67 @@ def CreateTerraform(data: json) -> None:
         cidr = cidr.replace("T", "0")
         network_map[name] = cidr
 
-    router_vms, infra_router, server_vms, infra_server_vms = Parse_device_JSON(data, network_map, wan_network)
+    # Second pass: If no 'T' network found, check if routers imply one
+    if not infra_network:
+        for vm in data["devices"]:
+            if vm["type"] == "Router" and vm.get("hostId") is not None:
+                interfaces = vm["interfaces"]
+                for eth_name, eth_ip in interfaces.items():
+                    if eth_ip and "T" in eth_ip:
+                        # Found a T-address connection!
+                        # The network name connected to this interface is the infra network
+                        target_net_name = interfaces.get(eth_name)
+                        # Does this name exist in team_networks? If so, move it to infra_network
+                        # But wait, interfaces dict value is usually the network name (e.g., "External WAN")
+                        # OR it's the IP?
+                        # In the provided JSON, interfaces keys are "eth0", values are "External WAN" (name) or "172.27.0.1/24" (IP? No, usually name or IP+CIDR)
+                        # The JSON example: "eth0": "External WAN", "eth1": "172.27.0.1/24"
+                        # Actually, looking at the JSON:
+                        # "interfaces": {"eth0": "External WAN", "eth1": "172.27.0.1/24"}
+                        # Wait, "External WAN" is a name. "172.27.0.1/24" is an IP/CIDR.
+                        # How does the parser distinguish?
+                        # In Parse_device_JSON:
+                        # if "eth0" in eth_name and wan_network: ... network_name = interfaces["eth0"]
+                        # else: ip = eth_ip.split("/")[0]; network_name = map_ip_to_network(ip, network_map)
+
+                        # So if the value is "External WAN", it's a name. If it's "1.2.3.4/24", it's an IP.
+                        # The issue is, if we have "eth0": "External WAN", we don't see the IP there to check for 'T'.
+                        # But wait, the user said "just a router with 'T' in it's IP".
+                        # This implies the JSON might look like: "eth0": "10.20.T.2/16" ?
+                        # Or does the user mean the router definition has a specific IP field?
+                        # The JSON has "interfaces": { "eth0": "External WAN" }
+                        # Where is the IP "10.20.T.2"?
+                        # Ah, in the original code:
+                        # if "eth0" in eth_name and wan_network: ... network[3] = str(vm["hostId"])... ip = ...
+
+                        # If the user defines "eth0": "10.20.T.2/16", then `eth_ip` is "10.20.T.2/16".
+                        # `Parse_device_JSON` handles `eth_ip.split("/")[0]`.
+
+                        if "T" in eth_ip:
+                            # It's an IP string with T.
+                            # We need to find which network this belongs to.
+                            # We can try to map it (treating T as 0 or matching name?)
+                            # But usually, explicit IPs are mapped to networks via `map_ip_to_network`.
+
+                            # However, if it has a T, map_ip_to_network might fail unless we assume T=0.
+                            ip_sanitized = eth_ip.split("/")[0].replace("T", "0")
+                            found_net = map_ip_to_network(ip_sanitized, network_map)
+
+                            if found_net and found_net in team_networks:
+                                # Move from team_networks to infra_network
+                                infra_network[found_net] = team_networks.pop(found_net)
+                                infra_network_name = found_net
+                                break
+                if infra_network_name:
+                    break
+
+    router_vms, infra_router, server_vms, infra_server_vms = Parse_device_JSON(data, network_map, wan_network, infra_network_name)
 
     infra_router_template = ""
     if infra_router:
         infra_router_template = infra_routers_module()
 
-    team_router_template = team_routers_module(bool(infra_network))
+    team_router_template = team_routers_module(bool(infra_network), infra_network_name)
     team_servers_template = team_servers_module()
 
     infra_servers_template = ""

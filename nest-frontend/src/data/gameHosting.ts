@@ -30,10 +30,10 @@ export const destroyHostedGame = async (hostedGameId: number): Promise<void> => 
     method: 'POST',
   });
   if (!response.ok) {
-    let message = 'Failed to destroy game infrastructure';
+    let message = `Failed to destroy game infrastructure (HTTP ${response.status})`;
     try {
       const body = await response.json();
-      if (body?.error) message = body.error as string;
+      if (body?.error) message = `${body.error as string} (HTTP ${response.status})`;
     } catch {
       // use default message
     }
@@ -50,7 +50,14 @@ export const fetchGameStatus = async (
 ): Promise<HostedGameStatus> => {
   const response = await fetch(`${API_BASE}/api/games/${hostedGameId}/status`);
   if (!response.ok) {
-    throw new Error('Failed to fetch game status');
+    let message = `Failed to fetch game status (HTTP ${response.status})`;
+    try {
+      const body = await response.json();
+      if (body?.error) message = `${body.error as string} (HTTP ${response.status})`;
+    } catch {
+      // use default message
+    }
+    throw new Error(message);
   }
   const data = (await response.json()) as BackendGameStatus;
   return {
@@ -168,10 +175,10 @@ export const hostGameInstance = async (
   });
 
   if (!response.ok) {
-    let message = 'Failed to host game.';
+    let message = `Failed to host game (HTTP ${response.status}).`;
     try {
       const body = await response.json();
-      if (body?.error) message = body.error as string;
+      if (body?.error) message = `${body.error as string} (HTTP ${response.status})`;
     } catch {
       // use default message
     }

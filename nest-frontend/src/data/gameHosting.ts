@@ -1,4 +1,8 @@
 import { Game } from './games';
+import { loadNetworkSnapshot } from './networkStorage';
+import { CyberGamePayload, serializeNetworkToCyberGame } from './networkSerializer';
+
+const API_BASE = 'http://localhost:4545';
 
 export type HostedGameStatus = {
   id: number;
@@ -9,84 +13,113 @@ export type HostedGameStatus = {
   gameId: string;
 };
 
-export const destroyHostedGame = async (hostedGameId: number): Promise<void> => {
-  const response = await fetch(`http://localhost:4545/api/games/${hostedGameId}`, { method: 'DELETE' });
-  if (!response.ok) {
-    throw new Error('Failed to destroy game infrastructure');
-  }
-};
-
-export const readTerraformConsole = async (): Promise<string[]> => {
-  const response = await fetch('http://localhost:4545/api/terraform/console');
-  if (!response.ok) {
-    throw new Error('Unable to read terraform console');
-  }
-
-  const body = await response.text();
-  return body
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean);
-};
-
 type BackendGameStatus = {
-  ID: number;
-  Name: string;
-  Status: string;
-  UpdatedAt?: string;
-  StartedAt?: string;
+  id: number;
+  name: string;
+  status: string;
+  updatedAt?: string;
+  startedAt?: string;
 };
 
-type CyberGamePayload = {
-  networks: { name: string; cidr: string }[];
-  devices: {
-    name: string;
-    type: string;
-    os: { id: number; name: string };
-    hostId?: number | null;
-    interfaces?: Record<string, string>;
-    router?: string;
-    interface?: string;
-    segment?: string;
-    dhcp?: boolean;
-    ip?: string;
-    services: Record<string, number>;
-    ldapZone?: string;
-  }[];
-  blackteamServices: { name: string; templateId: number; hostId: number; ip: string }[];
-  applications: { name: string; servers: string[]; services: string[]; color: string }[];
-  ldapZones: {
-    name: string;
-    server: string;
-    users: { username: string; password: string }[];
-    connectedServers: string[];
-  }[];
-};
-
-const buildTeamLdapZones = (teamCount: number): CyberGamePayload['ldapZones'] => {
-  if (!Number.isFinite(teamCount) || teamCount <= 0) return [];
-  return Array.from({ length: Math.floor(teamCount) }, (_, index) => {
-    const teamNumber = index + 1;
-    return {
-      name: `Team ${teamNumber}`,
-      server: `team${teamNumber}.ldap.local`,
-      users: [
-        { username: `team${teamNumber}-captain`, password: 'changeme!' },
-        { username: `team${teamNumber}-member`, password: 'changeme!' },
-      ],
-      connectedServers: [],
-    };
+/**
+ * Stops a running game and triggers terraform destroy via the backend.
+ * Matches backend endpoint: POST /api/games/:id/stop
+ */
+export const destroyHostedGame = async (hostedGameId: number): Promise<void> => {
+  const response = await fetch(`${API_BASE}/api/games/${hostedGameId}/stop`, {
+    method: 'POST',
   });
+  if (!response.ok) {
+    let message = 'Failed to destroy game infrastructure';
+    try {
+      const body = await response.json();
+      if (body?.error) message = body.error as string;
+    } catch {
+      // use default message
+    }
+    throw new Error(message);
+  }
 };
 
-const buildCyberGamePayload = (game: Game, teamCount?: number): CyberGamePayload => {
-  const hasRvb = game.types.includes('Red vs. Blue');
-  const safeTeamCount = hasRvb && teamCount ? Math.max(1, Math.floor(teamCount)) : 0;
+/**
+ * Fetches the current status of a game from the backend.
+ * Matches backend endpoint: GET /api/games/:id/status
+ */
+export const fetchGameStatus = async (
+  hostedGameId: number,
+): Promise<HostedGameStatus> => {
+  const response = await fetch(`${API_BASE}/api/games/${hostedGameId}/status`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch game status');
+  }
+  const data = (await response.json()) as BackendGameStatus;
+  return {
+    id: data.id,
+    name: data.name,
+    status: data.status,
+    updatedAt: data.updatedAt,
+    startedAt: data.startedAt,
+    gameId: '',
+  };
+};
 
+/**
+ * Opens an SSE connection to stream terraform logs from the backend.
+ * Matches backend endpoint: GET /api/games/:id/logs
+ *
+ * Returns an EventSource that the caller should close when done.
+ * Each 'message' event contains a log line in event.data.
+ * A 'close' event is sent when the stream ends.
+ */
+export const streamTerraformLogs = (
+  hostedGameId: number,
+  onMessage: (line: string) => void,
+  onClose?: () => void,
+  onError?: (error: Event) => void,
+): EventSource => {
+  const source = new EventSource(`${API_BASE}/api/games/${hostedGameId}/logs`);
+
+  source.onmessage = (event) => {
+    onMessage(event.data);
+  };
+
+  source.addEventListener('close', () => {
+    source.close();
+    onClose?.();
+  });
+
+  source.onerror = (event) => {
+    onError?.(event);
+    // EventSource auto-reconnects on error, but if the stream
+    // was intentionally closed server-side the readyState will be CLOSED
+    if (source.readyState === EventSource.CLOSED) {
+      onClose?.();
+    }
+  };
+
+  return source;
+};
+
+/**
+ * Builds the CyberGame payload from the network editor snapshot.
+ * Falls back to a minimal payload if no network snapshot exists.
+ */
+const buildPayloadFromNetwork = (
+  game: Game,
+  teamCount: number,
+): CyberGamePayload => {
+  const snapshot = loadNetworkSnapshot(game.id);
+
+  if (snapshot && snapshot.nodes.length > 0) {
+    return serializeNetworkToCyberGame(snapshot, game, teamCount);
+  }
+
+  // Fallback: no network configured, send minimal payload
+  const safeTeamCount = Math.max(1, Math.floor(teamCount));
   return {
     networks: [],
     devices: [],
-    blackteamServices: game.rvbServices.map((service, index) => ({
+    blackteamServices: (game.rvbServices || []).map((service, index) => ({
       name: service,
       templateId: index + 1,
       hostId: index + 1,
@@ -98,16 +131,35 @@ const buildCyberGamePayload = (game: Game, teamCount?: number): CyberGamePayload
       services: [],
       color: ['#E11D48', '#2563EB', '#10B981'][index % 3],
     })),
-    ldapZones: hasRvb ? buildTeamLdapZones(safeTeamCount || game.teamCount || 0) : [],
+    ldapZones: Array.from({ length: safeTeamCount }, (_, index) => {
+      const teamNumber = index + 1;
+      return {
+        name: `Team ${teamNumber}`,
+        server: `team${teamNumber}.ldap.local`,
+        users: (game.credentials || []).map((cred) => ({
+          username: `team${teamNumber}-${cred.username}`,
+          password: cred.password,
+        })),
+        connectedServers: [],
+      };
+    }),
   };
 };
 
+/**
+ * Sends the game's network configuration to the backend to create
+ * infrastructure via terraform. Uses the network editor snapshot data.
+ *
+ * Matches backend endpoint: POST /api/games
+ */
 export const hostGameInstance = async (
   game: Game,
-  options?: { teamCount?: number }
+  options?: { teamCount?: number },
 ): Promise<HostedGameStatus> => {
-  const payload = buildCyberGamePayload(game, options?.teamCount);
-  const response = await fetch('http://localhost:4545/api/games', {
+  const teamCount = options?.teamCount ?? game.teamCount ?? 2;
+  const payload = buildPayloadFromNetwork(game, teamCount);
+
+  const response = await fetch(`${API_BASE}/api/games`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -120,8 +172,8 @@ export const hostGameInstance = async (
     try {
       const body = await response.json();
       if (body?.error) message = body.error as string;
-    } catch (error) {
-      // ignore parse errors and fallback to default message
+    } catch {
+      // use default message
     }
     throw new Error(message);
   }
@@ -129,11 +181,11 @@ export const hostGameInstance = async (
   const data = (await response.json()) as BackendGameStatus;
 
   return {
-    id: data.ID,
-    name: data.Name,
-    status: data.Status,
-    updatedAt: data.UpdatedAt,
-    startedAt: data.StartedAt,
+    id: data.id,
+    name: data.name,
+    status: data.status,
+    updatedAt: data.updatedAt,
+    startedAt: data.startedAt,
     gameId: game.id,
   };
 };

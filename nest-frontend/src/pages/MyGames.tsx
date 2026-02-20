@@ -13,7 +13,7 @@ import {
   cancelScheduledSession,
   updateInfrastructureStatus,
 } from '../data/gameSessions';
-import { destroyHostedGame, hostGameInstance, readTerraformConsole } from '../data/gameHosting';
+import { destroyHostedGame, hostGameInstance, streamTerraformLogs } from '../data/gameHosting';
 import { listTeams } from '../data/teams';
 import { useAuth } from '../providers/AuthProvider';
 import ComingSoon from './partials/ComingSoon';
@@ -39,7 +39,8 @@ const MyGames: React.FC = () => {
   const [consoleVisible, setConsoleVisible] = useState(false);
   const [consoleTitle, setConsoleTitle] = useState('');
   const [consoleMode, setConsoleMode] = useState<'create' | 'destroy' | null>(null);
-  const consoleIntervalRef = useRef<number | null>(null);
+  const sseRef = useRef<EventSource | null>(null);
+  const [activeInfraId, setActiveInfraId] = useState<number | null>(null);
   const [destroyingSessionId, setDestroyingSessionId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -49,31 +50,35 @@ const MyGames: React.FC = () => {
     }
   }, [isDeveloper, user]);
 
+  // SSE log streaming: connect when console is visible and we have an infra ID
   useEffect(() => {
-    const refreshConsole = async () => {
-      try {
-        const lines = await readTerraformConsole();
-        setConsoleLogs(lines);
-      } catch (error) {
-        setConsoleLogs((prev) => [
-          ...(prev.length ? prev : ['Terraform console']),
-          error instanceof Error ? error.message : 'Unable to read terraform console',
-        ]);
-      }
-    };
+    if (!consoleVisible || activeInfraId === null) return undefined;
 
-    if (!consoleVisible) return undefined;
+    // Close any existing connection
+    if (sseRef.current) {
+      sseRef.current.close();
+      sseRef.current = null;
+    }
 
-    refreshConsole();
-    const intervalId = window.setInterval(refreshConsole, 2000);
-    consoleIntervalRef.current = intervalId;
+    const source = streamTerraformLogs(
+      activeInfraId,
+      (line) => {
+        setConsoleLogs((prev) => [...prev, line]);
+      },
+      () => {
+        setConsoleLogs((prev) => [...prev, '[STREAM] Connection closed.']);
+      },
+      () => {
+        setConsoleLogs((prev) => [...prev, '[STREAM] Connection error - retrying...']);
+      },
+    );
+    sseRef.current = source;
 
     return () => {
-      if (consoleIntervalRef.current) {
-        clearInterval(consoleIntervalRef.current);
-      }
+      source.close();
+      sseRef.current = null;
     };
-  }, [consoleVisible]);
+  }, [consoleVisible, activeInfraId]);
 
   const filteredGames = useMemo(
     () =>
@@ -128,6 +133,9 @@ const MyGames: React.FC = () => {
 
       const hosted = await hostGameInstance(game, { teamCount: teams });
 
+      // Start SSE streaming for this infrastructure
+      setActiveInfraId(hosted.id);
+
       const session = scheduleGameSession(game, { id: user.id, name: user.name }, {
         startTime: start.toISOString(),
         endTime: end.toISOString(),
@@ -143,6 +151,7 @@ const MyGames: React.FC = () => {
     } catch (error) {
       setHostingError(error instanceof Error ? error.message : 'Failed to host game.');
       setConsoleVisible(false);
+      setActiveInfraId(null);
     }
 
     setHostingGameId(null);
@@ -192,6 +201,7 @@ const MyGames: React.FC = () => {
     setConsoleLogs([]);
     setConsoleTitle(`Destroying ${session.gameName}`);
     setConsoleMode('destroy');
+    setActiveInfraId(session.infrastructureId);
     setConsoleVisible(true);
 
     try {
@@ -201,6 +211,7 @@ const MyGames: React.FC = () => {
       setSessions(listDeveloperSessions(user.id));
     } catch (error) {
       setHostingError(error instanceof Error ? error.message : 'Failed to destroy game.');
+      setActiveInfraId(null);
     }
 
     setDestroyingSessionId(null);
@@ -318,17 +329,21 @@ const MyGames: React.FC = () => {
                       >
                         View game
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setConsoleTitle(`Terraform console for ${session.gameName}`);
-                          setConsoleMode(null);
-                          setConsoleVisible(true);
-                        }}
-                        className="rounded-lg bg-slate-100 px-3 py-1 text-indigo-700 ring-1 ring-indigo-100 transition hover:bg-slate-50"
-                      >
-                        View terraform console
-                      </button>
+                      {session.infrastructureId && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setConsoleLogs([]);
+                            setConsoleTitle(`Terraform console for ${session.gameName}`);
+                            setConsoleMode(null);
+                            setActiveInfraId(session.infrastructureId!);
+                            setConsoleVisible(true);
+                          }}
+                          className="rounded-lg bg-slate-100 px-3 py-1 text-indigo-700 ring-1 ring-indigo-100 transition hover:bg-slate-50"
+                        >
+                          View terraform console
+                        </button>
+                      )}
                       {session.status === 'scheduled' && !session.infrastructureId && (
                         <button
                           type="button"
@@ -599,7 +614,14 @@ const MyGames: React.FC = () => {
               </div>
               <button
                 type="button"
-                onClick={() => setConsoleVisible(false)}
+                onClick={() => {
+                  setConsoleVisible(false);
+                  setActiveInfraId(null);
+                  if (sseRef.current) {
+                    sseRef.current.close();
+                    sseRef.current = null;
+                  }
+                }}
                 className="rounded-lg bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-200"
               >
                 Close

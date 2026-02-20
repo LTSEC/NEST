@@ -546,6 +546,48 @@ const NetworkEditor: React.FC = () => {
     );
   };
 
+  const computeDhcpIp = (
+    networkCidr: string | undefined,
+    currentNodes: NetworkNode[],
+    excludeNodeId: string,
+    excludeInterfaceId: string,
+  ): string | undefined => {
+    if (!networkCidr) return undefined;
+    const [network, prefix] = networkCidr.split('/');
+    if (!network || !prefix) return undefined;
+    const octets = network.split('.');
+    if (octets.length !== 4) return undefined;
+
+    // Collect all IPs already in use on this network
+    const usedIps = new Set<string>();
+    currentNodes.forEach((node) => {
+      node.interfaces.forEach((intf) => {
+        if (intf.ip && intf.networkCidr === networkCidr) {
+          if (node.id !== excludeNodeId || intf.id !== excludeInterfaceId) {
+            usedIps.add(intf.ip);
+          }
+        }
+      });
+    });
+
+    // Router IP is always .1
+    const routerIp = `${octets[0]}.${octets[1]}.${octets[2]}.1`;
+    usedIps.add(routerIp);
+    // Network address (.0) is reserved
+    usedIps.add(`${octets[0]}.${octets[1]}.${octets[2]}.0`);
+
+    // Find next available IP starting from .2
+    const mask = parseInt(prefix, 10);
+    const maxHosts = mask >= 24 ? Math.pow(2, 32 - mask) - 1 : 254;
+    for (let i = 2; i <= Math.min(maxHosts, 254); i++) {
+      const candidateIp = `${octets[0]}.${octets[1]}.${octets[2]}.${i}`;
+      if (!usedIps.has(candidateIp)) {
+        return candidateIp;
+      }
+    }
+    return undefined;
+  };
+
   const updateInterface = (
     nodeId: string,
     interfaceId: string,
@@ -573,7 +615,9 @@ const NetworkEditor: React.FC = () => {
                     }
                   }
                 } else if (updated.dhcpEnabled) {
-                  updated.ip = undefined;
+                  // Auto-assign a DHCP IP from the connected router's network
+                  const targetNetwork = updated.networkCidr;
+                  updated.ip = computeDhcpIp(targetNetwork, current, nodeId, interfaceId);
                 }
                 return updated;
               }),
@@ -1009,7 +1053,12 @@ const NetworkEditor: React.FC = () => {
         if (nextCidr !== intf.networkCidr) {
           nodeChanged = true;
           changed = true;
-          return { ...intf, networkCidr: nextCidr };
+          const updated = { ...intf, networkCidr: nextCidr };
+          // Recompute DHCP IP when the network changes
+          if (updated.dhcpEnabled && nextCidr) {
+            updated.ip = computeDhcpIp(nextCidr, nodes, node.id, intf.id);
+          }
+          return updated;
         }
         return intf;
       });
@@ -1069,7 +1118,9 @@ const NetworkEditor: React.FC = () => {
           return;
         }
 
-        const routerNetwork = routerNetworks[fromAnchor] ?? routerNetworks[toAnchor];
+        // For router-to-router links, don't auto-sync CIDRs since each side has its own network
+        const isRouterToRouter = fromResolved.node.kind === 'router' && toResolved.node.kind === 'router';
+        const routerNetwork = isRouterToRouter ? undefined : (routerNetworks[fromAnchor] ?? routerNetworks[toAnchor]);
         const adjustedLink =
           routerNetwork && routerNetwork !== link.networkCidr ? { ...link, networkCidr: routerNetwork } : link;
         if (adjustedLink !== link) {
@@ -1456,9 +1507,24 @@ const NetworkEditor: React.FC = () => {
                               <div className="flex-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1">
                                 <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-white/80">
                                   <span>{intf.name}</span>
-                                  <span className="text-[10px] font-medium text-white/60">{node.kind === 'router' ? 'out' : 'in'}</span>
+                                  <span className="text-[10px] font-medium text-white/60">
+                                    {node.kind === 'router'
+                                      ? (intf.targetRouterInterfaceId ? 'uplink' : 'out')
+                                      : 'in'}
+                                  </span>
                                 </div>
-                                <div className="text-[11px] text-white/90">{intf.ip || 'No IP assigned'}</div>
+                                <div className="text-[11px] text-white/90">
+                                  {intf.ip ? (
+                                    <>
+                                      {intf.ip}
+                                      {node.kind === 'host' && intf.dhcpEnabled && (
+                                        <span className="ml-1 rounded bg-emerald-500/30 px-1 text-[9px] font-semibold uppercase text-emerald-200">dhcp</span>
+                                      )}
+                                    </>
+                                  ) : (
+                                    'No IP assigned'
+                                  )}
+                                </div>
                                 <div className={`text-[10px] ${hasOverlap ? 'text-rose-200' : 'text-slate-200'}`}>
                                   {intf.networkCidr || 'No network'}
                                 </div>
@@ -1714,6 +1780,37 @@ const NetworkEditor: React.FC = () => {
                               />
                               {overlapping && <span className="text-[11px] text-rose-200">Overlaps another router network</span>}
                             </label>
+                            <div className="flex flex-col gap-1">
+                              <span className="text-[11px] uppercase tracking-wide text-slate-400">Uplink to router</span>
+                              <select
+                                value={intf.targetRouterInterfaceId || ''}
+                                onChange={(event) => {
+                                  const targetId = event.target.value || undefined;
+                                  const targetResolved = targetId ? resolveAnchor(targetId) : null;
+                                  updateInterface(selectedNode.id, intf.id, (current) => ({
+                                    ...current,
+                                    targetRouterInterfaceId: targetId,
+                                    networkCidr: targetResolved?.intf.networkCidr || current.networkCidr,
+                                  }));
+                                  // Create a link between this router and the upstream router
+                                  if (targetId) {
+                                    createLinkBetween(anchorKey(selectedNode.id, intf.id), targetId);
+                                  }
+                                }}
+                                className="rounded border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-100 outline-none focus:border-sky-400/60"
+                              >
+                                <option value="" className="bg-slate-900 text-slate-100">
+                                  None (standalone)
+                                </option>
+                                {routerInterfaceOptions
+                                  .filter((option) => !option.value.startsWith(selectedNode.id + ':'))
+                                  .map((option) => (
+                                    <option key={option.value} value={option.value} className="bg-slate-900 text-slate-100">
+                                      {option.label}
+                                    </option>
+                                  ))}
+                              </select>
+                            </div>
                           </>
                         )}
                       </div>
@@ -1738,7 +1835,7 @@ const NetworkEditor: React.FC = () => {
                         const role = definition?.requiredRoles?.find((item) => item.serviceId === service.id);
                         return role ? { custom, role } : null;
                       })
-                      .filter((item): item is { custom: CustomServiceInstance; role: { role: string } } => Boolean(item));
+                      .filter(Boolean) as { custom: CustomServiceInstance; role: { role: string; serviceId: string } }[];
                     const inConflict = instance ? servicePortConflicts.has(instance.id) : false;
                     return (
                       <div

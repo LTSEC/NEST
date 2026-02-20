@@ -238,19 +238,48 @@ const NetworkEditor: React.FC = () => {
 
       if (game?.blackTeamCidr) {
         const compRouterId = 'competition-router';
-        if (!snapshot.nodes.find((n) => n.id === compRouterId)) {
-          const [ip, prefix] = game.blackTeamCidr.split('/');
-          const routerIp = ip ? `${ip.split('.').slice(0, 3).join('.')}.254` : undefined;
+        const existingCompRouter = snapshot.nodes.find((n) => n.id === compRouterId);
 
+        // Ensure competition router exists and has correct interfaces
+        const [ip, prefix] = game.blackTeamCidr.split('/');
+        const internalIp = ip ? `${ip.split('.').slice(0, 3).join('.')}.254` : undefined;
+
+        if (!existingCompRouter) {
           snapshot.nodes.push({
             id: compRouterId,
             label: 'Competition Router',
             imageId: '-100', // Distinct ID
             kind: 'router',
             position: { x: MAP_WIDTH / 2 - 100, y: 100 },
-            interfaces: [{ id: createId(), name: 'eth0', ip: routerIp, networkCidr: game.blackTeamCidr }],
+            interfaces: [
+              { id: createId(), name: 'eth0', dhcpEnabled: true, networkCidr: 'External WAN' },
+              { id: createId(), name: 'eth1', ip: internalIp, networkCidr: game.blackTeamCidr },
+            ],
             services: [],
           });
+        } else {
+          // If it exists, ensure it has the right structure (e.g. if loaded from older save)
+          const eth0 = existingCompRouter.interfaces.find((i) => i.name === 'eth0');
+          if (!eth0) {
+            existingCompRouter.interfaces.unshift({
+              id: createId(),
+              name: 'eth0',
+              dhcpEnabled: true,
+              networkCidr: 'External WAN',
+            });
+          }
+          const eth1 = existingCompRouter.interfaces.find((i) => i.name === 'eth1');
+          if (!eth1) {
+            existingCompRouter.interfaces.push({
+              id: createId(),
+              name: 'eth1',
+              ip: internalIp,
+              networkCidr: game.blackTeamCidr,
+            });
+          } else if (eth1.networkCidr !== game.blackTeamCidr) {
+            eth1.networkCidr = game.blackTeamCidr;
+            eth1.ip = internalIp;
+          }
         }
       }
 
@@ -398,31 +427,45 @@ const NetworkEditor: React.FC = () => {
         // Schedule link creation after node state update
         setTimeout(() => {
           setLinks((currentLinks) => {
-            const compRouterIntf = compRouter.interfaces[0]; // Assuming eth0 or first interface
-            const newNodeIntf = newNode.interfaces[0]; // eth0
+            // Connect NewRouter:eth0 -> CompRouter:eth1 (internal)
+            const compRouterIntf = compRouter.interfaces.find((i) => i.name === 'eth1');
+            const newNodeIntf = newNode.interfaces.find((i) => i.name === 'eth0');
 
             if (!compRouterIntf || !newNodeIntf) return currentLinks;
 
-            return [...currentLinks, {
-              id: createId(),
-              from: { nodeId: newNode.id, interfaceId: newNodeIntf.id },
-              to: { nodeId: compRouter.id, interfaceId: compRouterIntf.id },
-              networkCidr: game.blackTeamCidr || '10.20.0.0/16',
-            }];
+            // Check if link already exists (unlikely for new node)
+            const exists = currentLinks.some(
+              (l) =>
+                (l.from.nodeId === newNode.id && l.to.nodeId === compRouter.id) ||
+                (l.to.nodeId === newNode.id && l.from.nodeId === compRouter.id),
+            );
+            if (exists) return currentLinks;
+
+            return [
+              ...currentLinks,
+              {
+                id: createId(),
+                from: { nodeId: newNode.id, interfaceId: newNodeIntf.id },
+                to: { nodeId: compRouter.id, interfaceId: compRouterIntf.id },
+                networkCidr: game.blackTeamCidr || '10.20.0.0/16',
+              },
+            ];
           });
 
-          // Also update the interface on the new node
-          setNodes((current) => current.map(node => {
-            if (node.id === newNode.id) {
-               return {
-                 ...node,
-                 interfaces: node.interfaces.map(intf =>
-                   intf.name === 'eth0' ? { ...intf, networkCidr: game.blackTeamCidr } : intf
-                 )
-               };
-            }
-            return node;
-          }));
+          // Also update the interface on the new node to inherit the black team CIDR
+          setNodes((current) =>
+            current.map((node) => {
+              if (node.id === newNode.id) {
+                return {
+                  ...node,
+                  interfaces: node.interfaces.map((intf) =>
+                    intf.name === 'eth0' ? { ...intf, networkCidr: game.blackTeamCidr } : intf,
+                  ),
+                };
+              }
+              return node;
+            }),
+          );
         }, 50);
       }
     }
@@ -577,6 +620,7 @@ const NetworkEditor: React.FC = () => {
   };
 
   const deleteNode = (id: string) => {
+    if (id === 'competition-router') return; // Prevent deletion of competition router
     setLinks((current) => current.filter((link) => link.from.nodeId !== id && link.to.nodeId !== id));
     setNodes((current) => current.filter((node) => node.id !== id));
     setCustomServices((current) =>
@@ -839,16 +883,59 @@ const NetworkEditor: React.FC = () => {
     };
 
     setLinks((current) => [...current, newLink]);
-    routerEndpoints.forEach((endpoint) => {
-      if (!endpoint.intf.networkCidr) {
-        updateInterface(endpoint.node.id, endpoint.intf.id, (intf) => ({ ...intf, networkCidr: newLink.networkCidr }));
+    // Logic for Router-to-Router connections:
+    // If one router has a network defined and the other doesn't (or is just created), the new one inherits.
+    // If the link involves the Competition Router, the other router MUST inherit.
+    if (routerEndpoints.length === 2) {
+      const compRouterEndpoint = routerEndpoints.find((ep) => ep.node.id === 'competition-router');
+      const otherRouterEndpoint = routerEndpoints.find((ep) => ep.node.id !== 'competition-router');
+
+      if (compRouterEndpoint && otherRouterEndpoint) {
+        // Enforce inheritance from Comp Router
+        const compCidr = compRouterEndpoint.intf.networkCidr;
+        if (compCidr) {
+          updateInterface(otherRouterEndpoint.node.id, otherRouterEndpoint.intf.id, (intf) => ({
+            ...intf,
+            networkCidr: compCidr,
+          }));
+          newLink.networkCidr = compCidr;
+        }
+      } else {
+        // Normal router-to-router (e.g. Router 1 -> Router 2)
+        // Heuristic: If source has CIDR and target doesn't, target inherits.
+        const sourceHasCidr = Boolean(source.intf.networkCidr);
+        const targetHasCidr = Boolean(target.intf.networkCidr);
+
+        if (sourceHasCidr && !targetHasCidr) {
+          updateInterface(target.node.id, target.intf.id, (intf) => ({
+            ...intf,
+            networkCidr: source.intf.networkCidr,
+          }));
+          newLink.networkCidr = source.intf.networkCidr!;
+        } else if (targetHasCidr && !sourceHasCidr) {
+          updateInterface(source.node.id, source.intf.id, (intf) => ({
+            ...intf,
+            networkCidr: target.intf.networkCidr,
+          }));
+          newLink.networkCidr = target.intf.networkCidr!;
+        }
       }
-    });
+    } else {
+      // Single router (Router <-> Host) logic remains
+      routerEndpoints.forEach((endpoint) => {
+        if (!endpoint.intf.networkCidr) {
+          updateInterface(endpoint.node.id, endpoint.intf.id, (intf) => ({ ...intf, networkCidr: newLink.networkCidr }));
+        }
+      });
+    }
+
     if (hostEndpoint) {
       updateInterface(hostEndpoint.node.id, hostEndpoint.intf.id, (intf) => ({
         ...intf,
         networkCidr: newLink.networkCidr,
-        targetRouterInterfaceId: primaryRouter ? anchorKey(primaryRouter.node.id, primaryRouter.intf.id) : intf.targetRouterInterfaceId,
+        targetRouterInterfaceId: primaryRouter
+          ? anchorKey(primaryRouter.node.id, primaryRouter.intf.id)
+          : intf.targetRouterInterfaceId,
       }));
     }
     setSelectedLinkId(newLink.id);
@@ -1754,6 +1841,16 @@ const NetworkEditor: React.FC = () => {
                   const key = anchorKey(selectedNode.id, intf.id);
                   const overlapping = overlappingInterfaces.has(key);
                   const invalidHost = invalidHostInterfaces.has(key);
+
+                  // Check if this interface is an uplink to a router (and thus inherits CIDR)
+                  const isUplink = links.some(
+                    (l) =>
+                      ((l.from.nodeId === selectedNode.id && l.from.interfaceId === intf.id) ||
+                       (l.to.nodeId === selectedNode.id && l.to.interfaceId === intf.id)) &&
+                      // Find the other node
+                      nodes.find(n => n.id === (l.from.nodeId === selectedNode.id ? l.to.nodeId : l.from.nodeId))?.kind === 'router'
+                  );
+
                   return (
                     <div
                       key={intf.id}
@@ -1857,14 +1954,16 @@ const NetworkEditor: React.FC = () => {
                               <input
                                 value={intf.networkCidr || ''}
                                 placeholder="172.27.0.0/24"
+                                disabled={isUplink}
                                 onChange={(event) =>
                                   updateInterface(selectedNode.id, intf.id, (current) => ({
                                     ...current,
                                     networkCidr: event.target.value,
                                   }))
                                 }
-                                className={`rounded border px-2 py-1 text-xs outline-none focus:border-sky-400/60 ${overlapping ? 'border-rose-400 bg-rose-500/10 text-rose-50' : 'border-white/10 bg-white/5 text-white'}`}
+                                className={`rounded border px-2 py-1 text-xs outline-none focus:border-sky-400/60 ${overlapping ? 'border-rose-400 bg-rose-500/10 text-rose-50' : 'border-white/10 bg-white/5 text-white'} ${isUplink ? 'cursor-not-allowed opacity-60' : ''}`}
                               />
+                              {isUplink && <span className="text-[10px] text-slate-400">Inherited from uplink</span>}
                               {overlapping && <span className="text-[11px] text-rose-200">Overlaps another router network</span>}
                             </label>
                             <div className="flex flex-col gap-1">
@@ -2031,16 +2130,23 @@ const NetworkEditor: React.FC = () => {
                 Connected: {resolveAnchor(anchorKey(selectedLink.from.nodeId, selectedLink.from.interfaceId))?.node.label} ⇄{' '}
                 {resolveAnchor(anchorKey(selectedLink.to.nodeId, selectedLink.to.interfaceId))?.node.label}
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setLinks((current) => current.filter((link) => link.id !== selectedLink.id));
-                  setSelectedLinkId(null);
-                }}
-                className="mt-2 w-full rounded bg-rose-600/80 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-white transition hover:bg-rose-500"
-              >
-                Delete link
-              </button>
+              {selectedLink.from.nodeId !== 'competition-router' && selectedLink.to.nodeId !== 'competition-router' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLinks((current) => current.filter((link) => link.id !== selectedLink.id));
+                    setSelectedLinkId(null);
+                  }}
+                  className="mt-2 w-full rounded bg-rose-600/80 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-white transition hover:bg-rose-500"
+                >
+                  Delete link
+                </button>
+              )}
+              {(selectedLink.from.nodeId === 'competition-router' || selectedLink.to.nodeId === 'competition-router') && (
+                <div className="mt-2 rounded bg-white/5 px-2 py-1 text-center text-[10px] text-slate-400">
+                  Competition links cannot be deleted.
+                </div>
+              )}
             </div>
           </div>
         )}

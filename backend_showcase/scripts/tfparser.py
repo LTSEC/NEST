@@ -106,10 +106,11 @@ resource \"opennebula_virtual_machine\" \"infra-routers\" {{\n\
 }}\n"
     return infra_routers_template
 
-def infra_servers_module() -> str:
+def infra_servers_module(has_infra_router: bool) -> str:
+    depends_on_str = "    depends_on = [opennebula_virtual_machine.infra-routers]\n" if has_infra_router else ""
     infra_servers_template = f"\
 resource \"opennebula_virtual_machine\" \"infra-servers\" {{\n\
-    depends_on = [opennebula_virtual_machine.infra-routers]\n\
+{depends_on_str}\
     for_each = local.infra_servers\n\
     name = each.key\n\
     template_id = each.value.template_id\n\
@@ -142,7 +143,12 @@ module \"team-networks\" {{\n\
 }}\n"
     return network_team_template
 
-def team_routers_module() -> str:
+def team_routers_module(has_infra_network: bool) -> str:
+    if has_infra_network:
+        network_id_line = "nic.value.network == \"External WAN\" ? module.infra-networks.id : module.team-networks[\"${each.value.team_name}-${nic.value.network}\"].id"
+    else:
+        network_id_line = "module.team-networks[\"${each.value.team_name}-${nic.value.network}\"].id"
+
     team_router_template = f"\
 resource \"opennebula_virtual_machine\" \"team-routers\" {{\n\
     depends_on = [module.team-networks]\n\
@@ -162,7 +168,7 @@ resource \"opennebula_virtual_machine\" \"team-routers\" {{\n\
     dynamic \"nic\" {{\n\
         for_each = local.routers[each.value.router_name].interfaces\n\
         content {{\n\
-            network_id = nic.value.network == \"External WAN\" ? module.infra-networks.id : module.team-networks[\"${{each.value.team_name}}-${{nic.value.network}}\"].id\n\
+            network_id = {network_id_line}\n\
             ip = replace(nic.value.ip, \"T\", each.value.team_number)\n\
         }}\n\
     }}\n\
@@ -300,12 +306,12 @@ def CreateTerraform(data: json) -> None:
     if infra_router:
         infra_router_template = infra_routers_module()
 
-    team_router_template = team_routers_module()
+    team_router_template = team_routers_module(bool(infra_network))
     team_servers_template = team_servers_module()
 
     infra_servers_template = ""
     if infra_server_vms:
-        infra_servers_template = infra_servers_module()
+        infra_servers_template = infra_servers_module(bool(infra_router))
 
     local_template = makeLocals(team_networks, router_vms, infra_router, server_vms, infra_server_vms, number_of_teams)
     team_network_template = team_network_module()

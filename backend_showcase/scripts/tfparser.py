@@ -63,7 +63,8 @@ locals {{\n\
     }}\n\
 }}\n"
 
-    local_output += f"\
+    if infra_router_vm:
+        local_output += f"\
 locals {{\n\
     comp_router_name = keys(local.infra_router)[0]\n\
     comp_router = values(local.infra_router)[0]\n\
@@ -208,7 +209,7 @@ def Parse_device_JSON(data : json, network_map: dict, wan_network: list) -> tupl
             interfaces = vm["interfaces"]
             for eth_name, eth_ip in interfaces.items():
                 if "eth" in eth_name and eth_ip != None:
-                    if "eth0" in eth_name:
+                    if "eth0" in eth_name and wan_network:
                         if vm["hostId"] != None:
                             network = wan_network
                             network[3] = str(vm["hostId"] or 0)
@@ -284,14 +285,24 @@ def CreateTerraform(data: json) -> None:
         network_map[name] = cidr
 
     router_vms, infra_router, server_vms, infra_server_vms = Parse_device_JSON(data, network_map, wan_network)
-    infra_router_template = infra_routers_module()
+
+    infra_router_template = ""
+    if infra_router:
+        infra_router_template = infra_routers_module()
+
     team_router_template = team_routers_module()
     team_servers_template = team_servers_module()
-    infra_servers_template = infra_servers_module()
+
+    infra_servers_template = ""
+    if infra_server_vms:
+        infra_servers_template = infra_servers_module()
 
     local_template = makeLocals(team_networks, router_vms, infra_router, server_vms, infra_server_vms, number_of_teams)
     team_network_template = team_network_module()
-    infra_network_template = infra_network_module(infra_network)
+
+    infra_network_template = ""
+    if infra_network:
+        infra_network_template = infra_network_module(infra_network)
 
     output_template = local_template + infra_network_template + infra_router_template + infra_servers_template + team_network_template + team_router_template + team_servers_template
     return output_template

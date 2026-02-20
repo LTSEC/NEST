@@ -71,11 +71,11 @@ func createGame(ctx echo.Context) error {
 		Status: types.StateQueued,
 	})
 
-	// Generate terrform
+	// Generate terraform
 	err = terraformer.GenerateTerraform(file_dir)
 	if err != nil {
 		return ctx.JSON(http.StatusInternalServerError, map[string]string{
-			"error": fmt.Sprintf("failed to create the terraform file: %v", err),
+			"error": fmt.Sprintf("failed to generate terraform from '%s': %v", file_dir, err),
 		})
 	}
 	// TODO: Run terraform and ansible

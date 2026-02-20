@@ -12,6 +12,7 @@ import (
 
 	"NESTBackendShowcase/games"
 	"NESTBackendShowcase/logger"
+	"NESTBackendShowcase/presets"
 	"NESTBackendShowcase/terraformer"
 	"NESTBackendShowcase/types"
 
@@ -71,11 +72,11 @@ func createGame(ctx echo.Context) error {
 		Status: types.StateQueued,
 	})
 
-	// Generate terrform
+	// Generate terraform
 	err = terraformer.GenerateTerraform(file_dir)
 	if err != nil {
 		return ctx.JSON(http.StatusInternalServerError, map[string]string{
-			"error": fmt.Sprintf("failed to create the terraform file: %v", err),
+			"error": fmt.Sprintf("failed to generate terraform from '%s': %v", file_dir, err),
 		})
 	}
 	// TODO: Run terraform and ansible
@@ -179,6 +180,11 @@ func streamLogs(ctx echo.Context) error {
 	return nil
 }
 
+// Returns a list of network presets
+func getPresets(ctx echo.Context) error {
+	return ctx.JSON(http.StatusOK, presets.Presets)
+}
+
 func main() {
 	// API Init
 	apiHost := echo.New()
@@ -198,6 +204,7 @@ func main() {
 	// GETs
 	apiHost.GET("/api/games/:id/status", returnGameStatus)
 	apiHost.GET("/api/games/:id/logs", streamLogs)
+	apiHost.GET("/api/presets", getPresets)
 
 	// POSTs
 	apiHost.POST("/api/games", createGame)

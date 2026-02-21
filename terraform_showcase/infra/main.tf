@@ -10,7 +10,7 @@ locals {
         "Web Server" = { ip = "192.168.1.10", network = "Internal", template_id = 0 }
     }
     infra_router = {
-        "Competition Router" = { interfaces = {"eth0" = { ip = "", network = "Competition WAN"}, "eth1" = { ip = "10.20.0.1", network = "External WAN"}}, network = "External WAN", template_id = 1 }
+        "Competition Router" = { interfaces = {"eth0" = { ip = "", network = "Competition WAN"}, "eth1" = { ip = "10.20.0.1", network = "External WAN"}}, network = "External WAN", template_id = 2 }
     }
     infra_servers = {
     }

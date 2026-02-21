@@ -5,6 +5,18 @@ export interface RegistryEntry {
   label: string;
 }
 
+/** Describes an Ansible-configurable field that a service definition exposes. */
+export interface AnsibleMetaField {
+  /** Machine-readable key written into ansibleMeta (e.g. "ssh_user"). */
+  key: string;
+  /** Human-readable label shown in the UI (e.g. "SSH User"). */
+  label: string;
+  /** Default value pre-filled in the configuration modal. */
+  defaultValue?: string;
+  /** Optional hint/placeholder text. */
+  placeholder?: string;
+}
+
 export interface ServiceDefinition {
   id: string;
   name: string;
@@ -13,6 +25,8 @@ export interface ServiceDefinition {
   defaultPort?: number;
   roles?: string[];
   dependencies?: string[];
+  /** Ansible-configurable fields exposed by this service. */
+  ansibleFields?: AnsibleMetaField[];
 }
 
 export interface CustomServiceRole {

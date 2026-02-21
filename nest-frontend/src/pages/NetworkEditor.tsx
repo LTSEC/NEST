@@ -55,6 +55,12 @@ interface ServiceInstance {
   protocol: 'tcp' | 'udp';
   port: number;
   customServiceId?: string;
+  /** Arbitrary key-value pairs consumed by Ansible playbooks (e.g. users, db names). */
+  ansibleMeta?: Record<string, string>;
+  /** Whether this service is scored by the scoring engine. */
+  scored?: boolean;
+  /** Points awarded per scoring cycle (1–100). Only meaningful when scored is true. */
+  scoringPoints?: number;
 }
 
 interface CustomServiceInstance {
@@ -134,6 +140,7 @@ const NetworkEditor: React.FC = () => {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [customServiceModal, setCustomServiceModal] = useState<string | null>(null);
   const [customServiceModalError, setCustomServiceModalError] = useState<string | null>(null);
+  const [configModalNodeId, setConfigModalNodeId] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const dragOrigin = useRef({ x: 0, y: 0 });
   const offsetOrigin = useRef({ x: 0, y: 0 });
@@ -1025,6 +1032,10 @@ const NetworkEditor: React.FC = () => {
       updateNodeServices(nodeId, (services) => {
         if (services.some((service) => service.serviceId === definitionId)) return services;
         const defaultPort = Number.isFinite(definition.defaultPort) ? Number(definition.defaultPort) : 0;
+        const ansibleMeta: Record<string, string> = {};
+        for (const field of definition.ansibleFields ?? []) {
+          if (field.defaultValue !== undefined) ansibleMeta[field.key] = field.defaultValue;
+        }
         return [
           ...services,
           {
@@ -1033,6 +1044,7 @@ const NetworkEditor: React.FC = () => {
             protocol: definition.protocol === 'udp' ? 'udp' : 'tcp',
             port: defaultPort,
             customServiceId,
+            ansibleMeta,
           },
         ];
       });
@@ -1051,6 +1063,37 @@ const NetworkEditor: React.FC = () => {
               port: normalized,
             }
           : service,
+      ),
+    );
+  };
+
+  const updateServiceAnsibleMeta = (nodeId: string, definitionId: string, key: string, value: string) => {
+    updateNodeServices(nodeId, (services) =>
+      services.map((service) => {
+        if (service.serviceId !== definitionId) return service;
+        const meta = { ...(service.ansibleMeta ?? {}), [key]: value };
+        return { ...service, ansibleMeta: meta };
+      }),
+    );
+  };
+
+  const hasScoringEngine = Boolean(game?.rvbServices?.includes('Scoring Engine'));
+
+  const toggleServiceScored = (nodeId: string, definitionId: string, scored: boolean) => {
+    updateNodeServices(nodeId, (services) =>
+      services.map((service) =>
+        service.serviceId === definitionId
+          ? { ...service, scored, scoringPoints: scored ? (service.scoringPoints ?? 10) : undefined }
+          : service,
+      ),
+    );
+  };
+
+  const updateServiceScoringPoints = (nodeId: string, definitionId: string, points: number) => {
+    const clamped = Number.isNaN(points) ? 1 : Math.min(100, Math.max(1, points));
+    updateNodeServices(nodeId, (services) =>
+      services.map((service) =>
+        service.serviceId === definitionId ? { ...service, scoringPoints: clamped } : service,
       ),
     );
   };
@@ -1677,6 +1720,18 @@ const NetworkEditor: React.FC = () => {
                           })}
                         </div>
                       )}
+                      {node.kind === 'host' && (
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setConfigModalNodeId(node.id);
+                          }}
+                          className="mt-2 w-full rounded-lg bg-indigo-500/30 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-indigo-100 ring-1 ring-indigo-400/40 transition hover:bg-indigo-500/50 hover:text-white"
+                        >
+                          Configure
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -2051,100 +2106,28 @@ const NetworkEditor: React.FC = () => {
 
             {selectedNode.kind === 'host' && (
               <div className="space-y-2">
-                <div className="flex items-center justify-between text-[11px] uppercase tracking-wide text-slate-400">
-                  <span>Services</span>
-                  <span className="text-[10px] text-slate-500 dark:text-slate-400">Ports configurable per host</span>
+                <div className="text-[11px] uppercase tracking-wide text-slate-400">
+                  Services — {selectedNode.services.length} active
                 </div>
-                <div className="space-y-2">
-                  {serviceCatalog.map((service) => {
-                    const instance = selectedNode.services.find((item) => item.serviceId === service.id) || null;
-                    const assignments = customServices
-                      .map((custom) => {
-                        const definition = customServicesById[custom.definitionId];
-                        const role = definition?.requiredRoles?.find((item) => item.serviceId === service.id);
-                        return role ? { custom, role } : null;
-                      })
-                      .filter(Boolean) as { custom: CustomServiceInstance; role: { role: string; serviceId: string } }[];
-                    const inConflict = instance ? servicePortConflicts.has(instance.id) : false;
-                    return (
-                      <div
-                        key={service.id}
-                        className={`rounded-lg border px-3 py-2 ${instance ? 'border-emerald-300/40 bg-emerald-500/10' : 'border-white/10 bg-white/5'}`}
-                      >
-                        <div className="flex items-center justify-between text-xs font-semibold text-slate-100">
-                          <div>
-                            <div>{service.name}</div>
-                            <div className="text-[11px] text-slate-300">{service.description}</div>
-                          </div>
-                          <label className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-slate-300">
-                            <span>{instance ? 'Enabled' : 'Disabled'}</span>
-                            <input
-                              type="checkbox"
-                              checked={Boolean(instance)}
-                              onChange={(event) => toggleServiceForNode(selectedNode.id, service.id, event.target.checked)}
-                              className="h-4 w-4 accent-emerald-400"
-                            />
-                          </label>
-                        </div>
-                        {instance && (
-                          <div className="mt-2 space-y-2 text-xs text-slate-200">
-                            <label className="flex flex-col gap-1">
-                              <span className="text-[11px] uppercase tracking-wide text-slate-400">Port / protocol</span>
-                              <div className="flex items-center gap-2">
-                                <input
-                                  type="number"
-                                  value={instance.port}
-                                  onChange={(event) => updateServicePort(selectedNode.id, service.id, Number(event.target.value))}
-                                  className={`w-24 rounded border px-2 py-1 text-xs outline-none focus:border-emerald-400/60 ${
-                                    inConflict ? 'border-rose-400 bg-rose-500/10 text-rose-100' : 'border-white/10 bg-white/5'
-                                  }`}
-                                />
-                                <span className="rounded border border-white/10 bg-white/5 px-2 py-1 text-[11px] uppercase tracking-wide text-slate-200">
-                                  {instance.protocol.toUpperCase()}
-                                </span>
-                              </div>
-                              {inConflict && <span className="text-[11px] text-rose-200">Port conflict on this host</span>}
-                              {!inConflict && service.defaultPort && instance.port !== service.defaultPort && (
-                                <span className="text-[11px] text-slate-300">
-                                  Default {service.defaultPort}/{service.protocol?.toUpperCase() ?? 'TCP'}
-                                </span>
-                              )}
-                            </label>
-                            {assignments.length > 0 && (
-                              <div className="space-y-1 rounded border border-white/10 bg-white/5 p-2 text-[11px] text-slate-200">
-                                <div className="font-semibold uppercase tracking-wide text-slate-300">Custom service roles</div>
-                                {assignments.map(({ custom, role }) => {
-                                  const boundHostId = custom.roleBindings[role.role];
-                                  const isBoundHere = boundHostId === selectedNode.id;
-                                  const boundLabel = isBoundHere ? 'Assigned' : boundHostId ? 'Assigned elsewhere' : 'Unassigned';
-                                  return (
-                                    <div key={`${custom.id}-${role.role}`} className="flex items-center justify-between gap-2">
-                                      <span>{customServicesById[custom.definitionId]?.name ?? custom.definitionId} • {role.role}</span>
-                                      <button
-                                        type="button"
-                                        disabled={Boolean(boundHostId && !isBoundHere)}
-                                        onClick={() => attachHostToCustomRole(custom.id, role.role, selectedNode.id)}
-                                        className={`rounded px-2 py-1 text-[11px] font-semibold uppercase tracking-wide ${
-                                          isBoundHere
-                                            ? 'bg-emerald-500/20 text-emerald-50 ring-1 ring-emerald-400/60'
-                                            : boundHostId
-                                            ? 'cursor-not-allowed bg-white/5 text-slate-400 ring-1 ring-white/10'
-                                            : 'bg-amber-500/20 text-amber-50 ring-1 ring-amber-400/60 hover:bg-amber-500/30'
-                                        }`}
-                                      >
-                                        {boundLabel}
-                                      </button>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                {selectedNode.services.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {selectedNode.services.map((svc) => {
+                      const def = serviceDefinitionsById[svc.serviceId];
+                      return (
+                        <span key={svc.id} className="rounded bg-amber-500/20 px-2 py-1 text-[10px] font-semibold uppercase text-amber-50 ring-1 ring-amber-400/50">
+                          {def?.name ?? svc.serviceId} • {svc.port}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setConfigModalNodeId(selectedNode.id)}
+                  className="w-full rounded-lg bg-indigo-500/30 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-indigo-100 ring-1 ring-indigo-400/40 transition hover:bg-indigo-500/50 hover:text-white"
+                >
+                  Open service configuration
+                </button>
               </div>
             )}
           </div>
@@ -2275,6 +2258,177 @@ const NetworkEditor: React.FC = () => {
             </div>
           </div>
         )}
+
+        {configModalNodeId && (() => {
+          const configNode = nodes.find((n) => n.id === configModalNodeId);
+          if (!configNode || configNode.kind !== 'host') return null;
+          return (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+              onClick={(event) => { if (event.target === event.currentTarget) return; }}
+              onWheel={(event) => event.stopPropagation()}
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <div
+                className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-white/10 bg-slate-900/95 shadow-2xl"
+                onWheel={(event) => event.stopPropagation()}
+              >
+                <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Host configuration</div>
+                    <div className="text-lg font-bold text-white">{configNode.label}</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setConfigModalNodeId(null)}
+                    className="rounded-lg bg-white/10 px-4 py-2 text-sm font-semibold text-white ring-1 ring-white/20 transition hover:bg-white/20"
+                  >
+                    Close
+                  </button>
+                </div>
+                <div className="flex-1 space-y-4 overflow-y-auto px-6 py-4">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    Services — toggle and configure Ansible parameters
+                  </div>
+                  {serviceCatalog.map((service) => {
+                    const instance = configNode.services.find((item) => item.serviceId === service.id) || null;
+                    const inConflict = instance ? servicePortConflicts.has(instance.id) : false;
+                    const assignments = customServices
+                      .map((custom) => {
+                        const definition = customServicesById[custom.definitionId];
+                        const role = definition?.requiredRoles?.find((item) => item.serviceId === service.id);
+                        return role ? { custom, role } : null;
+                      })
+                      .filter(Boolean) as { custom: CustomServiceInstance; role: { role: string; serviceId: string } }[];
+                    return (
+                      <div
+                        key={service.id}
+                        className={`rounded-lg border px-4 py-3 ${instance ? 'border-emerald-300/40 bg-emerald-500/10' : 'border-white/10 bg-white/5'}`}
+                      >
+                        <div className="flex items-center justify-between text-sm font-semibold text-slate-100">
+                          <div>
+                            <div>{service.name}</div>
+                            <div className="text-[11px] font-normal text-slate-300">{service.description}</div>
+                          </div>
+                          <label className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-slate-300">
+                            <span>{instance ? 'Enabled' : 'Disabled'}</span>
+                            <input
+                              type="checkbox"
+                              checked={Boolean(instance)}
+                              onChange={(event) => toggleServiceForNode(configNode.id, service.id, event.target.checked)}
+                              className="h-4 w-4 accent-emerald-400"
+                            />
+                          </label>
+                        </div>
+                        {instance && (
+                          <div className="mt-3 space-y-3 border-t border-white/10 pt-3 text-xs text-slate-200">
+                            <div className="flex items-center gap-4">
+                              <label className="flex flex-col gap-1">
+                                <span className="text-[11px] uppercase tracking-wide text-slate-400">Port</span>
+                                <input
+                                  type="number"
+                                  value={instance.port}
+                                  onChange={(event) => updateServicePort(configNode.id, service.id, Number(event.target.value))}
+                                  className={`w-24 rounded border px-2 py-1 text-xs outline-none focus:border-emerald-400/60 ${
+                                    inConflict ? 'border-rose-400 bg-rose-500/10 text-rose-100' : 'border-white/10 bg-white/5'
+                                  }`}
+                                />
+                                {inConflict && <span className="text-[11px] text-rose-200">Port conflict</span>}
+                              </label>
+                              <div className="flex flex-col gap-1">
+                                <span className="text-[11px] uppercase tracking-wide text-slate-400">Protocol</span>
+                                <span className="rounded border border-white/10 bg-white/5 px-2 py-1 text-[11px] uppercase tracking-wide text-slate-200">
+                                  {instance.protocol.toUpperCase()}
+                                </span>
+                              </div>
+                            </div>
+                            {hasScoringEngine && (
+                              <div className="flex items-center gap-3 rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-2">
+                                <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-amber-100">
+                                  <input
+                                    type="checkbox"
+                                    checked={Boolean(instance.scored)}
+                                    onChange={(event) => toggleServiceScored(configNode.id, service.id, event.target.checked)}
+                                    className="h-4 w-4 accent-amber-400"
+                                  />
+                                  Scored
+                                </label>
+                                {instance.scored && (
+                                  <label className="flex items-center gap-2 text-[11px] text-amber-100">
+                                    <span className="uppercase tracking-wide text-amber-200">Points / cycle</span>
+                                    <input
+                                      type="number"
+                                      min={1}
+                                      max={100}
+                                      value={instance.scoringPoints ?? 10}
+                                      onChange={(event) => updateServiceScoringPoints(configNode.id, service.id, Number(event.target.value))}
+                                      className="w-16 rounded border border-amber-400/40 bg-amber-500/20 px-2 py-1 text-xs text-white outline-none focus:border-amber-300"
+                                    />
+                                  </label>
+                                )}
+                              </div>
+                            )}
+                            {(service.ansibleFields ?? []).length > 0 && (
+                              <div className="space-y-2 rounded-lg border border-indigo-400/30 bg-indigo-500/10 p-3">
+                                <div className="text-[11px] font-semibold uppercase tracking-wide text-indigo-200">
+                                  Ansible configuration
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                  {(service.ansibleFields ?? []).map((field) => (
+                                    <label key={field.key} className="flex flex-col gap-1">
+                                      <span className="text-[11px] uppercase tracking-wide text-slate-300">{field.label}</span>
+                                      <input
+                                        value={instance.ansibleMeta?.[field.key] ?? field.defaultValue ?? ''}
+                                        placeholder={field.placeholder}
+                                        onChange={(event) =>
+                                          updateServiceAnsibleMeta(configNode.id, service.id, field.key, event.target.value)
+                                        }
+                                        className="rounded border border-white/10 bg-white/5 px-2 py-1 text-xs text-white outline-none focus:border-indigo-400/60"
+                                      />
+                                    </label>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {assignments.length > 0 && (
+                              <div className="space-y-1 rounded border border-white/10 bg-white/5 p-2 text-[11px] text-slate-200">
+                                <div className="font-semibold uppercase tracking-wide text-slate-300">Custom service roles</div>
+                                {assignments.map(({ custom, role }) => {
+                                  const boundHostId = custom.roleBindings[role.role];
+                                  const isBoundHere = boundHostId === configNode.id;
+                                  const boundLabel = isBoundHere ? 'Assigned' : boundHostId ? 'Assigned elsewhere' : 'Unassigned';
+                                  return (
+                                    <div key={`${custom.id}-${role.role}`} className="flex items-center justify-between gap-2">
+                                      <span>{customServicesById[custom.definitionId]?.name ?? custom.definitionId} - {role.role}</span>
+                                      <button
+                                        type="button"
+                                        disabled={Boolean(boundHostId && !isBoundHere)}
+                                        onClick={() => attachHostToCustomRole(custom.id, role.role, configNode.id)}
+                                        className={`rounded px-2 py-1 text-[11px] font-semibold uppercase tracking-wide ${
+                                          isBoundHere
+                                            ? 'bg-emerald-500/20 text-emerald-50 ring-1 ring-emerald-400/60'
+                                            : boundHostId
+                                            ? 'cursor-not-allowed bg-white/5 text-slate-400 ring-1 ring-white/10'
+                                            : 'bg-amber-500/20 text-amber-50 ring-1 ring-amber-400/60 hover:bg-amber-500/30'
+                                        }`}
+                                      >
+                                        {boundLabel}
+                                      </button>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {contextMenu && (
           <div

@@ -91,6 +91,7 @@ export type DBGame = {
   teamCount: number;
   presetId?: string;
   blackTeamCidr?: string;
+  scoringCheckInterval?: number;
   networkSnapshot?: unknown;
   createdAt: string;
   updatedAt: string;

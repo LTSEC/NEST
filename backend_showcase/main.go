@@ -101,6 +101,39 @@ func logoutHandler(ctx echo.Context) error {
 }
 
 // ---------------------------------------------------------------------------
+// Ansible configuration helpers
+// ---------------------------------------------------------------------------
+
+// AnsibleHostConfig holds the service configurations for a single host,
+// structured for easy consumption by Python/Ansible scripts.
+type AnsibleHostConfig struct {
+	Name     string                          `json:"name"`
+	IP       string                          `json:"ip,omitempty"`
+	Services map[string]types.ServiceConfig  `json:"services"`
+}
+
+// extractAnsibleConfig builds a map of host-name -> AnsibleHostConfig from the
+// game payload. Python scripts can read the resulting JSON to populate Ansible
+// playbook variables (e.g. SSH users, DB credentials, ports).
+func extractAnsibleConfig(game types.CyberGame) map[string]AnsibleHostConfig {
+	result := make(map[string]AnsibleHostConfig)
+	for _, device := range game.Devices {
+		if device.Type != "Server" {
+			continue
+		}
+		if len(device.ServiceConfigs) == 0 {
+			continue
+		}
+		result[device.Name] = AnsibleHostConfig{
+			Name:     device.Name,
+			IP:       device.IP,
+			Services: device.ServiceConfigs,
+		}
+	}
+	return result
+}
+
+// ---------------------------------------------------------------------------
 // Terraform game hosting (preserves existing flow + per-game directories)
 // ---------------------------------------------------------------------------
 
@@ -166,6 +199,17 @@ func createGame(ctx echo.Context) error {
 		enc.SetIndent("", "  ")
 		_ = enc.Encode(game)
 		legacyFile.Close()
+	}
+
+	// Write ansible-config.json — extracted service configurations keyed by host
+	// so that Python/Ansible scripts can easily read per-host service parameters.
+	ansibleConfig := extractAnsibleConfig(game)
+	ansiblePath := filepath.Join(gameDir, "ansible-config.json")
+	if ansibleFile, err := os.Create(ansiblePath); err == nil {
+		ansibleEnc := json.NewEncoder(ansibleFile)
+		ansibleEnc.SetIndent("", "  ")
+		_ = ansibleEnc.Encode(ansibleConfig)
+		ansibleFile.Close()
 	}
 
 	// Generate terraform into the per-game directory

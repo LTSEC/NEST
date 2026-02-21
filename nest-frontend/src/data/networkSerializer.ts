@@ -23,6 +23,18 @@ export const generateServiceIp = (cidr: string | undefined, index: number): stri
  * CyberGame payload types matching the Go backend types.CyberGame struct.
  * This is what the Python tfparser.py expects to receive.
  */
+/** Per-service configuration sent to the backend and consumed by Ansible scripts. */
+export interface ServiceConfig {
+  port: number;
+  protocol: string;
+  /** Arbitrary key-value pairs passed through to Ansible templates. */
+  ansibleMeta?: Record<string, string>;
+  /** Whether this service is scored by the scoring engine. */
+  scored?: boolean;
+  /** Points awarded per scoring cycle (1–100). */
+  scoringPoints?: number;
+}
+
 export interface CyberGamePayload {
   name: string;
   networks: { name: string; cidr: string }[];
@@ -30,6 +42,8 @@ export interface CyberGamePayload {
   blackteamServices: { name: string; templateId: number; hostId: number; ip: string }[];
   applications: { name: string; servers: string[]; services: string[]; color: string }[];
   teamCount?: number;
+  /** Scoring check interval in seconds (15–300). Present when a scoring engine is enabled. */
+  scoringCheckInterval?: number;
 }
 
 export interface CyberGameDevice {
@@ -43,7 +57,10 @@ export interface CyberGameDevice {
   segment?: string;
   dhcp?: boolean;
   ip?: string;
+  /** Legacy port-only map (kept for backwards compatibility with tfparser.py). */
   services: Record<string, number>;
+  /** Rich service configuration with Ansible metadata, keyed by service name. */
+  serviceConfigs?: Record<string, ServiceConfig>;
 }
 
 const anchorKey = (nodeId: string, interfaceId: string) => `${nodeId}:${interfaceId}`;
@@ -264,12 +281,21 @@ export const serializeNetworkToCyberGame = (
         }
       }
 
-      // Build services map
+      // Build services map (legacy) and rich service configs
       const services: Record<string, number> = {};
+      const serviceConfigs: Record<string, ServiceConfig> = {};
       for (const svc of node.services || []) {
         const def = serviceDefinitionsById[svc.serviceId];
         const name = def?.name || svc.serviceId;
         services[name] = svc.port;
+        serviceConfigs[name] = {
+          port: svc.port,
+          protocol: svc.protocol,
+          ...(svc.ansibleMeta && Object.keys(svc.ansibleMeta).length > 0
+            ? { ansibleMeta: svc.ansibleMeta }
+            : {}),
+          ...(svc.scored ? { scored: true, scoringPoints: svc.scoringPoints } : {}),
+        };
       }
 
       const imageId = parseInt(node.imageId, 10);
@@ -285,6 +311,7 @@ export const serializeNetworkToCyberGame = (
         dhcp: firstInterface?.dhcpEnabled ?? false,
         ip: firstInterface?.ip || '',
         services,
+        serviceConfigs,
       });
     }
   }
@@ -313,5 +340,6 @@ export const serializeNetworkToCyberGame = (
     devices,
     blackteamServices,
     applications,
+    ...(game.scoringCheckInterval ? { scoringCheckInterval: game.scoringCheckInterval } : {}),
   };
 };

@@ -313,7 +313,7 @@ def CreateTerraform(data: json) -> None:
     infra_network = {}
     team_networks = {}
     network_map = {}
-    number_of_teams = 2
+    number_of_teams = data.get("teamCount", 2)
     wan_network = []
     
     infra_network_name = ""

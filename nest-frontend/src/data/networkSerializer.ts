@@ -29,6 +29,7 @@ export interface CyberGamePayload {
   devices: CyberGameDevice[];
   blackteamServices: { name: string; templateId: number; hostId: number; ip: string }[];
   applications: { name: string; servers: string[]; services: string[]; color: string }[];
+  teamCount?: number;
 }
 
 export interface CyberGameDevice {

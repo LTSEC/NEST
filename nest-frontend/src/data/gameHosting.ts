@@ -1,6 +1,6 @@
 import { Game } from './games';
 import { loadNetworkSnapshot } from './networkStorage';
-import { CyberGamePayload, serializeNetworkToCyberGame, CyberGameDevice } from './networkSerializer';
+import { CyberGamePayload, serializeNetworkToCyberGame, CyberGameDevice, generateServiceIp } from './networkSerializer';
 import { fetchPresets } from './presets';
 
 const API_BASE = 'http://localhost:4545';
@@ -124,13 +124,14 @@ const buildPayloadFromNetwork = (
 
   // Fallback: no network configured, send minimal payload
   return {
+    name: game.name,
     networks: [],
     devices: [],
     blackteamServices: (game.rvbServices || []).map((service, index) => ({
       name: service,
       templateId: index + 1,
       hostId: index + 1,
-      ip: `10.0.0.${index + 10}`,
+      ip: generateServiceIp(game.blackTeamCidr, index),
     })),
     applications: game.types.map((type, index) => ({
       name: `${game.name} - ${type}`,
@@ -175,6 +176,7 @@ export const hostGameInstance = async (
 
     payload = {
       ...preset,
+      name: game.name,
       applications,
     };
   } else {

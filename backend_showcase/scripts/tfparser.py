@@ -71,13 +71,13 @@ locals {{\n\
 }}\n"
     return local_output
 
-def infra_network_module(infra_network: dict) -> str:
+def infra_network_module(infra_network: dict, game_name: str) -> str:
     Game_network_name, Game_network = next(iter(infra_network.items()))
     network_infra_template = f"\
 module \"infra-networks\" {{\n\
     source = \"../network-module\"\n\
     vnet = {{\n\
-        network_name = \"{Game_network_name}\"\n\
+        network_name = \"comp-network-{game_name}\"\n\
         octet1 = {Game_network["octets"][0]}\n\
         octet2 = {Game_network["octets"][1]}\n\
         octet3 = {Game_network["octets"][2]}\n\
@@ -89,17 +89,16 @@ module \"infra-networks\" {{\n\
 }}\n"
     return network_infra_template
 
-def infra_routers_module() -> str:
+def infra_routers_module(game_name: str) -> str:
     infra_routers_template = f"\
 resource \"opennebula_virtual_machine\" \"infra-routers\" {{\n\
-    depends_on = [module.team-networks]\n\
     keep_nic_order = true\n\
-    name = local.comp_router_name\n\
+    name = \"comp-router-{game_name}\"\n\
     template_id = local.comp_router.template_id\n\
     dynamic \"nic\" {{\n\
         for_each = local.comp_router.interfaces\n\
         content {{\n\
-            network_id = nic.value.network == \"Competition WAN\" ? 0 : module.infra-networks.id\n\
+            network_id = nic.value.network == \"Competition WAN\" ? 97 : module.infra-networks.id\n\
             ip = nic.value.network == \"Competition WAN\" ? null : nic.value.ip\n\
         }}\n\
     }}\n\
@@ -143,16 +142,24 @@ module \"team-networks\" {{\n\
 }}\n"
     return network_team_template
 
-def team_routers_module(has_infra_network: bool, infra_network_name: str = "External WAN") -> str:
+def team_routers_module(has_infra_network: bool, has_infra_router: bool, has_infra_servers: bool, infra_network_name: str = "External WAN") -> str:
     if has_infra_network:
         # Use the provided infra_network_name for comparison
         network_id_line = f"nic.value.network == \"{infra_network_name}\" ? module.infra-networks.id : module.team-networks[\"${{each.value.team_name}}-${{nic.value.network}}\"].id"
     else:
         network_id_line = "module.team-networks[\"${each.value.team_name}-${nic.value.network}\"].id"
 
+    depends_on_list = ["module.team-networks"]
+    if has_infra_servers:
+         depends_on_list.append("opennebula_virtual_machine.infra-servers")
+    elif has_infra_router:
+         depends_on_list.append("opennebula_virtual_machine.infra-routers")
+
+    depends_on_str = "    depends_on = [" + ", ".join(depends_on_list) + "]\n"
+
     team_router_template = f"\
 resource \"opennebula_virtual_machine\" \"team-routers\" {{\n\
-    depends_on = [module.team-networks]\n\
+{depends_on_str}\
     keep_nic_order = true\n\
     for_each = {{\n\
         for pair in setproduct(local.teams, keys(local.routers)):\n\
@@ -300,6 +307,8 @@ def CreateTerraform(data: json) -> None:
     
     infra_network_name = ""
 
+    game_name = data.get("name", "Game")
+
     # First pass: Identify networks and check for explicit 'T'
     for network in data["networks"]:
         name = network["name"]
@@ -384,11 +393,31 @@ def CreateTerraform(data: json) -> None:
 
     router_vms, infra_router, server_vms, infra_server_vms = Parse_device_JSON(data, network_map, wan_network, infra_network_name)
 
+    # Force inject competition router if it doesn't exist but infra network does
+    if not infra_router and infra_network:
+         gateway_ip = ""
+         # Assuming gateway is .1 of the network
+         if infra_network_name in infra_network:
+             octets = infra_network[infra_network_name]["octets"]
+             # Construct gateway IP: x.x.x.1
+             # Note: octets is a list of ints.
+             gateway_ip = f"{octets[0]}.{octets[1]}.{octets[2]}.1"
+
+         infra_router["Competition Router"] = {
+             "template_id": 1, # Default to 1 (VyOS or similar)
+             "host_id": 1, # Dummy ID
+             "network": infra_network_name,
+             "interfaces": {
+                 "eth0": { "ip": "", "network": "Competition WAN" },
+                 "eth1": { "ip": gateway_ip, "network": infra_network_name }
+             }
+         }
+
     infra_router_template = ""
     if infra_router:
-        infra_router_template = infra_routers_module()
+        infra_router_template = infra_routers_module(game_name)
 
-    team_router_template = team_routers_module(bool(infra_network), infra_network_name)
+    team_router_template = team_routers_module(bool(infra_network), bool(infra_router), bool(infra_server_vms), infra_network_name)
     team_servers_template = team_servers_module()
 
     infra_servers_template = ""
@@ -400,7 +429,7 @@ def CreateTerraform(data: json) -> None:
 
     infra_network_template = ""
     if infra_network:
-        infra_network_template = infra_network_module(infra_network)
+        infra_network_template = infra_network_module(infra_network, game_name)
 
     output_template = local_template + infra_network_template + infra_router_template + infra_servers_template + team_network_template + team_router_template + team_servers_template
     return output_template

@@ -78,6 +78,7 @@ type Device struct {
 
 // CyberGame represents the full exported network definition from the frontend.
 type CyberGame struct {
+	Name              string             `json:"name"`
 	Networks          []Network          `json:"networks"`
 	Devices           []Device           `json:"devices"`
 	BlackteamServices []BlackteamService `json:"blackteamServices"`

@@ -190,6 +190,16 @@ export const shutdownSession = (sessionId: string): GameSession | undefined => {
   return session;
 };
 
+export const removeSession = (sessionId: string): boolean => {
+  const index = sessionsTable.findIndex((entry) => entry.id === sessionId);
+  if (index === -1) return false;
+  sessionsTable.splice(index, 1);
+  return true;
+};
+
+export const listSessionsForGame = (gameId: string): GameSession[] =>
+  sessionsTable.filter((entry) => entry.gameId === gameId);
+
 export const startSessionImmediately = (sessionId: string): GameSession | undefined => {
   const session = sessionsTable.find((entry) => entry.id === sessionId);
   if (!session) return undefined;

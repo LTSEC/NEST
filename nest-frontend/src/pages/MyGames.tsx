@@ -12,6 +12,8 @@ import {
   startSessionImmediately,
   cancelScheduledSession,
   updateInfrastructureStatus,
+  removeSession,
+  listSessionsForGame,
 } from '../data/gameSessions';
 import { destroyHostedGame, hostGameInstance, streamTerraformLogs } from '../data/gameHosting';
 import { listTeams } from '../data/teams';
@@ -50,11 +52,9 @@ const MyGames: React.FC = () => {
     }
   }, [isDeveloper, user]);
 
-  // SSE log streaming: connect when console is visible and we have an infra ID
   useEffect(() => {
     if (!consoleVisible || activeInfraId === null) return undefined;
 
-    // Close any existing connection
     if (sseRef.current) {
       sseRef.current.close();
       sseRef.current = null;
@@ -65,21 +65,16 @@ const MyGames: React.FC = () => {
       (line) => {
         setConsoleLogs((prev) => [...prev, line]);
 
-        // Check for destroy success message
         if (line.includes('[OK] Terraform destroyed successfully')) {
-          setSessions((prev) =>
-            prev.map((session) => {
-              if (session.infrastructureId === activeInfraId) {
-                // Remove infra ID and mark as inactive
-                return {
-                  ...session,
-                  infrastructureId: undefined,
-                  infrastructureStatus: 'inactive',
-                };
-              }
-              return session;
-            })
-          );
+          // Remove destroyed sessions from the active list entirely
+          setSessions((prev) => {
+            const destroyed = prev.filter((s) => s.infrastructureId === activeInfraId);
+            for (const s of destroyed) {
+              shutdownSession(s.id);
+              removeSession(s.id);
+            }
+            return prev.filter((s) => s.infrastructureId !== activeInfraId);
+          });
         }
       },
       () => {
@@ -113,10 +108,26 @@ const MyGames: React.FC = () => {
     [sessions],
   );
 
-  const handleDelete = (gameId: string) => {
+  const handleDelete = async (gameId: string) => {
     if (!user) return;
+
+    // Destroy any active sessions for this game first
+    const gameSessions = listSessionsForGame(gameId);
+    for (const session of gameSessions) {
+      if (session.infrastructureId) {
+        try {
+          await destroyHostedGame(session.infrastructureId);
+        } catch {
+          // Infrastructure may already be destroyed or unreachable
+        }
+      }
+      shutdownSession(session.id);
+      removeSession(session.id);
+    }
+
     deleteGame(gameId, user.id);
     setGames(listGamesForDeveloper(user.id));
+    setSessions(listDeveloperSessions(user.id));
   };
 
   const startHostingGame = async (
@@ -166,7 +177,6 @@ const MyGames: React.FC = () => {
 
       const hosted = await hostGameInstance(game, { teamCount: teams });
 
-      // Start SSE streaming for this infrastructure
       setActiveInfraId(hosted.id);
 
       const session = scheduleGameSession(game, { id: user.id, name: user.name }, {
@@ -250,7 +260,6 @@ const MyGames: React.FC = () => {
 
     try {
       await destroyHostedGame(session.infrastructureId);
-      shutdownSession(session.id);
       updateInfrastructureStatus(session.id, 'destroying');
       setSessions(listDeveloperSessions(user.id));
     } catch (error) {
@@ -273,7 +282,7 @@ const MyGames: React.FC = () => {
 
   if (!isDeveloper) {
     return (
-      <div className="min-h-screen bg-slate-50">
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
         <NavBar role="user" userName={user.name} onLogout={logout} />
         <main className="mx-auto max-w-5xl p-6">
           <ComingSoon
@@ -286,17 +295,17 @@ const MyGames: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
       <NavBar role="developer" userName={user.name} onLogout={logout} />
       <main className="mx-auto max-w-5xl p-6 space-y-6">
         <section className="space-y-3">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="space-y-1">
-              <p className="text-sm font-semibold uppercase tracking-wide text-indigo-600">My Games</p>
-              <h1 className="text-2xl font-bold text-slate-900">Your games</h1>
-              <p className="text-sm text-slate-600">Filter and manage your games. Create or edit configurations from dedicated screens.</p>
-              <div className="flex items-center gap-2 text-xs font-semibold text-emerald-600">
-                <span className={`h-2 w-2 rounded-full ${activeHostedCount ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+              <p className="text-sm font-semibold uppercase tracking-wide text-indigo-600 dark:text-indigo-400">My Games</p>
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Your games</h1>
+              <p className="text-sm text-slate-600 dark:text-slate-400">Filter and manage your games. Create or edit configurations from dedicated screens.</p>
+              <div className="flex items-center gap-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                <span className={`h-2 w-2 rounded-full ${activeHostedCount ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`} />
                 <span>
                   {activeHostedCount} active {activeHostedCount === 1 ? 'game' : 'games'}
                 </span>
@@ -308,12 +317,12 @@ const MyGames: React.FC = () => {
                 placeholder="Search games..."
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm transition focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 sm:w-64"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm transition focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-indigo-500 dark:focus:ring-indigo-500/30 sm:w-64"
               />
               <button
                 type="button"
                 onClick={() => navigate('/my-games/new')}
-                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 dark:bg-indigo-500 dark:hover:bg-indigo-400"
               >
                 Create game
               </button>
@@ -321,40 +330,40 @@ const MyGames: React.FC = () => {
           </div>
 
           {hostingError && (
-            <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-100">
+            <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-100 dark:bg-red-900/20 dark:text-red-400 dark:ring-red-500/30">
               {hostingError}
             </div>
           )}
 
           {sessions.length > 0 && (
-            <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+            <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
               <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-semibold text-slate-800">Active game sessions</p>
-                <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100">
+                <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Active game sessions</p>
+                <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:ring-emerald-500/30">
                   {activeHostedCount} active
                 </span>
               </div>
 
-              <div className="mt-3 space-y-2 text-sm text-slate-700">
+              <div className="mt-3 space-y-2 text-sm text-slate-700 dark:text-slate-300">
                 {sessions.map((session) => (
                   <div
                     key={session.id}
-                    className="flex flex-col gap-2 rounded-lg bg-slate-50 px-3 py-2 ring-1 ring-slate-100"
+                    className="flex flex-col gap-2 rounded-lg bg-slate-50 px-3 py-2 ring-1 ring-slate-100 dark:bg-slate-800 dark:ring-slate-700"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <p className="font-semibold text-slate-800">{session.gameName}</p>
-                        <p className="text-xs text-slate-500">Status: {session.status}</p>
-                        <p className="text-[11px] text-slate-500">
+                        <p className="font-semibold text-slate-800 dark:text-slate-100">{session.gameName}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">Status: {session.status}</p>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
                           {new Date(session.startTime).toLocaleString()} - {new Date(session.endTime).toLocaleString()}
                         </p>
-                        <p className="text-[11px] text-slate-500">Visibility: {session.visibility}</p>
-                        <p className="text-[11px] text-slate-500">Minimum players: {session.minPlayers}</p>
-                        <p className="text-[11px] text-slate-500">
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">Visibility: {session.visibility}</p>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">Minimum players: {session.minPlayers}</p>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
                           Infrastructure: {session.infrastructureStatus ?? 'Not provisioned'}
                         </p>
                         {session.invitedTeamIds.length > 0 && (
-                          <p className="text-[11px] text-slate-500">
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400">
                             Invited:{' '}
                             {listTeams()
                               .filter((team) => session.invitedTeamIds.includes(team.id))
@@ -363,13 +372,13 @@ const MyGames: React.FC = () => {
                           </p>
                         )}
                       </div>
-                      <span className="text-xs font-semibold text-indigo-700">#{session.id}</span>
+                      <span className="text-xs font-semibold text-indigo-700 dark:text-indigo-300">#{session.id}</span>
                     </div>
                     <div className="flex flex-wrap gap-2 text-[11px] font-semibold">
                       <button
                         type="button"
                         onClick={() => navigate(`/games/${session.id}`)}
-                        className="rounded-lg bg-indigo-600 px-3 py-1 text-white shadow-sm transition hover:bg-indigo-500"
+                        className="rounded-lg bg-indigo-600 px-3 py-1 text-white shadow-sm transition hover:bg-indigo-500 dark:bg-indigo-500 dark:hover:bg-indigo-400"
                       >
                         View game
                       </button>
@@ -383,7 +392,7 @@ const MyGames: React.FC = () => {
                             setActiveInfraId(session.infrastructureId!);
                             setConsoleVisible(true);
                           }}
-                          className="rounded-lg bg-slate-100 px-3 py-1 text-indigo-700 ring-1 ring-indigo-100 transition hover:bg-slate-50"
+                          className="rounded-lg bg-slate-100 px-3 py-1 text-indigo-700 ring-1 ring-indigo-100 transition hover:bg-slate-50 dark:bg-slate-700 dark:text-indigo-300 dark:ring-indigo-500/30 dark:hover:bg-slate-600"
                         >
                           View terraform console
                         </button>
@@ -392,7 +401,7 @@ const MyGames: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => handleStartNow(session)}
-                          className="rounded-lg bg-emerald-600 px-3 py-1 text-white shadow-sm transition hover:bg-emerald-500"
+                          className="rounded-lg bg-emerald-600 px-3 py-1 text-white shadow-sm transition hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400"
                         >
                           Start Game Now
                         </button>
@@ -401,7 +410,7 @@ const MyGames: React.FC = () => {
                         type="button"
                         onClick={() => handleDestroySession(session)}
                         disabled={destroyingSessionId === session.id}
-                        className="rounded-lg bg-red-600 px-3 py-1 text-white shadow-sm transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-70"
+                        className="rounded-lg bg-red-600 px-3 py-1 text-white shadow-sm transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-70 dark:bg-red-500 dark:hover:bg-red-400"
                       >
                         {session.status === 'scheduled' && !session.infrastructureId
                           ? 'Remove game'
@@ -411,7 +420,7 @@ const MyGames: React.FC = () => {
                       </button>
                     </div>
                     {session.status === 'scheduled' && (
-                      <div className="flex flex-wrap gap-2 text-[11px] text-slate-600">
+                      <div className="flex flex-wrap gap-2 text-[11px] text-slate-600 dark:text-slate-400">
                         {listTeams().map((team) => (
                           <button
                             key={team.id}
@@ -419,8 +428,8 @@ const MyGames: React.FC = () => {
                             onClick={() => inviteTeamToSession(session.id, team.id)}
                             className={`rounded-full px-3 py-1 ring-1 transition ${
                               session.invitedTeamIds.includes(team.id)
-                                ? 'bg-indigo-600 text-white ring-indigo-500'
-                                : 'bg-white text-slate-700 ring-slate-200 hover:bg-slate-50'
+                                ? 'bg-indigo-600 text-white ring-indigo-500 dark:bg-indigo-500 dark:ring-indigo-400'
+                                : 'bg-white text-slate-700 ring-slate-200 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-600 dark:hover:bg-slate-700'
                             }`}
                           >
                             {session.invitedTeamIds.includes(team.id) ? 'Invited' : 'Invite'} {team.name}
@@ -438,16 +447,16 @@ const MyGames: React.FC = () => {
             {filteredGames.map((game) => {
               const isRedVsBlue = game.types.includes('Red vs. Blue');
               return (
-                <article key={game.id} className="flex flex-col gap-3 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+                <article key={game.id} className="flex flex-col gap-3 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
                   <header className="flex items-start justify-between gap-3">
                     <div>
-                      <h3 className="text-base font-semibold text-slate-900">{game.name}</h3>
-                      <p className="text-xs text-slate-500">Created {new Date(game.createdAt).toLocaleString()}</p>
+                      <h3 className="text-base font-semibold text-slate-900 dark:text-white">{game.name}</h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">Created {new Date(game.createdAt).toLocaleString()}</p>
                     </div>
                     <button
                       type="button"
                       onClick={() => handleDelete(game.id)}
-                      className="text-sm font-semibold text-red-600 hover:text-red-500"
+                      className="text-sm font-semibold text-red-600 hover:text-red-500 dark:text-red-400 dark:hover:text-red-300"
                     >
                       Delete
                     </button>
@@ -455,24 +464,24 @@ const MyGames: React.FC = () => {
 
                   <div className="flex flex-wrap gap-2 text-xs font-medium">
                     {game.types.map((type) => (
-                      <span key={type} className="rounded-full bg-indigo-50 px-3 py-1 text-indigo-700 ring-1 ring-indigo-100">
+                      <span key={type} className="rounded-full bg-indigo-50 px-3 py-1 text-indigo-700 ring-1 ring-indigo-100 dark:bg-indigo-500/20 dark:text-indigo-300 dark:ring-indigo-500/30">
                         {type}
                       </span>
                     ))}
                   </div>
 
                   {isRedVsBlue && (
-                    <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
-                      <p className="font-semibold text-slate-800">Red vs. Blue configuration</p>
-                      <p className="mt-1 text-xs text-slate-600">Services: {game.rvbServices.join(', ') || 'None selected'}</p>
-                      <p className="text-xs text-slate-600">
+                    <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                      <p className="font-semibold text-slate-800 dark:text-slate-100">Red vs. Blue configuration</p>
+                      <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">Services: {game.rvbServices.join(', ') || 'None selected'}</p>
+                      <p className="text-xs text-slate-600 dark:text-slate-400">
                         Teams: {game.teamCount || 'Choose when hosting'}
                       </p>
                     </div>
                   )}
 
                   {!isRedVsBlue && (
-                    <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
+                    <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                       Configuration for Injects and CTFs coming soon.
                     </div>
                   )}
@@ -482,7 +491,7 @@ const MyGames: React.FC = () => {
                       type="button"
                       onClick={() => handleTestNow(game)}
                       disabled={hostingGameId === game.id || activeHostedCount > 0}
-                      className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500"
+                      className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-70 dark:bg-amber-500 dark:hover:bg-amber-400"
                     >
                       {hostingGameId === game.id ? 'Starting...' : 'Test Now'}
                     </button>
@@ -490,7 +499,7 @@ const MyGames: React.FC = () => {
                       type="button"
                       onClick={() => handleHostClick(game)}
                       disabled={hostingGameId === game.id || activeHostedCount > 0}
-                      className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
+                      className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-70 dark:bg-emerald-500 dark:hover:bg-emerald-400"
                     >
                       {hostingGameId === game.id
                         ? 'Hosting...'
@@ -501,7 +510,7 @@ const MyGames: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => navigate(`/my-games/${game.id}/edit`)}
-                      className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+                      className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600"
                     >
                       Edit Game
                     </button>
@@ -509,7 +518,7 @@ const MyGames: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => navigate(`/my-games/${game.id}/network`)}
-                        className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                        className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 dark:bg-indigo-500 dark:hover:bg-indigo-400"
                       >
                         Edit Network
                       </button>
@@ -521,21 +530,21 @@ const MyGames: React.FC = () => {
           </div>
 
           {!filteredGames.length && (
-            <div className="rounded-xl bg-white p-4 text-sm text-slate-600 shadow-sm ring-1 ring-slate-200">
+            <div className="rounded-xl bg-white p-4 text-sm text-slate-600 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-400 dark:ring-slate-700">
               No games found. Adjust your search or create a new experience to get started.
             </div>
           )}
         </section>
 
         {pendingHostGame && (
-          <div className="fixed inset-0 z-10 flex items-center justify-center bg-slate-900/50 p-4">
-            <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl ring-1 ring-slate-200">
-              <h2 className="text-lg font-semibold text-slate-900">Host {pendingHostGame.name}</h2>
-              <p className="mt-1 text-sm text-slate-600">Choose the schedule, visibility, and invited teams.</p>
+          <div className="fixed inset-0 z-10 flex items-center justify-center bg-slate-900/50 dark:bg-black/60 p-4">
+            <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Host {pendingHostGame.name}</h2>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Choose the schedule, visibility, and invited teams.</p>
 
               <div className="mt-4 space-y-3">
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-slate-700" htmlFor="start-time-input">
+                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300" htmlFor="start-time-input">
                     Start time
                   </label>
                   <input
@@ -543,12 +552,12 @@ const MyGames: React.FC = () => {
                     type="datetime-local"
                     value={startTimeInput}
                     onChange={(event) => setStartTimeInput(event.target.value)}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm transition focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm transition focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-indigo-500 dark:focus:ring-indigo-500/30"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-slate-700" htmlFor="end-time-input">
+                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300" htmlFor="end-time-input">
                     End time
                   </label>
                   <input
@@ -556,17 +565,17 @@ const MyGames: React.FC = () => {
                     type="datetime-local"
                     value={endTimeInput}
                     onChange={(event) => setEndTimeInput(event.target.value)}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm transition focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm transition focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-indigo-500 dark:focus:ring-indigo-500/30"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700" htmlFor="visibility-choice">Visibility</label>
+                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300" htmlFor="visibility-choice">Visibility</label>
                   <select
                     id="visibility-choice"
                     value={visibility}
                     onChange={(event) => setVisibility(event.target.value as GameVisibility)}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                   >
                     <option value="public">Public — any team can request to join before start</option>
                     <option value="private">Private — invite-only</option>
@@ -575,7 +584,7 @@ const MyGames: React.FC = () => {
 
                 {pendingHostGame.types.includes('Red vs. Blue') && (
                   <div className="space-y-1">
-                    <label className="text-sm font-medium text-slate-700" htmlFor="team-count-selection">
+                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300" htmlFor="team-count-selection">
                       Number of teams
                     </label>
                     <input
@@ -584,13 +593,13 @@ const MyGames: React.FC = () => {
                       min={1}
                       value={teamCountInput}
                       onChange={(event) => setTeamCountInput(event.target.value)}
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm transition focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm transition focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-indigo-500 dark:focus:ring-indigo-500/30"
                     />
                   </div>
                 )}
 
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-slate-700" htmlFor="min-players-input">
+                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300" htmlFor="min-players-input">
                     Minimum players required per team
                   </label>
                   <input
@@ -599,17 +608,17 @@ const MyGames: React.FC = () => {
                     min={1}
                     value={minPlayersInput}
                     onChange={(event) => setMinPlayersInput(event.target.value)}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm transition focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm transition focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-indigo-500 dark:focus:ring-indigo-500/30"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <p className="text-sm font-medium text-slate-700">Invite teams</p>
-                  <div className="flex max-h-36 flex-col gap-2 overflow-y-auto rounded-lg border border-slate-200 p-2">
+                  <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Invite teams</p>
+                  <div className="flex max-h-36 flex-col gap-2 overflow-y-auto rounded-lg border border-slate-200 p-2 dark:border-slate-600">
                     {listTeams().map((team) => {
                       const checked = invitedTeams.includes(team.id);
                       return (
-                        <label key={team.id} className="flex items-center gap-2 text-sm text-slate-700">
+                        <label key={team.id} className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
                           <input
                             type="checkbox"
                             checked={checked}
@@ -623,7 +632,7 @@ const MyGames: React.FC = () => {
                             className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                           />
                           <span className="flex-1">{team.name}</span>
-                          <span className="text-[11px] text-slate-500">{team.members.length} members</span>
+                          <span className="text-[11px] text-slate-500 dark:text-slate-400">{team.members.length} members</span>
                         </label>
                       );
                     })}
@@ -635,14 +644,14 @@ const MyGames: React.FC = () => {
                 <button
                   type="button"
                   onClick={cancelTeamSelection}
-                  className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-50"
+                  className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-600 dark:hover:bg-slate-700"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
                   onClick={confirmTeamSelection}
-                  className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                  className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 dark:bg-indigo-500 dark:hover:bg-indigo-400"
                 >
                   Start hosting
                 </button>
@@ -652,11 +661,11 @@ const MyGames: React.FC = () => {
         )}
 
         {consoleVisible && (
-          <div className="fixed bottom-4 right-4 z-20 w-full max-w-xl overflow-hidden rounded-xl bg-white shadow-xl ring-1 ring-slate-200">
-            <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+          <div className="fixed bottom-4 right-4 z-20 w-full max-w-xl overflow-hidden rounded-xl bg-white shadow-xl ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
+            <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-700">
               <div>
-                <p className="text-sm font-semibold text-slate-900">{consoleTitle || 'Terraform console'}</p>
-                <p className="text-[11px] text-slate-500">
+                <p className="text-sm font-semibold text-slate-900 dark:text-white">{consoleTitle || 'Terraform console'}</p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
                   {consoleMode === 'create'
                     ? 'Provisioning infrastructure...'
                     : consoleMode === 'destroy'
@@ -674,12 +683,12 @@ const MyGames: React.FC = () => {
                     sseRef.current = null;
                   }
                 }}
-                className="rounded-lg bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-200"
+                className="rounded-lg bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:ring-slate-600 dark:hover:bg-slate-600"
               >
                 Close
               </button>
             </div>
-            <pre className="max-h-64 overflow-y-auto bg-slate-900 px-4 py-3 text-xs text-slate-100">
+            <pre className="max-h-64 overflow-y-auto bg-slate-900 px-4 py-3 text-xs text-slate-100 dark:bg-slate-950">
               {(consoleLogs.length ? consoleLogs : ['Waiting for console output...']).join('\n')}
             </pre>
           </div>

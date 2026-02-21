@@ -1930,7 +1930,7 @@ const NetworkEditor: React.FC = () => {
                               <div className="rounded border border-white/10 bg-white/5 px-2 py-1 text-xs font-semibold text-sky-200">
                                 {intf.ip || `${game!.blackTeamCidr!.split('/')[0].split('.').slice(0, 2).join('.')}.T.1`}
                               </div>
-                              <span className="text-[10px] text-slate-500">
+                              <span className="text-[10px] text-slate-500 dark:text-slate-400">
                                 T is replaced with each team's ID at deploy time.
                               </span>
                             </div>
@@ -2053,7 +2053,7 @@ const NetworkEditor: React.FC = () => {
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-[11px] uppercase tracking-wide text-slate-400">
                   <span>Services</span>
-                  <span className="text-[10px] text-slate-500">Ports configurable per host</span>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400">Ports configurable per host</span>
                 </div>
                 <div className="space-y-2">
                   {serviceCatalog.map((service) => {

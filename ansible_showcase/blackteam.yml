@@ -1,0 +1,34 @@
+---
+- name: Provision blackteam user across mixed environments
+  hosts: all
+  gather_facts: no  # Must be 'no' because gathering facts will fail on MikroTik
+  
+  tasks:
+    # Standard Linux
+    - name: Create blackteam user on standard Linux
+      ansible.builtin.user:
+        name: blackteam
+        # Passwords must be hashed for standard Linux
+        password: "{{ 'G^H&J*K(LA@S#D$F%0987f' | password_hash('sha512') }}"
+        shell: /bin/bash
+        create_home: yes
+        state: present
+      become: yes
+      when: ansible_network_os is not defined
+
+    # VyOS
+    - name: Create blackteam user on VyOS
+      vyos.vyos.vyos_user:
+        name: blackteam
+        configured_password: G^H&J*K(LA@S#D$F%0987f
+        level: admin  # Options are usually 'admin' or 'operator'
+        state: present
+      when: ansible_network_os | default('') == 'vyos'
+
+    # Mikrotik RouterOS
+    - name: Create blackteam user on MikroTik
+      community.routeros.command:
+        commands:
+          - /user add name=blackteam group=full password="G^H&J*K(LA@S#D$F%0987f"
+      when: ansible_network_os | default('') == 'routeros'
+      ignore_errors: yes

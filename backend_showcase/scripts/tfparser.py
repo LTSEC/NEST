@@ -183,7 +183,12 @@ resource \"opennebula_virtual_machine\" \"team-routers\" {{\n\
 }}\n"
     return team_router_template
 
-def team_servers_module() -> str:
+def team_servers_module(has_infra_network: bool, infra_network_name: str = "External WAN") -> str:
+    if has_infra_network:
+        network_id_line = f"each.value.team_network == \"{infra_network_name}\" ? module.infra-networks.id : module.team-networks[\"${{each.value.team_name}}-${{each.value.team_network}}\"].id"
+    else:
+        network_id_line = "module.team-networks[\"${each.value.team_name}-${each.value.team_network}\"].id"
+
     server_vm_template = f"\
 resource \"opennebula_virtual_machine\" \"team-servers\" {{\n\
     depends_on = [resource.opennebula_virtual_machine.team-routers]\n\
@@ -203,7 +208,7 @@ resource \"opennebula_virtual_machine\" \"team-servers\" {{\n\
     template_id = each.value.template_id\n\
     nic {{\n\
         model=\"virtio\"\n\
-        network_id = module.team-networks[\"${{each.value.team_name}}-${{each.value.team_network}}\"].id\n\
+        network_id = {network_id_line}\n\
     }}\n\
 }}\n"
     return server_vm_template
@@ -280,7 +285,11 @@ def Parse_device_JSON(data : json, network_map: dict, wan_network: list, infra_n
             ip = "" if dhcp else vm.get("ip", "")
 
             server_network = network_context
-            if ip:
+            # Prefer the frontend-provided segment (exact team network name)
+            segment = vm.get("segment", "")
+            if segment and segment in network_map:
+                server_network = segment
+            elif ip:
                 found_network = map_ip_to_network(ip, network_map)
                 if found_network:
                     server_network = found_network
@@ -418,7 +427,7 @@ def CreateTerraform(data: json) -> None:
         infra_router_template = infra_routers_module(game_name)
 
     team_router_template = team_routers_module(bool(infra_network), bool(infra_router), bool(infra_server_vms), infra_network_name)
-    team_servers_template = team_servers_module()
+    team_servers_template = team_servers_module(bool(infra_network), infra_network_name)
 
     infra_servers_template = ""
     if infra_server_vms:

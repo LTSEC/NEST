@@ -37,6 +37,7 @@ const GameEditor: React.FC = () => {
   const [creationMode, setCreationMode] = useState<'scratch' | 'preset'>('scratch');
   const [selectedPreset, setSelectedPreset] = useState<string>('');
   const [blackTeamCidr, setBlackTeamCidr] = useState<string>(existingGame?.blackTeamCidr ?? '10.20.0.0/16');
+  const [scoringCheckInterval, setScoringCheckInterval] = useState<number>(existingGame?.scoringCheckInterval ?? 60);
 
   useEffect(() => {
     fetchPresets().then((data) => {
@@ -65,6 +66,9 @@ const GameEditor: React.FC = () => {
       if (existingGame.blackTeamCidr) {
         setBlackTeamCidr(existingGame.blackTeamCidr);
       }
+      if (existingGame.scoringCheckInterval) {
+        setScoringCheckInterval(existingGame.scoringCheckInterval);
+      }
     }
   }, [existingGame]);
 
@@ -83,6 +87,7 @@ const GameEditor: React.FC = () => {
   }, [isDeveloper, navigate]);
 
   const hasRvbSelected = useMemo(() => selectedTypes.includes('Red vs. Blue'), [selectedTypes]);
+  const hasScoringEngine = useMemo(() => hasRvbSelected && selectedServices.includes('Scoring Engine'), [hasRvbSelected, selectedServices]);
 
   const toggleType = (type: GameType) => {
     setSelectedTypes((prev) => {
@@ -134,6 +139,7 @@ const GameEditor: React.FC = () => {
           teamCount: existingGame.teamCount,
           presetId: isPreset ? selectedPreset : undefined,
           blackTeamCidr: hasRvbSelected ? blackTeamCidr : undefined,
+          scoringCheckInterval: hasScoringEngine ? scoringCheckInterval : undefined,
         });
       } else {
         createGame({
@@ -145,6 +151,7 @@ const GameEditor: React.FC = () => {
           teamCount: existingGame?.teamCount ?? 0,
           presetId: isPreset ? selectedPreset : undefined,
           blackTeamCidr: hasRvbSelected ? blackTeamCidr : undefined,
+          scoringCheckInterval: hasScoringEngine ? scoringCheckInterval : undefined,
         });
       }
       navigate('/my-games');
@@ -318,6 +325,34 @@ const GameEditor: React.FC = () => {
                   Defines the IP range for the top-level competition router.
                 </p>
               </div>
+
+              {hasScoringEngine && (
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300" htmlFor="scoring-interval">
+                    Scoring Check Interval
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      id="scoring-interval"
+                      name="scoring-interval"
+                      type="number"
+                      min={15}
+                      max={300}
+                      step={1}
+                      className="w-28 rounded-lg border border-slate-200 dark:border-slate-600 px-3 py-2 text-sm shadow-sm transition focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-500/30 dark:bg-slate-800 dark:text-slate-100"
+                      value={scoringCheckInterval}
+                      onChange={(event) => {
+                        const v = Number(event.target.value);
+                        setScoringCheckInterval(Number.isNaN(v) ? 60 : Math.min(300, Math.max(15, v)));
+                      }}
+                    />
+                    <span className="text-sm text-slate-500 dark:text-slate-400">seconds</span>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    How often the scoring engine checks each service (15s – 5min).
+                  </p>
+                </div>
+              )}
 
               <p className="text-xs text-slate-600 dark:text-slate-400">
                 Team counts are chosen when hosting a Red vs. Blue game.

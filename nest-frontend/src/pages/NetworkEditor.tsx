@@ -57,6 +57,10 @@ interface ServiceInstance {
   customServiceId?: string;
   /** Arbitrary key-value pairs consumed by Ansible playbooks (e.g. users, db names). */
   ansibleMeta?: Record<string, string>;
+  /** Whether this service is scored by the scoring engine. */
+  scored?: boolean;
+  /** Points awarded per scoring cycle (1–100). Only meaningful when scored is true. */
+  scoringPoints?: number;
 }
 
 interface CustomServiceInstance {
@@ -1070,6 +1074,27 @@ const NetworkEditor: React.FC = () => {
         const meta = { ...(service.ansibleMeta ?? {}), [key]: value };
         return { ...service, ansibleMeta: meta };
       }),
+    );
+  };
+
+  const hasScoringEngine = Boolean(game?.rvbServices?.includes('Scoring Engine'));
+
+  const toggleServiceScored = (nodeId: string, definitionId: string, scored: boolean) => {
+    updateNodeServices(nodeId, (services) =>
+      services.map((service) =>
+        service.serviceId === definitionId
+          ? { ...service, scored, scoringPoints: scored ? (service.scoringPoints ?? 10) : undefined }
+          : service,
+      ),
+    );
+  };
+
+  const updateServiceScoringPoints = (nodeId: string, definitionId: string, points: number) => {
+    const clamped = Number.isNaN(points) ? 1 : Math.min(100, Math.max(1, points));
+    updateNodeServices(nodeId, (services) =>
+      services.map((service) =>
+        service.serviceId === definitionId ? { ...service, scoringPoints: clamped } : service,
+      ),
     );
   };
 
@@ -2317,6 +2342,32 @@ const NetworkEditor: React.FC = () => {
                                 </span>
                               </div>
                             </div>
+                            {hasScoringEngine && (
+                              <div className="flex items-center gap-3 rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-2">
+                                <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-amber-100">
+                                  <input
+                                    type="checkbox"
+                                    checked={Boolean(instance.scored)}
+                                    onChange={(event) => toggleServiceScored(configNode.id, service.id, event.target.checked)}
+                                    className="h-4 w-4 accent-amber-400"
+                                  />
+                                  Scored
+                                </label>
+                                {instance.scored && (
+                                  <label className="flex items-center gap-2 text-[11px] text-amber-100">
+                                    <span className="uppercase tracking-wide text-amber-200">Points / cycle</span>
+                                    <input
+                                      type="number"
+                                      min={1}
+                                      max={100}
+                                      value={instance.scoringPoints ?? 10}
+                                      onChange={(event) => updateServiceScoringPoints(configNode.id, service.id, Number(event.target.value))}
+                                      className="w-16 rounded border border-amber-400/40 bg-amber-500/20 px-2 py-1 text-xs text-white outline-none focus:border-amber-300"
+                                    />
+                                  </label>
+                                )}
+                              </div>
+                            )}
                             {(service.ansibleFields ?? []).length > 0 && (
                               <div className="space-y-2 rounded-lg border border-indigo-400/30 bg-indigo-500/10 p-3">
                                 <div className="text-[11px] font-semibold uppercase tracking-wide text-indigo-200">

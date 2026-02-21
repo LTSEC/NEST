@@ -25,6 +25,10 @@ export interface PersistedServiceInstance {
   customServiceId?: string;
   /** Arbitrary key-value pairs consumed by Ansible playbooks (e.g. users, db names). */
   ansibleMeta?: Record<string, string>;
+  /** Whether this service is scored by the scoring engine. */
+  scored?: boolean;
+  /** Points awarded per scoring cycle (1–100). Only meaningful when scored is true. */
+  scoringPoints?: number;
 }
 
 export interface PersistedLinkEnd {

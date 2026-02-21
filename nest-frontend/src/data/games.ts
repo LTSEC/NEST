@@ -19,6 +19,8 @@ export type Game = {
   createdAt: string;
   presetId?: string;
   blackTeamCidr?: string;
+  /** Scoring check interval in seconds (15–300). Only relevant when Scoring Engine is enabled. */
+  scoringCheckInterval?: number;
 };
 
 const allowedGameTypes: GameType[] = ['Injects', 'CTFs', 'Red vs. Blue'];
@@ -73,6 +75,9 @@ export const updateGame = (gameId: string, developerId: VerifiedUser['id'], upda
   if ('blackTeamCidr' in updates) {
     game.blackTeamCidr = updates.blackTeamCidr;
   }
+  if ('scoringCheckInterval' in updates) {
+    game.scoringCheckInterval = updates.scoringCheckInterval;
+  }
 
   return game;
 };
@@ -86,6 +91,7 @@ export const createGame = (params: {
   teamCount?: number;
   presetId?: string;
   blackTeamCidr?: string;
+  scoringCheckInterval?: number;
 }): Game => {
   const trimmedName = params.name.trim();
   if (!trimmedName) {
@@ -117,6 +123,7 @@ export const createGame = (params: {
     createdAt: new Date().toISOString(),
     presetId: params.presetId,
     blackTeamCidr: params.blackTeamCidr,
+    scoringCheckInterval: params.scoringCheckInterval,
   };
 
   gamesTable.unshift(newGame);

@@ -29,6 +29,10 @@ export interface ServiceConfig {
   protocol: string;
   /** Arbitrary key-value pairs passed through to Ansible templates. */
   ansibleMeta?: Record<string, string>;
+  /** Whether this service is scored by the scoring engine. */
+  scored?: boolean;
+  /** Points awarded per scoring cycle (1–100). */
+  scoringPoints?: number;
 }
 
 export interface CyberGamePayload {
@@ -38,6 +42,8 @@ export interface CyberGamePayload {
   blackteamServices: { name: string; templateId: number; hostId: number; ip: string }[];
   applications: { name: string; servers: string[]; services: string[]; color: string }[];
   teamCount?: number;
+  /** Scoring check interval in seconds (15–300). Present when a scoring engine is enabled. */
+  scoringCheckInterval?: number;
 }
 
 export interface CyberGameDevice {
@@ -288,6 +294,7 @@ export const serializeNetworkToCyberGame = (
           ...(svc.ansibleMeta && Object.keys(svc.ansibleMeta).length > 0
             ? { ansibleMeta: svc.ansibleMeta }
             : {}),
+          ...(svc.scored ? { scored: true, scoringPoints: svc.scoringPoints } : {}),
         };
       }
 
@@ -333,5 +340,6 @@ export const serializeNetworkToCyberGame = (
     devices,
     blackteamServices,
     applications,
+    ...(game.scoringCheckInterval ? { scoringCheckInterval: game.scoringCheckInterval } : {}),
   };
 };

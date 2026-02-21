@@ -3,6 +3,23 @@ import { Game } from './games';
 import { serviceDefinitionsById } from './services';
 
 /**
+ * Helper to calculate IP addresses for black team services based on the game CIDR.
+ */
+export const generateServiceIp = (cidr: string | undefined, index: number): string => {
+  const baseCidr = cidr || '10.0.0.0/16';
+  // Replace T with 0
+  const cleanCidr = baseCidr.replace('T', '0');
+  const ipPart = cleanCidr.split('/')[0];
+  const octets = ipPart.split('.').map(Number);
+
+  // Set last octet to 10 + index
+  // Assuming a /24 or larger network where the last octet is available
+  octets[3] = 10 + index;
+
+  return octets.join('.');
+};
+
+/**
  * CyberGame payload types matching the Go backend types.CyberGame struct.
  * This is what the Python tfparser.py expects to receive.
  */
@@ -276,7 +293,7 @@ export const serializeNetworkToCyberGame = (
     name: service,
     templateId: index + 1,
     hostId: index + 1,
-    ip: `10.0.0.${index + 10}`,
+    ip: generateServiceIp(game.blackTeamCidr, index),
   }));
 
   // 4. Build applications

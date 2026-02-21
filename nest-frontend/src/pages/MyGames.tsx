@@ -64,6 +64,23 @@ const MyGames: React.FC = () => {
       activeInfraId,
       (line) => {
         setConsoleLogs((prev) => [...prev, line]);
+
+        // Check for destroy success message
+        if (line.includes('[OK] Terraform destroyed successfully')) {
+          setSessions((prev) =>
+            prev.map((session) => {
+              if (session.infrastructureId === activeInfraId) {
+                // Remove infra ID and mark as inactive
+                return {
+                  ...session,
+                  infrastructureId: undefined,
+                  infrastructureStatus: 'inactive',
+                };
+              }
+              return session;
+            })
+          );
+        }
       },
       () => {
         setConsoleLogs((prev) => [...prev, '[STREAM] Connection closed.']);

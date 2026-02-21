@@ -3,10 +3,11 @@ import { NetworkSnapshot, PersistedNode, PersistedLink, PersistedInterface } fro
 
 const createId = () => (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2, 10));
 
-const LAYOUT_START_X = 100;
-const LAYOUT_START_Y = 100;
-const GRID_SPACING_X = 250;
-const GRID_SPACING_Y = 200;
+const LAYOUT_START_X = 200;
+const LAYOUT_START_Y = 120;
+const ROUTER_SPACING_X = 400;
+const HOST_SPACING_X = 280;
+const HOST_OFFSET_Y = 280;
 
 export const presetToSnapshot = (preset: CyberGamePayload, gameId: string | null): NetworkSnapshot => {
   const nodes: PersistedNode[] = [];
@@ -15,8 +16,10 @@ export const presetToSnapshot = (preset: CyberGamePayload, gameId: string | null
   const routerNodes = new Map<string, PersistedNode>();
   const routerInterfaceMap = new Map<string, string>(); // RouterName:InterfaceName -> InterfaceId
 
+  // Track which router each host connects to for layout grouping
+  const routerHostCount = new Map<string, number>();
+
   let routerX = LAYOUT_START_X;
-  let hostX = LAYOUT_START_X;
 
   // 1. Create Router Nodes
   preset.devices
@@ -28,13 +31,14 @@ export const presetToSnapshot = (preset: CyberGamePayload, gameId: string | null
       if (device.interfaces) {
         Object.entries(device.interfaces).forEach(([name, value]) => {
           const interfaceId = createId();
+          const isWan = value.includes('External WAN') || value === 'External WAN';
           const [ip, prefix] = value.includes('/') ? value.split('/') : [value, ''];
-          const cidr = value.includes('External WAN') ? undefined : (ip && prefix ? `${ip.split('.').slice(0, 3).join('.')}.0/${prefix}` : undefined);
+          const cidr = isWan ? undefined : (ip && prefix ? `${ip.split('.').slice(0, 3).join('.')}.0/${prefix}` : undefined);
 
           interfaces.push({
             id: interfaceId,
             name: name,
-            ip: ip && !value.includes('External WAN') ? ip : undefined,
+            ip: ip && !isWan ? ip : undefined,
             networkCidr: cidr,
           });
 
@@ -57,8 +61,9 @@ export const presetToSnapshot = (preset: CyberGamePayload, gameId: string | null
       };
 
       routerNodes.set(device.name, node);
+      routerHostCount.set(device.name, 0);
       nodes.push(node);
-      routerX += GRID_SPACING_X;
+      routerX += ROUTER_SPACING_X;
     });
 
   // 2. Create Host Nodes & Connect to Routers
@@ -70,6 +75,7 @@ export const presetToSnapshot = (preset: CyberGamePayload, gameId: string | null
 
       let targetRouterInterfaceId: string | undefined = undefined;
       let networkCidr: string | undefined = undefined;
+      let connectedRouterName: string | undefined = undefined;
 
       if (device.router && device.interface) {
         const routerNode = routerNodes.get(device.router);
@@ -94,6 +100,7 @@ export const presetToSnapshot = (preset: CyberGamePayload, gameId: string | null
           }
 
           targetRouterInterfaceId = `${routerNode.id}:${effectiveIntfId}`;
+          connectedRouterName = device.router;
 
           // Create Link
           links.push({
@@ -105,12 +112,27 @@ export const presetToSnapshot = (preset: CyberGamePayload, gameId: string | null
         }
       }
 
+      // Position hosts below their connected router, grouped
+      let hostX = LAYOUT_START_X;
+      const hostY = LAYOUT_START_Y + HOST_OFFSET_Y;
+
+      if (connectedRouterName) {
+        const routerNode = routerNodes.get(connectedRouterName);
+        const hostIndex = routerHostCount.get(connectedRouterName) ?? 0;
+        routerHostCount.set(connectedRouterName, hostIndex + 1);
+
+        if (routerNode) {
+          // Center hosts under their router, offset by index
+          hostX = routerNode.position.x + (hostIndex * HOST_SPACING_X) - (HOST_SPACING_X * 0.5 * Math.max(0, hostIndex - 1));
+        }
+      }
+
       const node: PersistedNode = {
         id: nodeId,
         label: device.name,
         imageId: (device.os?.id || 0).toString(),
         kind: 'host',
-        position: { x: hostX, y: LAYOUT_START_Y + GRID_SPACING_Y },
+        position: { x: hostX, y: hostY },
         interfaces: [{
           id: interfaceId,
           name: 'eth0',
@@ -119,15 +141,10 @@ export const presetToSnapshot = (preset: CyberGamePayload, gameId: string | null
           targetRouterInterfaceId,
           networkCidr
         }],
-        services: [], // Services could be populated from device.services if needed
+        services: [],
       };
 
-      // Populate services? device.services is Record<string, number> (Name -> Port)
-      // But we need ServiceInstance with serviceId. We'd need to lookup serviceDefinitionsById.
-      // For now, let's skip or implement if crucial. The prompt says "shows the VMs", which we have.
-
       nodes.push(node);
-      hostX += GRID_SPACING_X;
     });
 
   return {
@@ -136,6 +153,6 @@ export const presetToSnapshot = (preset: CyberGamePayload, gameId: string | null
     gridSnapEnabled: true,
     nodes,
     links,
-    customServices: [], // Presets generally don't have custom services defined this way yet?
+    customServices: [],
   };
 };

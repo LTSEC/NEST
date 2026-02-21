@@ -361,12 +361,19 @@ const NetworkEditor: React.FC = () => {
     const point = screenToWorld(event.clientX, event.clientY);
 
     // When a router is dropped and a competition network is defined, pre-assign eth0 to that
-    // network. The backend will substitute the team-specific IP — no comp-router node needed.
+    // network with the X.X.T.1 IP scheme. The backend substitutes T with the team ID.
     const defaultInterfaces =
       kind === 'router'
         ? [
             game?.blackTeamCidr
-              ? { ...createInterface('eth0'), networkCidr: game.blackTeamCidr }
+              ? (() => {
+                  const compOctets = game.blackTeamCidr.split('/')[0].split('.');
+                  return {
+                    ...createInterface('eth0'),
+                    networkCidr: game.blackTeamCidr,
+                    ip: compOctets.length === 4 ? `${compOctets[0]}.${compOctets[1]}.T.1` : undefined,
+                  };
+                })()
               : createInterface('eth0'),
             createInterface('eth1'),
           ]
@@ -685,8 +692,11 @@ const NetworkEditor: React.FC = () => {
                   const isCompNetwork =
                     Boolean(game?.blackTeamCidr) && updated.networkCidr === game?.blackTeamCidr;
                   if (isCompNetwork) {
-                    // Backend substitutes the team-specific uplink IP — never hardcode one here.
-                    updated.ip = undefined;
+                    // Set the IP to the X.X.T.1 scheme so the backend can substitute T with team ID.
+                    const compOctets = game!.blackTeamCidr!.split('/')[0].split('.');
+                    if (compOctets.length === 4) {
+                      updated.ip = `${compOctets[0]}.${compOctets[1]}.T.1`;
+                    }
                   } else if (!updated.ip) {
                     // Only auto-assign .1 when the field is currently blank (never overwrite user edits).
                     const cidrIp = updated.networkCidr?.split('/')[0];
@@ -782,12 +792,14 @@ const NetworkEditor: React.FC = () => {
       nodes
         .filter((node) => node.kind === 'router')
         .flatMap((node) =>
-          node.interfaces.map((intf) => ({
-            value: anchorKey(node.id, intf.id),
-            label: `${node.label} • ${intf.name}`,
-          })),
+          node.interfaces
+            .filter((intf) => !(game?.blackTeamCidr && intf.networkCidr === game.blackTeamCidr))
+            .map((intf) => ({
+              value: anchorKey(node.id, intf.id),
+              label: `${node.label} • ${intf.name}`,
+            })),
         ),
-    [nodes],
+    [nodes, game?.blackTeamCidr],
   );
 
   const mapTransform = {
@@ -804,12 +816,19 @@ const NetworkEditor: React.FC = () => {
     return node && intf ? { node, intf } : null;
   };
 
+  const isCompNetworkInterface = (node: NetworkNode, intf: NetworkInterface) =>
+    node.kind === 'router' && Boolean(game?.blackTeamCidr) && intf.networkCidr === game?.blackTeamCidr;
+
   const createLinkBetween = (sourceAnchorId: string, targetAnchorId: string) => {
     const source = resolveAnchor(sourceAnchorId);
     const target = resolveAnchor(targetAnchorId);
     if (!source || !target) return;
     if (source.node.id === target.node.id) return;
     if (source.node.kind === 'host' && target.node.kind === 'host') return;
+
+    // Block connections on interfaces locked to the competition network
+    if (isCompNetworkInterface(source.node, source.intf)) return;
+    if (isCompNetworkInterface(target.node, target.intf)) return;
 
     const alreadyExists = links.some(
       (link) =>
@@ -870,6 +889,9 @@ const NetworkEditor: React.FC = () => {
 
   const handleAnchorMouseDown = (event: React.MouseEvent<HTMLDivElement>, anchorId: string) => {
     event.stopPropagation();
+    // Block drag-to-link from comp-network interfaces
+    const resolved = resolveAnchor(anchorId);
+    if (resolved && isCompNetworkInterface(resolved.node, resolved.intf)) return;
     const world = screenToWorld(event.clientX, event.clientY);
     setLinkInProgress({ anchorId, point: world });
     setSelectedLinkId(null);
@@ -1589,6 +1611,7 @@ const NetworkEditor: React.FC = () => {
                           const key = anchorKey(node.id, intf.id);
                           const anchorSide = node.kind === 'host' ? 'left' : 'right';
                           const hasOverlap = overlappingInterfaces.has(key);
+                          const isCompLocked = node.kind === 'router' && Boolean(game?.blackTeamCidr) && intf.networkCidr === game?.blackTeamCidr;
                           return (
                             <div key={intf.id} className="relative flex items-center gap-2">
                               <div
@@ -1599,19 +1622,25 @@ const NetworkEditor: React.FC = () => {
                                     delete anchorRefs.current[key];
                                   }
                                 }}
-                                className={`absolute top-1/2 h-3 w-3 -translate-y-1/2 rounded-full border-2 ${anchorSide === 'left' ? '-left-4' : '-right-4'} ${hasOverlap ? 'border-rose-300 bg-rose-500' : 'border-white/70 bg-white/80'}`}
+                                className={`absolute top-1/2 h-3 w-3 -translate-y-1/2 rounded-full border-2 ${anchorSide === 'left' ? '-left-4' : '-right-4'} ${isCompLocked ? 'border-sky-300 bg-sky-500 cursor-not-allowed' : hasOverlap ? 'border-rose-300 bg-rose-500' : 'border-white/70 bg-white/80'}`}
                                 onMouseDown={(event) => handleAnchorMouseDown(event, key)}
                                 onMouseUp={(event) => handleAnchorMouseUp(event, key)}
-                                title={hasOverlap ? 'Overlapping network range' : 'Drag to link'}
+                                title={isCompLocked ? 'Locked to competition network' : hasOverlap ? 'Overlapping network range' : 'Drag to link'}
                               />
-                              <div className="flex-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1">
+                              <div className={`flex-1 rounded-lg border px-2 py-1 ${isCompLocked ? 'border-sky-400/30 bg-sky-500/10' : 'border-white/10 bg-white/5'}`}>
                                 <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-white/80">
                                   <span>{intf.name}</span>
-                                  <span className="text-[10px] font-medium text-white/60">
-                                    {node.kind === 'router'
-                                      ? (intf.targetRouterInterfaceId ? 'uplink' : 'out')
-                                      : 'in'}
-                                  </span>
+                                  {isCompLocked ? (
+                                    <span className="rounded bg-sky-500/30 px-1 text-[9px] font-bold uppercase tracking-wide text-sky-100">
+                                      comp
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] font-medium text-white/60">
+                                      {node.kind === 'router'
+                                        ? (intf.targetRouterInterfaceId ? 'uplink' : 'out')
+                                        : 'in'}
+                                    </span>
+                                  )}
                                 </div>
                                 <div className="text-[11px] text-white/90">
                                   {intf.ip ? (
@@ -1885,7 +1914,7 @@ const NetworkEditor: React.FC = () => {
                             )}
                           </>
                         ) : isCompNetworkIntf ? (
-                          // Comp-network interface: locked — backend assigns the team-specific IP
+                          // Comp-network interface: locked — no connections allowed, IP uses T scheme
                           <>
                             <div className="flex flex-col gap-1">
                               <span className="text-[11px] uppercase tracking-wide text-slate-400">Network (CIDR)</span>
@@ -1898,13 +1927,34 @@ const NetworkEditor: React.FC = () => {
                             </div>
                             <div className="flex flex-col gap-1">
                               <span className="text-[11px] uppercase tracking-wide text-slate-400">IP address</span>
-                              <div className="rounded border border-white/10 bg-white/5 px-2 py-1 text-xs italic text-slate-400">
-                                Backend-assigned (10.20.T.1)
+                              <div className="rounded border border-white/10 bg-white/5 px-2 py-1 text-xs font-semibold text-sky-200">
+                                {intf.ip || `${game!.blackTeamCidr!.split('/')[0].split('.').slice(0, 2).join('.')}.T.1`}
                               </div>
                               <span className="text-[10px] text-slate-500">
-                                The backend substitutes the team-specific uplink IP at deploy time.
+                                T is replaced with each team's ID at deploy time.
                               </span>
                             </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                // Remove any links on this interface before disconnecting
+                                setLinks((current) =>
+                                  current.filter(
+                                    (l) =>
+                                      !(l.from.nodeId === selectedNode.id && l.from.interfaceId === intf.id) &&
+                                      !(l.to.nodeId === selectedNode.id && l.to.interfaceId === intf.id),
+                                  ),
+                                );
+                                updateInterface(selectedNode.id, intf.id, (current) => ({
+                                  ...current,
+                                  networkCidr: undefined,
+                                  ip: undefined,
+                                }));
+                              }}
+                              className="rounded border border-rose-400/40 bg-rose-500/10 px-2 py-1 text-[11px] font-semibold text-rose-200 transition hover:bg-rose-500/20"
+                            >
+                              Disconnect from Comp Network
+                            </button>
                           </>
                         ) : (
                           <>
@@ -1967,6 +2017,29 @@ const NetworkEditor: React.FC = () => {
                                   ))}
                               </select>
                             </div>
+                            {game?.blackTeamCidr && intf.networkCidr !== game.blackTeamCidr && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  // Remove any existing links on this interface before connecting to comp
+                                  setLinks((current) =>
+                                    current.filter(
+                                      (l) =>
+                                        !(l.from.nodeId === selectedNode.id && l.from.interfaceId === intf.id) &&
+                                        !(l.to.nodeId === selectedNode.id && l.to.interfaceId === intf.id),
+                                    ),
+                                  );
+                                  updateInterface(selectedNode.id, intf.id, (current) => ({
+                                    ...current,
+                                    networkCidr: game.blackTeamCidr,
+                                    targetRouterInterfaceId: undefined,
+                                  }));
+                                }}
+                                className="rounded border border-sky-400/40 bg-sky-500/10 px-2 py-1 text-[11px] font-semibold text-sky-200 transition hover:bg-sky-500/20"
+                              >
+                                Connect to Comp Network ({game.blackTeamCidr})
+                              </button>
+                            )}
                           </>
                         )}
                       </div>

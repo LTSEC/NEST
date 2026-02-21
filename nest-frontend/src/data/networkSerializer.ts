@@ -3,20 +3,32 @@ import { Game } from './games';
 import { serviceDefinitionsById } from './services';
 
 /**
+ * Helper to calculate IP addresses for black team services based on the game CIDR.
+ */
+export const generateServiceIp = (cidr: string | undefined, index: number): string => {
+  const baseCidr = cidr || '10.0.0.0/16';
+  // Replace T with 0
+  const cleanCidr = baseCidr.replace('T', '0');
+  const ipPart = cleanCidr.split('/')[0];
+  const octets = ipPart.split('.').map(Number);
+
+  // Set last octet to 10 + index
+  // Assuming a /24 or larger network where the last octet is available
+  octets[3] = 10 + index;
+
+  return octets.join('.');
+};
+
+/**
  * CyberGame payload types matching the Go backend types.CyberGame struct.
  * This is what the Python tfparser.py expects to receive.
  */
 export interface CyberGamePayload {
+  name: string;
   networks: { name: string; cidr: string }[];
   devices: CyberGameDevice[];
   blackteamServices: { name: string; templateId: number; hostId: number; ip: string }[];
   applications: { name: string; servers: string[]; services: string[]; color: string }[];
-  ldapZones: {
-    name: string;
-    server: string;
-    users: { username: string; password: string }[];
-    connectedServers: string[];
-  }[];
 }
 
 export interface CyberGameDevice {
@@ -31,7 +43,6 @@ export interface CyberGameDevice {
   dhcp?: boolean;
   ip?: string;
   services: Record<string, number>;
-  ldapZone?: string;
 }
 
 const anchorKey = (nodeId: string, interfaceId: string) => `${nodeId}:${interfaceId}`;
@@ -80,47 +91,12 @@ const findConnectedRouter = (
 };
 
 /**
- * Determines if a router is the "infrastructure" (competition) router.
- * The infra router is defined as having an interface connected to the WAN
- * (an interface whose network CIDR contains 'T' in the octet for team numbering,
- * or a router that has no hostId/is not connected to other routers as children).
- *
- * For simplicity: the first router whose eth0 connects to no other router
- * is considered the infra/competition router. Users can set hostId via the
- * image ID in the network editor.
+ * Checks if an interface is connected to the competition network.
+ * An interface is on the comp network if its IP contains 'T' (the team placeholder).
  */
-const isInfraRouter = (
-  node: PersistedNode,
-  links: PersistedLink[],
-  nodes: PersistedNode[],
-): boolean => {
-  // A router is an infra router if none of its interfaces are connected
-  // to another router (i.e., it's the top-level gateway).
-  for (const intf of node.interfaces) {
-    const key = anchorKey(node.id, intf.id);
-    for (const link of links) {
-      const fromKey = anchorKey(link.from.nodeId, link.from.interfaceId);
-      const toKey = anchorKey(link.to.nodeId, link.to.interfaceId);
-      let otherNodeId: string | null = null;
-
-      if (fromKey === key) otherNodeId = link.to.nodeId;
-      else if (toKey === key) otherNodeId = link.from.nodeId;
-
-      if (otherNodeId) {
-        const otherNode = nodes.find((n) => n.id === otherNodeId);
-        if (otherNode?.kind === 'router') {
-          // This router IS connected to another router - check if this is the parent
-          // A parent router has its child connecting TO it, not FROM it
-          // For now, use heuristic: infra router has imageId that parses as non-negative int
-          // and is not connected as a child of another router
-        }
-      }
-    }
-  }
-
-  // Heuristic: router with imageId "-1" (Blank) that has no parent router is infra
-  const imageId = parseInt(node.imageId, 10);
-  return imageId < 0;
+const isCompNetworkInterface = (intf: PersistedInterface, blackTeamCidr?: string): boolean => {
+  if (!blackTeamCidr) return false;
+  return intf.networkCidr === blackTeamCidr || Boolean(intf.ip && intf.ip.includes('T'));
 };
 
 /**
@@ -130,6 +106,7 @@ const isInfraRouter = (
 const collectNetworks = (
   nodes: PersistedNode[],
   links: PersistedLink[],
+  blackTeamCidr?: string,
 ): Map<string, string> => {
   const networks = new Map<string, string>();
 
@@ -137,6 +114,19 @@ const collectNetworks = (
     if (node.kind !== 'router') continue;
     for (const intf of node.interfaces) {
       if (!intf.networkCidr) continue;
+
+      // If this interface is on the competition network, emit the External WAN entry
+      if (isCompNetworkInterface(intf, blackTeamCidr)) {
+        const cidr = intf.networkCidr;
+        const [ip, prefix] = cidr.split('/');
+        const octets = ip.split('.');
+        // Replace the third octet with T for team numbering
+        octets[2] = 'T';
+        octets[3] = '0';
+        networks.set('External WAN', `${octets.join('.')}/${prefix}`);
+        continue;
+      }
+
       const name = networkNameForRouterInterface(node, intf);
 
       // Check if this interface connects to another router (WAN link)
@@ -159,21 +149,7 @@ const collectNetworks = (
         }
       }
 
-      if (connectsToRouter) {
-        // For router-to-router links, use the parent router's network name
-        // and mark with 'T' for team numbering if it's the WAN
-        const isInfra = isInfraRouter(node, links, nodes);
-        if (isInfra) {
-          // WAN network - use T notation for team-per-octet
-          const cidr = intf.networkCidr;
-          const [ip, prefix] = cidr.split('/');
-          const octets = ip.split('.');
-          // Replace last non-zero octet with T for team numbering
-          octets[octets.length - 2] = 'T';
-          octets[octets.length - 1] = '0';
-          networks.set('External WAN', `${octets.join('.')}/${prefix}`);
-        }
-      } else {
+      if (!connectsToRouter) {
         // Normal team network
         networks.set(name, intf.networkCidr);
       }
@@ -195,7 +171,7 @@ export const serializeNetworkToCyberGame = (
   const { nodes, links } = snapshot;
 
   // 1. Collect all unique networks from router interfaces
-  const networkMap = collectNetworks(nodes, links);
+  const networkMap = collectNetworks(nodes, links, game.blackTeamCidr);
   const networkArray = Array.from(networkMap.entries()).map(([name, cidr]) => ({
     name,
     cidr,
@@ -207,11 +183,17 @@ export const serializeNetworkToCyberGame = (
   for (const node of nodes) {
     if (node.kind === 'router') {
       const interfaces: Record<string, string> = {};
-      let lastNetworkName = '';
 
       for (const intf of node.interfaces) {
         if (!intf.networkCidr && !intf.ip) {
           interfaces[intf.name] = '';
+          continue;
+        }
+
+        // If this interface is on the competition network, mark as External WAN
+        // and use the T-based IP for the backend to substitute
+        if (isCompNetworkInterface(intf, game.blackTeamCidr)) {
+          interfaces[intf.name] = 'External WAN';
           continue;
         }
 
@@ -238,17 +220,21 @@ export const serializeNetworkToCyberGame = (
         if (connectsToRouter) {
           // This is a WAN-facing interface
           interfaces[intf.name] = 'External WAN';
-          lastNetworkName = 'External WAN';
         } else {
           // LAN interface
-          const networkName = networkNameForRouterInterface(node, intf);
           interfaces[intf.name] = intf.ip ? `${intf.ip}/${intf.networkCidr?.split('/')[1] || '24'}` : '';
-          lastNetworkName = networkName;
         }
       }
 
       const imageId = parseInt(node.imageId, 10);
-      const infra = isInfraRouter(node, links, nodes);
+
+      // A router is "infra" (competition router) if it has no comp network interface
+      // and has imageId < 0. But now we detect it by checking if any interface is
+      // connected to the comp network — if none are, and it's connected to a router
+      // that IS on the comp network, it's a team router.
+      const hasCompInterface = node.interfaces.some((i) => isCompNetworkInterface(i, game.blackTeamCidr));
+      // If no comp interface, treat hostId as the image ID for team routers
+      const infra = hasCompInterface ? false : imageId < 0;
 
       devices.push({
         name: node.label,
@@ -307,7 +293,7 @@ export const serializeNetworkToCyberGame = (
     name: service,
     templateId: index + 1,
     hostId: index + 1,
-    ip: `10.0.0.${index + 10}`,
+    ip: generateServiceIp(game.blackTeamCidr, index),
   }));
 
   // 4. Build applications
@@ -320,26 +306,11 @@ export const serializeNetworkToCyberGame = (
     color: ['#E11D48', '#2563EB', '#10B981'][index % 3],
   }));
 
-  // 5. Build LDAP zones
-  const safeTeamCount = Math.max(1, Math.floor(teamCount));
-  const ldapZones = Array.from({ length: safeTeamCount }, (_, index) => {
-    const teamNumber = index + 1;
-    return {
-      name: `Team ${teamNumber}`,
-      server: `team${teamNumber}.ldap.local`,
-      users: (game.credentials || []).map((cred) => ({
-        username: `team${teamNumber}-${cred.username}`,
-        password: cred.password,
-      })),
-      connectedServers: nodes.filter((n) => n.kind === 'host').map((n) => n.label),
-    };
-  });
-
   return {
+    name: game.name,
     networks: networkArray,
     devices,
     blackteamServices,
     applications,
-    ldapZones,
   };
 };

@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { UserRole } from '../auth';
 import ProfileMenu from './ProfileMenu';
+import ThemeToggle from './ThemeToggle';
 
 export type NavBarProps = {
   role: UserRole;
@@ -36,11 +37,11 @@ const NavBar: React.FC<NavBarProps> = ({ role, onLogout, userName }) => {
   const navItems = navItemsByRole[role] ?? navItemsByRole.user;
 
   return (
-    <nav className="border-b border-slate-200 bg-white shadow-sm">
+    <nav className="border-b border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
       <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
         <div className="flex items-center gap-8">
-          <div className="text-lg font-semibold text-indigo-700">Nest Dev Portal</div>
-          <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+          <div className="text-lg font-semibold text-indigo-700 dark:text-indigo-400">Nest Dev Portal</div>
+          <div className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300">
             {navItems.map((item) => {
               const isActive =
                 location.pathname === item.to || location.pathname.startsWith(`${item.to}/`);
@@ -50,8 +51,8 @@ const NavBar: React.FC<NavBarProps> = ({ role, onLogout, userName }) => {
                   to={item.to}
                   className={`rounded-md px-3 py-2 transition ${
                     isActive
-                      ? 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100'
-                      : 'text-slate-700 hover:bg-slate-100'
+                      ? 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100 dark:bg-indigo-500/20 dark:text-indigo-300 dark:ring-indigo-500/30'
+                      : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
                   }`}
                 >
                   {item.label}
@@ -61,15 +62,18 @@ const NavBar: React.FC<NavBarProps> = ({ role, onLogout, userName }) => {
           </div>
         </div>
 
-        {userName && (
-          <ProfileMenu
-            initial={userName.trim()[0]?.toUpperCase() ?? '?'}
-            items={[
-              { label: 'Edit Profile', to: '/profile' },
-              { label: 'Sign out', onClick: onLogout },
-            ]}
-          />
-        )}
+        <div className="flex items-center gap-3">
+          <ThemeToggle />
+          {userName && (
+            <ProfileMenu
+              initial={userName.trim()[0]?.toUpperCase() ?? '?'}
+              items={[
+                { label: 'Edit Profile', to: '/profile' },
+                { label: 'Sign out', onClick: onLogout },
+              ]}
+            />
+          )}
+        </div>
       </div>
     </nav>
   );

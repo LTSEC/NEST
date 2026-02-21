@@ -61,19 +61,27 @@ type OSInfo struct {
 	Name string `json:"name"`
 }
 
+// ServiceConfig carries per-service configuration including Ansible metadata.
+type ServiceConfig struct {
+	Port        int               `json:"port"`
+	Protocol    string            `json:"protocol"`
+	AnsibleMeta map[string]string `json:"ansibleMeta,omitempty"`
+}
+
 // Device represents either a router or a server.
 type Device struct {
-	Name       string            `json:"name"`
-	Type       string            `json:"type"` // "Router" or "Server"
-	OS         OSInfo            `json:"os"`
-	HostID     *int              `json:"hostId"` // nullable
-	Interfaces map[string]string `json:"interfaces,omitempty"`
-	Router     string            `json:"router,omitempty"`    // for servers
-	Interface  string            `json:"interface,omitempty"` // for servers
-	Segment    string            `json:"segment,omitempty"`
-	DHCP       bool              `json:"dhcp,omitempty"`
-	IP         string            `json:"ip,omitempty"`
-	Services   map[string]int    `json:"services"`
+	Name           string                   `json:"name"`
+	Type           string                   `json:"type"` // "Router" or "Server"
+	OS             OSInfo                   `json:"os"`
+	HostID         *int                     `json:"hostId"` // nullable
+	Interfaces     map[string]string        `json:"interfaces,omitempty"`
+	Router         string                   `json:"router,omitempty"`    // for servers
+	Interface      string                   `json:"interface,omitempty"` // for servers
+	Segment        string                   `json:"segment,omitempty"`
+	DHCP           bool                     `json:"dhcp,omitempty"`
+	IP             string                   `json:"ip,omitempty"`
+	Services       map[string]int           `json:"services"`
+	ServiceConfigs map[string]ServiceConfig `json:"serviceConfigs,omitempty"`
 }
 
 // CyberGame represents the full exported network definition from the frontend.

@@ -10,6 +10,7 @@ const normalizeServices = (services: ServiceDefinition[] | undefined): ServiceDe
       defaultPort: typeof service.defaultPort === 'number' ? service.defaultPort : undefined,
       roles: Array.isArray(service.roles) ? service.roles : [],
       dependencies: Array.isArray(service.dependencies) ? service.dependencies : [],
+      ansibleFields: Array.isArray(service.ansibleFields) ? service.ansibleFields : [],
     }));
 };
 

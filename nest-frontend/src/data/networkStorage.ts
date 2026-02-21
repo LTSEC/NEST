@@ -23,6 +23,8 @@ export interface PersistedServiceInstance {
   protocol: 'tcp' | 'udp';
   port: number;
   customServiceId?: string;
+  /** Arbitrary key-value pairs consumed by Ansible playbooks (e.g. users, db names). */
+  ansibleMeta?: Record<string, string>;
 }
 
 export interface PersistedLinkEnd {

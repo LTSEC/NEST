@@ -15,7 +15,10 @@
       "description": "Generic web server listening for HTTP traffic",
       "protocol": "tcp",
       "defaultPort": 80,
-      "roles": ["webserver"]
+      "roles": ["webserver"],
+      "ansibleFields": [
+        { "key": "document_root", "label": "Document Root", "defaultValue": "/var/www/html", "placeholder": "/var/www/html" }
+      ]
     },
     {
       "id": "https",
@@ -23,7 +26,12 @@
       "description": "TLS-enabled web server endpoint",
       "protocol": "tcp",
       "defaultPort": 443,
-      "roles": ["webserver"]
+      "roles": ["webserver"],
+      "ansibleFields": [
+        { "key": "document_root", "label": "Document Root", "defaultValue": "/var/www/html", "placeholder": "/var/www/html" },
+        { "key": "cert_path", "label": "TLS Certificate Path", "defaultValue": "/etc/ssl/certs/server.crt", "placeholder": "/etc/ssl/certs/server.crt" },
+        { "key": "key_path", "label": "TLS Key Path", "defaultValue": "/etc/ssl/private/server.key", "placeholder": "/etc/ssl/private/server.key" }
+      ]
     },
     {
       "id": "ssh",
@@ -31,7 +39,11 @@
       "description": "Secure shell for remote access",
       "protocol": "tcp",
       "defaultPort": 22,
-      "roles": ["admin"]
+      "roles": ["admin"],
+      "ansibleFields": [
+        { "key": "ssh_user", "label": "Login User", "defaultValue": "root", "placeholder": "root" },
+        { "key": "permit_root", "label": "Permit Root Login", "defaultValue": "yes", "placeholder": "yes / no" }
+      ]
     },
     {
       "id": "dns",
@@ -39,7 +51,11 @@
       "description": "Authoritative DNS service",
       "protocol": "udp",
       "defaultPort": 53,
-      "roles": ["dns"]
+      "roles": ["dns"],
+      "ansibleFields": [
+        { "key": "zone", "label": "Zone Name", "defaultValue": "", "placeholder": "example.com" },
+        { "key": "forwarders", "label": "Forwarders (comma-separated)", "defaultValue": "8.8.8.8", "placeholder": "8.8.8.8,8.8.4.4" }
+      ]
     },
     {
       "id": "postgresql",
@@ -47,7 +63,12 @@
       "description": "PostgreSQL database server",
       "protocol": "tcp",
       "defaultPort": 5432,
-      "roles": ["database"]
+      "roles": ["database"],
+      "ansibleFields": [
+        { "key": "db_name", "label": "Database Name", "defaultValue": "app_db", "placeholder": "app_db" },
+        { "key": "db_user", "label": "Database User", "defaultValue": "postgres", "placeholder": "postgres" },
+        { "key": "db_password", "label": "Database Password", "defaultValue": "", "placeholder": "secret" }
+      ]
     },
     {
       "id": "mariadb",
@@ -55,7 +76,12 @@
       "description": "MySQL-compatible database service",
       "protocol": "tcp",
       "defaultPort": 3306,
-      "roles": ["database"]
+      "roles": ["database"],
+      "ansibleFields": [
+        { "key": "db_name", "label": "Database Name", "defaultValue": "app_db", "placeholder": "app_db" },
+        { "key": "db_user", "label": "Database User", "defaultValue": "root", "placeholder": "root" },
+        { "key": "db_password", "label": "Database Password", "defaultValue": "", "placeholder": "secret" }
+      ]
     }
   ],
   "customServices": [

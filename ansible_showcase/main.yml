@@ -1,0 +1,2 @@
+# Always do blackteam first for all vms
+- import_playbook: blackteam.yml

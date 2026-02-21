@@ -41,6 +41,7 @@ const MyGames: React.FC = () => {
   const [consoleVisible, setConsoleVisible] = useState(false);
   const [consoleTitle, setConsoleTitle] = useState('');
   const [consoleMode, setConsoleMode] = useState<'create' | 'destroy' | null>(null);
+  const [consoleMaximized, setConsoleMaximized] = useState(false);
   const sseRef = useRef<EventSource | null>(null);
   const [activeInfraId, setActiveInfraId] = useState<number | null>(null);
   const [destroyingSessionId, setDestroyingSessionId] = useState<string | null>(null);
@@ -139,20 +140,24 @@ const MyGames: React.FC = () => {
       visibility?: GameVisibility;
       minPlayers?: string;
       invitedTeamIds?: string[];
+      skipTerraform?: boolean;
     },
   ) => {
     if (!user) return;
-    if (activeHostedCount > 0) {
+    if (activeHostedCount > 0 && !overrides?.skipTerraform) {
       setHostingError('You can only host one game at a time.');
       return;
     }
 
     setHostingGameId(game.id);
     setHostingError(null);
-    setConsoleLogs([]);
-    setConsoleTitle(`Hosting ${game.name}`);
-    setConsoleMode('create');
-    setConsoleVisible(true);
+
+    if (!overrides?.skipTerraform) {
+      setConsoleLogs([]);
+      setConsoleTitle(`Hosting ${game.name}`);
+      setConsoleMode('create');
+      setConsoleVisible(true);
+    }
 
     try {
       const effectiveStartTime = overrides?.startTime ?? startTimeInput;
@@ -167,7 +172,7 @@ const MyGames: React.FC = () => {
       if (end <= start) {
         setHostingError('End time must be after start time.');
         setHostingGameId(null);
-        setConsoleVisible(false);
+        if (!overrides?.skipTerraform) setConsoleVisible(false);
         return;
       }
 
@@ -175,9 +180,11 @@ const MyGames: React.FC = () => {
       const safeMinPlayers = Number.isFinite(minPlayers) && minPlayers > 0 ? Math.floor(minPlayers) : 1;
       const effectiveMinimum = teams ? Math.max(safeMinPlayers, teams) : safeMinPlayers;
 
-      const hosted = await hostGameInstance(game, { teamCount: teams });
-
-      setActiveInfraId(hosted.id);
+      let hosted = null;
+      if (!overrides?.skipTerraform) {
+        hosted = await hostGameInstance(game, { teamCount: teams });
+        setActiveInfraId(hosted.id);
+      }
 
       const session = scheduleGameSession(game, { id: user.id, name: user.name }, {
         startTime: start.toISOString(),
@@ -185,23 +192,31 @@ const MyGames: React.FC = () => {
         visibility: effectiveVisibility,
         invitedTeamIds: effectiveInvitedTeams,
         minPlayers: effectiveMinimum,
-        infrastructureId: hosted.id,
-        infrastructureStatus: hosted.status === 'running' ? 'active' : 'creating',
+        infrastructureId: hosted?.id,
+        infrastructureStatus: hosted ? (hosted.status === 'running' ? 'active' : 'creating') : undefined,
       });
 
-      updateInfrastructureStatus(session.id, hosted.status === 'running' ? 'active' : 'creating');
+      if (hosted) {
+        updateInfrastructureStatus(session.id, hosted.status === 'running' ? 'active' : 'creating');
+      }
       setSessions(listDeveloperSessions(user.id));
     } catch (error) {
       setHostingError(error instanceof Error ? error.message : 'Failed to host game.');
-      setConsoleVisible(false);
-      setActiveInfraId(null);
+      if (!overrides?.skipTerraform) {
+        setConsoleVisible(false);
+        setActiveInfraId(null);
+      }
     }
 
     setHostingGameId(null);
   };
 
   const handleTestNow = (game: Game) => {
-    const teamCount = Math.max(1, game.teamCount || 2);
+    const defaultTeamCount = Math.max(1, game.teamCount || 2);
+    const input = window.prompt('How many teams?', String(defaultTeamCount));
+    if (input === null) return; // User cancelled
+    const teamCount = Math.max(1, parseInt(input, 10) || defaultTeamCount);
+
     void startHostingGame(game, teamCount, {
       startTime: '',
       endTime: '',
@@ -231,7 +246,7 @@ const MyGames: React.FC = () => {
     const safeTeamCount = Number.isFinite(parsedTeams) && parsedTeams > 0 ? Math.floor(parsedTeams) : 1;
     const gameToHost = pendingHostGame;
     setPendingHostGame(null);
-    await startHostingGame(gameToHost, safeTeamCount);
+    await startHostingGame(gameToHost, safeTeamCount, { skipTerraform: true });
   };
 
   const cancelTeamSelection = () => setPendingHostGame(null);
@@ -270,12 +285,49 @@ const MyGames: React.FC = () => {
     setDestroyingSessionId(null);
   };
 
-  const handleStartNow = (session: GameSession) => {
+  const handleStartNow = async (session: GameSession) => {
     if (!user) return;
-    const updated = startSessionImmediately(session.id);
-    if (updated) {
-      setSessions(listDeveloperSessions(user.id));
+    if (activeHostedCount > 0) {
+      setHostingError('You can only host one game at a time.');
+      return;
     }
+
+    const game = games.find((g) => g.id === session.gameId);
+    if (!game) {
+      setHostingError('Game definition not found.');
+      return;
+    }
+
+    setHostingGameId(game.id);
+    setHostingError(null);
+    setConsoleLogs([]);
+    setConsoleTitle(`Hosting ${game.name}`);
+    setConsoleMode('create');
+    setConsoleVisible(true);
+    setActiveInfraId(null); // Will be set after hosting starts
+
+    try {
+      // Determine team count from invited teams, defaulting to game default or 2
+      const teamCount = Math.max(session.invitedTeamIds.length, game.teamCount || 2);
+
+      const hosted = await hostGameInstance(game, { teamCount });
+
+      setActiveInfraId(hosted.id);
+
+      // Update session with infrastructure details
+      updateInfrastructureStatus(session.id, hosted.status === 'running' ? 'active' : 'creating');
+      // Also mark session as running
+      startSessionImmediately(session.id);
+
+      // Update local state
+      setSessions(listDeveloperSessions(user.id));
+    } catch (error) {
+      setHostingError(error instanceof Error ? error.message : 'Failed to host game.');
+      setConsoleVisible(false);
+      setActiveInfraId(null);
+    }
+
+    setHostingGameId(null);
   };
 
   if (!user) return null;
@@ -653,7 +705,7 @@ const MyGames: React.FC = () => {
                   onClick={confirmTeamSelection}
                   className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 dark:bg-indigo-500 dark:hover:bg-indigo-400"
                 >
-                  Start hosting
+                  Create Lobby
                 </button>
               </div>
             </div>
@@ -661,7 +713,11 @@ const MyGames: React.FC = () => {
         )}
 
         {consoleVisible && (
-          <div className="fixed bottom-4 right-4 z-20 w-full max-w-xl overflow-hidden rounded-xl bg-white shadow-xl ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
+          <div
+            className={`fixed z-20 overflow-hidden rounded-xl bg-white shadow-xl ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700 ${
+              consoleMaximized ? 'inset-4 flex flex-col' : 'bottom-4 right-4 w-full max-w-xl'
+            }`}
+          >
             <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-700">
               <div>
                 <p className="text-sm font-semibold text-slate-900 dark:text-white">{consoleTitle || 'Terraform console'}</p>
@@ -673,22 +729,35 @@ const MyGames: React.FC = () => {
                     : 'Live output from the terraform console'}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setConsoleVisible(false);
-                  setActiveInfraId(null);
-                  if (sseRef.current) {
-                    sseRef.current.close();
-                    sseRef.current = null;
-                  }
-                }}
-                className="rounded-lg bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:ring-slate-600 dark:hover:bg-slate-600"
-              >
-                Close
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setConsoleMaximized(!consoleMaximized)}
+                  className="rounded-lg bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:ring-slate-600 dark:hover:bg-slate-600"
+                >
+                  {consoleMaximized ? 'Minimize' : 'Full Screen'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConsoleVisible(false);
+                    setActiveInfraId(null);
+                    if (sseRef.current) {
+                      sseRef.current.close();
+                      sseRef.current = null;
+                    }
+                  }}
+                  className="rounded-lg bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:ring-slate-600 dark:hover:bg-slate-600"
+                >
+                  Close
+                </button>
+              </div>
             </div>
-            <pre className="max-h-64 overflow-y-auto bg-slate-900 px-4 py-3 text-xs text-slate-100 dark:bg-slate-950">
+            <pre
+              className={`overflow-y-auto bg-slate-900 px-4 py-3 text-xs text-slate-100 dark:bg-slate-950 ${
+                consoleMaximized ? 'flex-1' : 'max-h-64'
+              }`}
+            >
               {(consoleLogs.length ? consoleLogs : ['Waiting for console output...']).join('\n')}
             </pre>
           </div>

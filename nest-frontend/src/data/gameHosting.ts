@@ -178,9 +178,13 @@ export const hostGameInstance = async (
       ...preset,
       name: game.name,
       applications,
+      teamCount,
     };
   } else {
-    payload = buildPayloadFromNetwork(game, teamCount);
+    payload = {
+      ...buildPayloadFromNetwork(game, teamCount),
+      teamCount,
+    };
   }
 
   const response = await fetch(`${API_BASE}/api/games`, {

@@ -83,4 +83,5 @@ type CyberGame struct {
 	Devices           []Device           `json:"devices"`
 	BlackteamServices []BlackteamService `json:"blackteamServices"`
 	Applications      []Application      `json:"applications"`
+	TeamCount         int                `json:"teamCount,omitempty"`
 }

@@ -268,6 +268,9 @@ def Parse_device_JSON(data : json, network_map: dict, wan_network: list, infra_n
 
                     eth[eth_name] = {"ip": ip, "network": network_name}
                     network_context = network_name
+
+                    if network_name is None:
+                        raise ValueError(f"Interface {eth_name} on device {name} has IP {ip} but no matching network found.")
             
             # If the hostId is none, then it is considered the "Competition" router
             if vm.get("hostId") is None:
@@ -299,6 +302,9 @@ def Parse_device_JSON(data : json, network_map: dict, wan_network: list, infra_n
             server_vms[name] = {"template_id": template_id,
                                 "dhcp": ip,
                                 "network": server_network}
+
+            if server_network is None and ip != "":
+                 raise ValueError(f"Server {name} has IP {ip} but no matching network found.")
             
     for vm in data.get("blackteamServices", []):
         name = vm["name"]
@@ -313,7 +319,7 @@ def CreateTerraform(data: json) -> None:
     infra_network = {}
     team_networks = {}
     network_map = {}
-    number_of_teams = 2
+    number_of_teams = data.get("teamCount", 2)
     wan_network = []
     
     infra_network_name = ""

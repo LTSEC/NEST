@@ -124,6 +124,7 @@ const buildPayloadFromNetwork = (
 
   // Fallback: no network configured, send minimal payload
   return {
+    name: game.name,
     networks: [],
     devices: [],
     blackteamServices: (game.rvbServices || []).map((service, index) => ({
@@ -175,6 +176,7 @@ export const hostGameInstance = async (
 
     payload = {
       ...preset,
+      name: game.name,
       applications,
     };
   } else {

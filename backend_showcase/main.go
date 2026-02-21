@@ -67,8 +67,12 @@ func createGame(ctx echo.Context) error {
 	file.Close()
 
 	// Create the game state in memory
+	gameName := game.Name
+	if gameName == "" {
+		gameName = "Test Game"
+	}
 	id := games.GlobalGameManager.Create(&types.GameStatus{
-		Name:   "Test Game",
+		Name:   gameName,
 		Status: types.StateQueued,
 	})
 

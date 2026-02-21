@@ -7,6 +7,7 @@ import { serviceDefinitionsById } from './services';
  * This is what the Python tfparser.py expects to receive.
  */
 export interface CyberGamePayload {
+  name: string;
   networks: { name: string; cidr: string }[];
   devices: CyberGameDevice[];
   blackteamServices: { name: string; templateId: number; hostId: number; ip: string }[];
@@ -289,6 +290,7 @@ export const serializeNetworkToCyberGame = (
   }));
 
   return {
+    name: game.name,
     networks: networkArray,
     devices,
     blackteamServices,

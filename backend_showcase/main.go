@@ -424,7 +424,7 @@ func deleteSessionHandler(ctx echo.Context) error {
 	if err != nil {
 		return ctx.JSON(http.StatusBadRequest, map[string]string{"error": "invalid id"})
 	}
-	if err := database.DeleteSession(ctx.Request().Context(), id); err != nil {
+	if err := database.DeleteGameSession(ctx.Request().Context(), id); err != nil {
 		return ctx.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
 	return ctx.NoContent(http.StatusOK)

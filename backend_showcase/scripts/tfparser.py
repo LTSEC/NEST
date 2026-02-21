@@ -355,42 +355,10 @@ def CreateTerraform(data: json) -> None:
                 interfaces = vm["interfaces"]
                 for eth_name, eth_ip in interfaces.items():
                     if eth_ip and "T" in eth_ip:
-                        # Found a T-address connection!
-                        # The network name connected to this interface is the infra network
                         target_net_name = interfaces.get(eth_name)
-                        # Does this name exist in team_networks? If so, move it to infra_network
-                        # But wait, interfaces dict value is usually the network name (e.g., "External WAN")
-                        # OR it's the IP?
-                        # In the provided JSON, interfaces keys are "eth0", values are "External WAN" (name) or "172.27.0.1/24" (IP? No, usually name or IP+CIDR)
-                        # The JSON example: "eth0": "External WAN", "eth1": "172.27.0.1/24"
-                        # Actually, looking at the JSON:
-                        # "interfaces": {"eth0": "External WAN", "eth1": "172.27.0.1/24"}
-                        # Wait, "External WAN" is a name. "172.27.0.1/24" is an IP/CIDR.
-                        # How does the parser distinguish?
-                        # In Parse_device_JSON:
-                        # if "eth0" in eth_name and wan_network: ... network_name = interfaces["eth0"]
-                        # else: ip = eth_ip.split("/")[0]; network_name = map_ip_to_network(ip, network_map)
-
-                        # So if the value is "External WAN", it's a name. If it's "1.2.3.4/24", it's an IP.
-                        # The issue is, if we have "eth0": "External WAN", we don't see the IP there to check for 'T'.
-                        # But wait, the user said "just a router with 'T' in it's IP".
-                        # This implies the JSON might look like: "eth0": "10.20.T.2/16" ?
-                        # Or does the user mean the router definition has a specific IP field?
-                        # The JSON has "interfaces": { "eth0": "External WAN" }
-                        # Where is the IP "10.20.T.2"?
-                        # Ah, in the original code:
-                        # if "eth0" in eth_name and wan_network: ... network[3] = str(vm["hostId"])... ip = ...
-
-                        # If the user defines "eth0": "10.20.T.2/16", then `eth_ip` is "10.20.T.2/16".
-                        # `Parse_device_JSON` handles `eth_ip.split("/")[0]`.
 
                         if "T" in eth_ip:
-                            # It's an IP string with T.
-                            # We need to find which network this belongs to.
-                            # We can try to map it (treating T as 0 or matching name?)
-                            # But usually, explicit IPs are mapped to networks via `map_ip_to_network`.
 
-                            # However, if it has a T, map_ip_to_network might fail unless we assume T=0.
                             ip_sanitized = eth_ip.split("/")[0].replace("T", "0")
                             found_net = map_ip_to_network(ip_sanitized, network_map)
 

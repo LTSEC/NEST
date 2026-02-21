@@ -50,7 +50,7 @@ locals {{\n\
     for key,value in infra_router_vm.items():
         interfaces = "{" + ", ".join(f"\"{k}\" = {{ ip = \"{v["ip"]}\", network = \"{v["network"]}\"}}" for k, v in value["interfaces"].items()) + "}"
         local_output += f"\
-        \"{key}\" = {{ interfaces = {interfaces}, network = \"{value["network"]}\", template_id = {value["template_id"]} }}\n"
+        \"{key}\" = {{ interfaces = {interfaces}, network = \"{value["network"]}\", template_id = 2\n"
 
     # Infra Servers (black team)
     local_output += f"\

@@ -165,8 +165,8 @@ func UpdateInfrastructureStatus(ctx context.Context, id int, infraID *int, infra
 	return nil
 }
 
-// DeleteSession removes a session by ID.
-func DeleteSession(ctx context.Context, id int) error {
+// DeleteGameSession removes a session by ID.
+func DeleteGameSession(ctx context.Context, id int) error {
 	_, err := DB.ExecContext(ctx, `DELETE FROM game_sessions WHERE id = $1`, id)
 	if err != nil {
 		return fmt.Errorf("delete session: %w", err)

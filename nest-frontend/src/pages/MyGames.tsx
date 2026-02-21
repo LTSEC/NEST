@@ -12,6 +12,8 @@ import {
   startSessionImmediately,
   cancelScheduledSession,
   updateInfrastructureStatus,
+  removeSession,
+  listSessionsForGame,
 } from '../data/gameSessions';
 import { destroyHostedGame, hostGameInstance, streamTerraformLogs } from '../data/gameHosting';
 import { listTeams } from '../data/teams';
@@ -64,18 +66,15 @@ const MyGames: React.FC = () => {
         setConsoleLogs((prev) => [...prev, line]);
 
         if (line.includes('[OK] Terraform destroyed successfully')) {
-          setSessions((prev) =>
-            prev.map((session) => {
-              if (session.infrastructureId === activeInfraId) {
-                return {
-                  ...session,
-                  infrastructureId: undefined,
-                  infrastructureStatus: 'inactive',
-                };
-              }
-              return session;
-            })
-          );
+          // Remove destroyed sessions from the active list entirely
+          setSessions((prev) => {
+            const destroyed = prev.filter((s) => s.infrastructureId === activeInfraId);
+            for (const s of destroyed) {
+              shutdownSession(s.id);
+              removeSession(s.id);
+            }
+            return prev.filter((s) => s.infrastructureId !== activeInfraId);
+          });
         }
       },
       () => {
@@ -109,10 +108,26 @@ const MyGames: React.FC = () => {
     [sessions],
   );
 
-  const handleDelete = (gameId: string) => {
+  const handleDelete = async (gameId: string) => {
     if (!user) return;
+
+    // Destroy any active sessions for this game first
+    const gameSessions = listSessionsForGame(gameId);
+    for (const session of gameSessions) {
+      if (session.infrastructureId) {
+        try {
+          await destroyHostedGame(session.infrastructureId);
+        } catch {
+          // Infrastructure may already be destroyed or unreachable
+        }
+      }
+      shutdownSession(session.id);
+      removeSession(session.id);
+    }
+
     deleteGame(gameId, user.id);
     setGames(listGamesForDeveloper(user.id));
+    setSessions(listDeveloperSessions(user.id));
   };
 
   const startHostingGame = async (
@@ -245,7 +260,6 @@ const MyGames: React.FC = () => {
 
     try {
       await destroyHostedGame(session.infrastructureId);
-      shutdownSession(session.id);
       updateInfrastructureStatus(session.id, 'destroying');
       setSessions(listDeveloperSessions(user.id));
     } catch (error) {

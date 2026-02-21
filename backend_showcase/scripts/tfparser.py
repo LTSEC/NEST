@@ -202,6 +202,7 @@ resource \"opennebula_virtual_machine\" \"team-servers\" {{\n\
             team_name = pair[0]\n\
             team_number = replace(pair[0], \"team\", \"\")\n\
             team_network = local.servers[pair[1]].network\n\
+            ip = local.servers[pair[1]].ip\n\
         }}\n\
     }}\n\
     name = each.key\n\
@@ -209,6 +210,7 @@ resource \"opennebula_virtual_machine\" \"team-servers\" {{\n\
     nic {{\n\
         model=\"virtio\"\n\
         network_id = {network_id_line}\n\
+        ip = each.value.ip != \"\" ? replace(each.value.ip, \"T\", each.value.team_number) : null\n\
     }}\n\
 }}\n"
     return server_vm_template

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AUTH_TOKEN_EXPIRY_HOURS, authenticateWithUsersTable } from '../auth';
 import { useAuth } from '../providers/AuthProvider';
+import ThemeToggle from '../components/ThemeToggle';
 
 const DevSignIn: React.FC = () => {
   const navigate = useNavigate();
@@ -32,7 +33,10 @@ const DevSignIn: React.FC = () => {
   };
 
   return (
-    <div className="grid min-h-screen grid-cols-1 bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-white md:grid-cols-2">
+    <div className="relative grid min-h-screen grid-cols-1 bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-white md:grid-cols-2">
+      <div className="absolute right-4 top-4 z-10">
+        <ThemeToggle />
+      </div>
       <div className="flex items-center justify-center bg-slate-900 p-12 text-white">
         <div className="flex max-w-md flex-col items-center gap-4 text-center">
           <div className="flex h-24 w-24 items-center justify-center rounded-full border border-indigo-300/70 bg-indigo-300/30 text-lg font-semibold uppercase tracking-wide text-indigo-100">
@@ -47,7 +51,7 @@ const DevSignIn: React.FC = () => {
         </div>
       </div>
 
-      <div className="flex items-center justify-center bg-white p-8 dark:bg-slate-900 md:p-12">
+      <div className="flex items-center justify-center bg-white p-8 dark:bg-slate-950 md:p-12">
         <div className="w-full max-w-md space-y-8">
           <header className="space-y-2">
             <p className="text-sm font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Developer sign in</p>

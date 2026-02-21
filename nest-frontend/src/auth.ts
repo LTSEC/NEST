@@ -1,3 +1,5 @@
+import { apiLogin, apiVerifyToken, type AuthResponse, type UserInfo } from './data/api';
+
 export const AUTH_COOKIE_NAME = 'nest_auth_token';
 export const AUTH_TOKEN_EXPIRY_HOURS = 24;
 
@@ -30,24 +32,25 @@ export type VerifiedUser = {
   role: UserRole;
 };
 
+// ---------------------------------------------------------------------------
+// In-memory fallback users (used when the backend DB is unavailable)
+// Passwords are checked against the backend with bcrypt when the DB is online.
+// ---------------------------------------------------------------------------
+
 type UsersTableRow = {
   id: string;
   username: string;
   email: string;
   password_hash: string;
-  password_plain?: string;
   role: UserRole;
 };
 
-// Simulated SQL users table seeded from db/init.sql. These values mirror the
-// INSERT statements used when spinning up a development database.
 const usersTableRows: UsersTableRow[] = [
   {
     id: '1',
     username: 'Test',
     email: 'test@example.com',
     password_hash: 'Test',
-    password_plain: 'Test',
     role: 'user',
   },
   {
@@ -55,7 +58,6 @@ const usersTableRows: UsersTableRow[] = [
     username: 'Developer',
     email: 'dev@example.com',
     password_hash: 'Dev',
-    password_plain: 'Dev',
     role: 'developer',
   },
 ];
@@ -85,7 +87,6 @@ export const upsertUserInMockTable = (token: SessionToken, user: VerifiedUser): 
       username: user.name,
       email: user.email ?? `${normalize(user.name)}@example.com`,
       password_hash: 'temporary',
-      password_plain: 'temporary',
       role: user.role,
     });
   }
@@ -93,35 +94,38 @@ export const upsertUserInMockTable = (token: SessionToken, user: VerifiedUser): 
   activeSessionIndex[token] = user.id;
 };
 
-// Stubbed implementation to demonstrate how a backend service might verify the token
-// against a Postgres users table. Replace with a real fetch/DB call when available.
-export const verifyTokenAgainstUserTable = async (
-  token: SessionToken
-): Promise<VerifiedUser | null> => {
-  if (!token) {
-    return null;
-  }
-
-  const userId = activeSessionIndex[token];
-  if (!userId) {
-    return null;
-  }
-
-  const userRow = usersTableRows.find((row) => row.id === userId);
-  return userRow ? mapRowToVerifiedUser(userRow) : null;
-};
-
+/**
+ * Authenticates against the backend API first (bcrypt-hashed passwords).
+ * Falls back to in-memory mock users if the backend is unavailable.
+ */
 export const authenticateWithUsersTable = async (
   username: string,
   password: string,
   requiredRole?: UserRole
 ): Promise<{ token: SessionToken; user: VerifiedUser } | null> => {
+  // Try backend authentication first
+  try {
+    const result: AuthResponse = await apiLogin(username, password, requiredRole);
+    const user: VerifiedUser = {
+      id: result.user.id,
+      name: result.user.name,
+      email: result.user.email,
+      role: result.user.role,
+    };
+    activeSessionIndex[result.token] = user.id;
+    upsertUserInMockTable(result.token, user);
+    return { token: result.token, user };
+  } catch {
+    // Backend unavailable, fall through to in-memory auth
+  }
+
+  // In-memory fallback
   const row = findUserRowByUsername(username);
   if (!row) {
     return null;
   }
 
-  const passwordMatches = row.password_plain === password || row.password_hash === password;
+  const passwordMatches = row.password_hash === password;
   const roleMatches = !requiredRole || row.role === requiredRole;
 
   if (!passwordMatches || !roleMatches) {
@@ -132,6 +136,39 @@ export const authenticateWithUsersTable = async (
   activeSessionIndex[sessionToken] = row.id;
 
   return { token: sessionToken, user: mapRowToVerifiedUser(row) };
+};
+
+/**
+ * Verifies a session token against the backend, falling back to in-memory.
+ */
+export const verifyTokenAgainstUserTable = async (
+  token: SessionToken
+): Promise<VerifiedUser | null> => {
+  if (!token) {
+    return null;
+  }
+
+  // Try backend verification first
+  try {
+    const info: UserInfo = await apiVerifyToken(token);
+    return {
+      id: info.id,
+      name: info.name,
+      email: info.email,
+      role: info.role,
+    };
+  } catch {
+    // Backend unavailable, fall through
+  }
+
+  // In-memory fallback
+  const userId = activeSessionIndex[token];
+  if (!userId) {
+    return null;
+  }
+
+  const userRow = usersTableRows.find((row) => row.id === userId);
+  return userRow ? mapRowToVerifiedUser(userRow) : null;
 };
 
 export const updateUserNameInPostgres = async (

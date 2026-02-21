@@ -98,7 +98,7 @@ resource \"opennebula_virtual_machine\" \"infra-routers\" {{\n\
     dynamic \"nic\" {{\n\
         for_each = local.comp_router.interfaces\n\
         content {{\n\
-            network_id = nic.value.network == \"Competition WAN\" ? 0 : module.infra-networks.id\n\
+            network_id = nic.value.network == \"Competition WAN\" ? 97 : module.infra-networks.id\n\
             ip = nic.value.network == \"Competition WAN\" ? null : nic.value.ip\n\
         }}\n\
     }}\n\
@@ -392,6 +392,26 @@ def CreateTerraform(data: json) -> None:
                     break
 
     router_vms, infra_router, server_vms, infra_server_vms = Parse_device_JSON(data, network_map, wan_network, infra_network_name)
+
+    # Force inject competition router if it doesn't exist but infra network does
+    if not infra_router and infra_network:
+         gateway_ip = ""
+         # Assuming gateway is .1 of the network
+         if infra_network_name in infra_network:
+             octets = infra_network[infra_network_name]["octets"]
+             # Construct gateway IP: x.x.x.1
+             # Note: octets is a list of ints.
+             gateway_ip = f"{octets[0]}.{octets[1]}.{octets[2]}.1"
+
+         infra_router["Competition Router"] = {
+             "template_id": 1, # Default to 1 (VyOS or similar)
+             "host_id": 1, # Dummy ID
+             "network": infra_network_name,
+             "interfaces": {
+                 "eth0": { "ip": "", "network": "Competition WAN" },
+                 "eth1": { "ip": gateway_ip, "network": infra_network_name }
+             }
+         }
 
     infra_router_template = ""
     if infra_router:

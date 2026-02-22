@@ -1,16 +1,16 @@
 locals {
     teams = ["team1", "team2"]
     networks = {
-        "Internal" = { octet1 = 192, octet2 = 168, octet3 = 1, octet4 = 0, mask = "255.255.255.0", cluster_id = 0, size = 254 }
+        "LAN" = { octet1 = 192, octet2 = 168, octet3 = 0, octet4 = 0, mask = "255.255.255.0", cluster_id = 0, size = 254 }
     }
     routers = {
-        "Router" = { interfaces = {"eth0" = { ip = "10.20.T.1", network = "External WAN"}, "eth1" = { ip = "192.168.1.1", network = "Internal"}}, network = "Internal", template_id = 2 }
+        "TeamRouter" = { interfaces = {"LAN" = { ip = "192.168.0.254", network = "LAN"}, "WAN" = { ip = "10.0.T.2", network = "External WAN"}}, network = "External WAN", template_id = 2 }
     }
     servers = {
-        "Web Server" = { ip = "192.168.1.10", network = "Internal", template_id = 0 }
+        "Jumphost" = { ip = "", network = "LAN", template_id = 0 }
     }
     infra_router = {
-        "Competition Router" = { interfaces = {"eth0" = { ip = "", network = "Competition WAN"}, "eth1" = { ip = "10.20.0.1", network = "External WAN"}}, network = "External WAN", template_id = 2 }
+        "Competition Router" = { interfaces = {"eth0" = { ip = "", network = "Competition WAN"}, "eth1" = { ip = "10.0.0.1", network = "External WAN"}}, network = "External WAN", template_id = 2 }
     }
     infra_servers = {
     }
@@ -22,9 +22,9 @@ locals {
 module "infra-networks" {
     source = "../network-module"
     vnet = {
-        network_name = "comp-network-Valid Network"
+        network_name = "comp-network-Repro Game"
         octet1 = 10
-        octet2 = 20
+        octet2 = 0
         octet3 = 0
         octet4 = 0
         mask = "255.255.255.0"
@@ -34,7 +34,7 @@ module "infra-networks" {
 }
 resource "opennebula_virtual_machine" "infra-routers" {
     keep_nic_order = true
-    name = "comp-router-Valid Network"
+    name = "comp-router-Repro Game"
     template_id = local.comp_router.template_id
     dynamic "nic" {
         for_each = local.comp_router.interfaces

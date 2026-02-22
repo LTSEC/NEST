@@ -72,17 +72,23 @@ type ServiceConfig struct {
 
 // Device represents either a router or a server.
 type Device struct {
-	Name           string                   `json:"name"`
-	Type           string                   `json:"type"` // "Router" or "Server"
-	OS             OSInfo                   `json:"os"`
-	HostID         *int                     `json:"hostId"` // nullable
-	Interfaces     map[string]string        `json:"interfaces,omitempty"`
-	Router         string                   `json:"router,omitempty"`    // for servers
-	Interface      string                   `json:"interface,omitempty"` // for servers
-	Segment        string                   `json:"segment,omitempty"`
-	DHCP           bool                     `json:"dhcp,omitempty"`
-	IP             string                   `json:"ip,omitempty"`
-	ServiceConfigs map[string]ServiceConfig `json:"serviceConfigs,omitempty"`
+	Name            string                   `json:"name"`
+	Type            string                   `json:"type"` // "Router" or "Server"
+	OS              OSInfo                   `json:"os"`
+	HostID          *int                     `json:"hostId"` // nullable
+	Interfaces      map[string]string        `json:"interfaces,omitempty"`
+	Router          string                   `json:"router,omitempty"`    // for servers
+	Interface       string                   `json:"interface,omitempty"` // for servers
+	Segment         string                   `json:"segment,omitempty"`
+	DHCP            bool                     `json:"dhcp,omitempty"`
+	IP              string                   `json:"ip,omitempty"`
+	AddDefaultUsers bool                     `json:"addDefaultUsers,omitempty"`
+	ServiceConfigs  map[string]ServiceConfig `json:"serviceConfigs,omitempty"`
+}
+
+type Credential struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
 }
 
 // CyberGame represents the full exported network definition from the frontend.
@@ -90,6 +96,7 @@ type CyberGame struct {
 	Name                 string             `json:"name"`
 	Networks             []Network          `json:"networks"`
 	Devices              []Device           `json:"devices"`
+	Credentials          []Credential       `json:"credentials"`
 	BlackteamServices    []BlackteamService `json:"blackteamServices"`
 	Applications         []Application      `json:"applications"`
 	TeamCount            int                `json:"teamCount,omitempty"`

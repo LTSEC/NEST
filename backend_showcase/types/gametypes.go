@@ -63,9 +63,11 @@ type OSInfo struct {
 
 // ServiceConfig carries per-service configuration including Ansible metadata.
 type ServiceConfig struct {
-	Port        int               `json:"port"`
-	Protocol    string            `json:"protocol"`
-	AnsibleMeta map[string]string `json:"ansibleMeta,omitempty"`
+	Port          int               `json:"port"`
+	Protocol      string            `json:"protocol"`
+	AnsibleMeta   map[string]string `json:"ansibleMeta,omitempty"`
+	Scored        bool              `json:"scored,omitempty"`
+	ScoringPoints int               `json:"scoringPoints,omitempty"`
 }
 
 // Device represents either a router or a server.
@@ -80,16 +82,16 @@ type Device struct {
 	Segment        string                   `json:"segment,omitempty"`
 	DHCP           bool                     `json:"dhcp,omitempty"`
 	IP             string                   `json:"ip,omitempty"`
-	Services       map[string]int           `json:"services"`
 	ServiceConfigs map[string]ServiceConfig `json:"serviceConfigs,omitempty"`
 }
 
 // CyberGame represents the full exported network definition from the frontend.
 type CyberGame struct {
-	Name              string             `json:"name"`
-	Networks          []Network          `json:"networks"`
-	Devices           []Device           `json:"devices"`
-	BlackteamServices []BlackteamService `json:"blackteamServices"`
-	Applications      []Application      `json:"applications"`
-	TeamCount         int                `json:"teamCount,omitempty"`
+	Name                 string             `json:"name"`
+	Networks             []Network          `json:"networks"`
+	Devices              []Device           `json:"devices"`
+	BlackteamServices    []BlackteamService `json:"blackteamServices"`
+	Applications         []Application      `json:"applications"`
+	TeamCount            int                `json:"teamCount,omitempty"`
+	ScoringCheckInterval int                `json:"scoringCheckInterval,omitempty"`
 }

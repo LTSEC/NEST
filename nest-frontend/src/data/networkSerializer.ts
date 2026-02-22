@@ -57,8 +57,6 @@ export interface CyberGameDevice {
   segment?: string;
   dhcp?: boolean;
   ip?: string;
-  /** Legacy port-only map (kept for backwards compatibility with tfparser.py). */
-  services: Record<string, number>;
   /** Rich service configuration with Ansible metadata, keyed by service name. */
   serviceConfigs?: Record<string, ServiceConfig>;
 }
@@ -260,7 +258,6 @@ export const serializeNetworkToCyberGame = (
         os: { id: isNaN(imageId) ? 0 : Math.abs(imageId), name: node.label },
         hostId: infra ? null : (isNaN(imageId) ? 0 : Math.abs(imageId)),
         interfaces,
-        services: {},
       });
     } else {
       // Host/Server
@@ -281,13 +278,11 @@ export const serializeNetworkToCyberGame = (
         }
       }
 
-      // Build services map (legacy) and rich service configs
-      const services: Record<string, number> = {};
+      // Build rich service configs
       const serviceConfigs: Record<string, ServiceConfig> = {};
       for (const svc of node.services || []) {
         const def = serviceDefinitionsById[svc.serviceId];
         const name = def?.name || svc.serviceId;
-        services[name] = svc.port;
         serviceConfigs[name] = {
           port: svc.port,
           protocol: svc.protocol,
@@ -310,7 +305,6 @@ export const serializeNetworkToCyberGame = (
         segment,
         dhcp: firstInterface?.dhcpEnabled ?? false,
         ip: firstInterface?.ip || '',
-        services,
         serviceConfigs,
       });
     }

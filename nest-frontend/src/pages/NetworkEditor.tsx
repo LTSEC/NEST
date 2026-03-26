@@ -1400,7 +1400,7 @@ const NetworkEditor: React.FC = () => {
   };
 
   return (
-    <div className="h-screen w-screen bg-slate-950 text-white">
+    <div className="h-screen w-screen bg-[#0a0f1e] text-white">
       <div
         ref={canvasRef}
         className="relative h-full w-full overflow-hidden"
@@ -1417,35 +1417,39 @@ const NetworkEditor: React.FC = () => {
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className="rounded-lg bg-white/10 px-3 py-2 text-sm font-semibold text-white shadow-sm ring-1 ring-white/20 transition hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            className="rounded-xl bg-white/10 px-3.5 py-2 text-sm font-semibold text-white shadow-sm backdrop-blur-sm transition-all hover:bg-white/20"
           >
             ← Back
           </button>
           <button
             type="button"
             onClick={handleSaveNetwork}
-            className="rounded-lg bg-emerald-500 px-3 py-2 text-sm font-semibold text-white shadow-sm ring-1 ring-emerald-400 transition hover:bg-emerald-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-200"
+            className="rounded-xl bg-emerald-500 px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-emerald-400 hover:shadow-md hover:shadow-emerald-500/25"
           >
             Save
           </button>
           {saveStatus !== 'idle' && (
-            <span className="rounded-lg bg-white/10 px-2 py-1 text-xs font-medium text-white ring-1 ring-white/10">
+            <span className={`rounded-lg px-2.5 py-1 text-xs font-medium backdrop-blur-sm ${
+              saveStatus === 'saved' ? 'bg-emerald-500/20 text-emerald-200' :
+              saveStatus === 'error' ? 'bg-red-500/20 text-red-200' :
+              'bg-white/10 text-white'
+            }`}>
               {saveStatus === 'saving' && 'Saving...'}
               {saveStatus === 'saved' && 'Saved'}
               {saveStatus === 'error' && 'Save failed'}
             </span>
           )}
-        {saveError && <span className="text-xs text-red-200">{saveError}</span>}
-        <div className="rounded-lg bg-white/5 px-3 py-2 text-xs font-medium text-slate-100 ring-1 ring-white/10">
+        {saveError && <span className="text-xs text-red-300">{saveError}</span>}
+        <div className="rounded-lg bg-white/5 px-3 py-2 text-xs font-medium text-slate-200 backdrop-blur-sm">
           {game ? `${game.name} network` : 'Network editor'}
         </div>
       </div>
 
       <div className="pointer-events-auto absolute left-4 top-20 z-20 w-80 space-y-2" onWheel={(event) => event.stopPropagation()}>
-        <div className="rounded-lg border border-white/10 bg-slate-900/85 p-3 text-xs shadow-lg backdrop-blur">
-          <div className="mb-2 flex items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-slate-200">
+        <div className="rounded-2xl border border-white/10 bg-slate-900/90 p-4 text-xs shadow-2xl shadow-black/40 backdrop-blur-xl">
+          <div className="mb-3 flex items-center justify-between text-[11px] font-semibold uppercase tracking-widest text-slate-300">
             <span>Custom services</span>
-            <span className="text-[10px] text-slate-400">{customServices.length} active</span>
+            <span className="text-[10px] text-slate-500">{customServices.length} active</span>
           </div>
           <div className="space-y-2">
             {customServices.length === 0 && <div className="text-[11px] text-slate-300">None registered</div>}
@@ -1472,7 +1476,7 @@ const NetworkEditor: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => removeCustomServiceInstance(service.id)}
-                          className="rounded bg-black/20 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white/80 ring-1 ring-white/10 transition hover:bg-rose-500/20 hover:text-white"
+                          className="rounded border border-white/10 bg-black/20 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white/80 transition hover:border-rose-400/30 hover:bg-rose-500/20 hover:text-white"
                         >
                           Delete
                         </button>
@@ -1502,36 +1506,36 @@ const NetworkEditor: React.FC = () => {
         activeCustomServiceIds={customServices.map((service) => service.definitionId)}
       />
 
-      <div className="pointer-events-none absolute right-4 top-4 z-20 flex items-center gap-2">
+      <div className="pointer-events-none absolute right-4 top-4 z-20 flex items-center gap-1.5">
           <button
             type="button"
             onClick={zoomOut}
-            className="pointer-events-auto rounded-lg bg-white/10 px-3 py-2 text-sm font-semibold text-white shadow-sm ring-1 ring-white/20 transition hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            className="pointer-events-auto rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/20"
           >
             -
           </button>
           <button
             type="button"
             onClick={zoomIn}
-            className="pointer-events-auto rounded-lg bg-white/10 px-3 py-2 text-sm font-semibold text-white shadow-sm ring-1 ring-white/20 transition hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            className="pointer-events-auto rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/20"
           >
             +
           </button>
           <button
             type="button"
             onClick={resetView}
-            className="pointer-events-auto rounded-lg bg-white/10 px-3 py-2 text-sm font-semibold text-white shadow-sm ring-1 ring-white/20 transition hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            className="pointer-events-auto rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/20"
           >
             Reset
           </button>
           <button
             type="button"
             onClick={() => setGridSnapEnabled((enabled) => !enabled)}
-            className={`pointer-events-auto rounded-lg px-3 py-2 text-sm font-semibold shadow-sm ring-1 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 ${gridSnapEnabled ? 'bg-emerald-500 text-white ring-emerald-400 hover:bg-emerald-400 focus-visible:outline-emerald-200' : 'bg-white/10 text-white ring-white/20 hover:bg-white/20 focus-visible:outline-white'}`}
+            className={`pointer-events-auto rounded-xl px-3 py-2 text-sm font-semibold shadow-sm transition-all ${gridSnapEnabled ? 'bg-emerald-500 text-white hover:bg-emerald-400' : 'bg-white/10 text-white backdrop-blur-sm hover:bg-white/20'}`}
           >
             {gridSnapEnabled ? 'Snap: On' : 'Snap: Off'}
           </button>
-          <span className="rounded-lg bg-white/10 px-2 py-1 text-xs font-medium text-white ring-1 ring-white/20">{Math.round(scale * 100)}%</span>
+          <span className="rounded-lg bg-white/10 px-2.5 py-1.5 text-xs font-medium text-slate-200 backdrop-blur-sm">{Math.round(scale * 100)}%</span>
         </div>
 
         <div className="absolute inset-0" aria-label="Network canvas">
@@ -1643,7 +1647,7 @@ const NetworkEditor: React.FC = () => {
                     }}
                   >
                     <div
-                      className={`pointer-events-auto w-60 select-none rounded-xl border px-3 py-2 text-sm font-semibold shadow-lg backdrop-blur transition ${node.kind === 'router' ? 'border-sky-400/30 bg-sky-500/20 text-sky-100' : 'border-emerald-400/30 bg-emerald-500/15 text-emerald-100'} ${selectedNodeId === node.id ? 'ring-2 ring-white/60' : 'ring-1 ring-black/30'}`}
+                      className={`pointer-events-auto w-60 select-none rounded-xl border px-3 py-2 text-sm font-semibold shadow-lg shadow-black/30 backdrop-blur transition ${node.kind === 'router' ? 'border-sky-400/30 bg-sky-500/20 text-sky-100' : 'border-emerald-400/30 bg-emerald-500/15 text-emerald-100'} ${selectedNodeId === node.id ? 'border-white/50 shadow-white/10' : ''}`}
                     >
                       <div className="text-[11px] uppercase tracking-wide opacity-80">{node.kind}</div>
                       <div className="flex items-center justify-between gap-2">
@@ -1715,7 +1719,7 @@ const NetworkEditor: React.FC = () => {
                             return (
                               <span
                                 key={service.id}
-                                className="rounded bg-amber-500/20 px-2 py-1 text-amber-50 ring-1 ring-amber-400/50"
+                                className="rounded border border-amber-400/40 bg-amber-500/20 px-2 py-1 text-amber-50"
                               >
                                 {definition?.name ?? service.serviceId} • {service.port}/{service.protocol.toUpperCase()}
                               </span>
@@ -1730,7 +1734,7 @@ const NetworkEditor: React.FC = () => {
                             event.stopPropagation();
                             setConfigModalNodeId(node.id);
                           }}
-                          className="mt-2 w-full rounded-lg bg-indigo-500/30 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-indigo-100 ring-1 ring-indigo-400/40 transition hover:bg-indigo-500/50 hover:text-white"
+                          className="mt-2 w-full rounded-lg border border-indigo-400/30 bg-indigo-500/30 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-indigo-100 transition hover:border-indigo-400/50 hover:bg-indigo-500/50 hover:text-white"
                         >
                           Configure
                         </button>
@@ -1744,17 +1748,17 @@ const NetworkEditor: React.FC = () => {
 
           {nodes.length === 0 && (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <div className="rounded-xl bg-black/40 px-6 py-4 text-center text-sm font-medium text-slate-100 ring-1 ring-white/10">
+              <div className="rounded-xl border border-white/10 bg-black/40 px-6 py-4 text-center text-sm font-medium text-slate-100">
                 Drag resources from the drawer onto the canvas. Pan with left click, scroll to zoom, and right click a node to duplicate or delete it.
               </div>
             </div>
           )}
         </div>
 
-        <div className="pointer-events-none absolute bottom-4 right-4 z-30 rounded-lg border border-white/10 bg-black/60 p-3 shadow-lg backdrop-blur">
-          <div className="mb-2 flex items-center justify-between text-xs font-semibold text-slate-200">
+        <div className="pointer-events-none absolute bottom-4 right-4 z-30 rounded-2xl border border-white/10 bg-slate-900/90 p-3 shadow-2xl shadow-black/40 backdrop-blur-xl">
+          <div className="mb-2 flex items-center justify-between text-xs font-semibold text-slate-300">
             <span>Overview</span>
-            <span className="text-[11px] text-slate-400">{nodes.length} nodes</span>
+            <span className="text-[11px] text-slate-500">{nodes.length} nodes</span>
           </div>
           <div className="relative overflow-hidden rounded-md border border-white/10 bg-slate-900/70" style={{ width: minimap.width, height: minimap.height }}>
             <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(255,255,255,0.12) 1px, transparent 0)', backgroundSize: '24px 24px' }} />
@@ -1779,7 +1783,7 @@ const NetworkEditor: React.FC = () => {
 
         {selectedNode && (
           <div
-            className="pointer-events-auto absolute right-4 top-20 z-30 w-80 space-y-3 overflow-y-auto rounded-lg border border-white/10 bg-slate-900/85 p-4 text-sm shadow-xl backdrop-blur"
+            className="pointer-events-auto absolute right-4 top-20 z-30 w-80 space-y-3 overflow-y-auto rounded-2xl border border-white/10 bg-slate-900/90 p-4 text-sm shadow-2xl shadow-black/40 backdrop-blur-xl"
             style={{ maxHeight: '80vh' }}
             onWheel={(event) => event.stopPropagation()}
           >
@@ -2133,7 +2137,7 @@ const NetworkEditor: React.FC = () => {
                     {selectedNode.services.map((svc) => {
                       const def = serviceDefinitionsById[svc.serviceId];
                       return (
-                        <span key={svc.id} className="rounded bg-amber-500/20 px-2 py-1 text-[10px] font-semibold uppercase text-amber-50 ring-1 ring-amber-400/50">
+                        <span key={svc.id} className="rounded border border-amber-400/40 bg-amber-500/20 px-2 py-1 text-[10px] font-semibold uppercase text-amber-50">
                           {def?.name ?? svc.serviceId} • {svc.port}
                         </span>
                       );
@@ -2143,7 +2147,7 @@ const NetworkEditor: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setConfigModalNodeId(selectedNode.id)}
-                  className="w-full rounded-lg bg-indigo-500/30 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-indigo-100 ring-1 ring-indigo-400/40 transition hover:bg-indigo-500/50 hover:text-white"
+                  className="w-full rounded-lg border border-indigo-400/30 bg-indigo-500/30 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-indigo-100 transition hover:border-indigo-400/50 hover:bg-indigo-500/50 hover:text-white"
                 >
                   Open service configuration
                 </button>
@@ -2173,7 +2177,7 @@ const NetworkEditor: React.FC = () => {
         )}
 
         {selectedLink && (
-          <div className="pointer-events-auto absolute right-4 top-[calc(20px+360px)] z-30 w-80 space-y-3 rounded-lg border border-white/10 bg-slate-900/85 p-4 text-sm shadow-xl backdrop-blur">
+          <div className="pointer-events-auto absolute right-4 top-[calc(20px+360px)] z-30 w-80 space-y-3 rounded-2xl border border-white/10 bg-slate-900/90 p-4 text-sm shadow-2xl shadow-black/40 backdrop-blur-xl">
             <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-slate-200">
               <span>Link metadata</span>
               <button
@@ -2210,9 +2214,9 @@ const NetworkEditor: React.FC = () => {
         )}
 
         {customServiceModal && (
-          <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4">
+          <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
             <div
-              className="w-full max-w-xl space-y-4 overflow-y-auto rounded-lg border border-white/10 bg-slate-900/95 p-6 text-sm shadow-2xl"
+              className="w-full max-w-xl animate-slide-up space-y-4 overflow-y-auto rounded-2xl border border-white/10 bg-slate-900/95 p-6 text-sm shadow-2xl shadow-black/50"
               style={{ maxHeight: '80vh' }}
               onWheel={(event) => event.stopPropagation()}
             >
@@ -2303,13 +2307,13 @@ const NetworkEditor: React.FC = () => {
           if (!configNode || configNode.kind !== 'host') return null;
           return (
             <div
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
-              onClick={(event) => { if (event.target === event.currentTarget) return; }}
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+              onClick={(event) => { if (event.target === event.currentTarget) setConfigModalNodeId(null); }}
               onWheel={(event) => event.stopPropagation()}
               onMouseDown={(event) => event.stopPropagation()}
             >
               <div
-                className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-white/10 bg-slate-900/95 shadow-2xl"
+                className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-slate-900/95 shadow-2xl shadow-black/40 animate-slide-up"
                 onWheel={(event) => event.stopPropagation()}
               >
                 <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
@@ -2320,7 +2324,7 @@ const NetworkEditor: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setConfigModalNodeId(null)}
-                    className="rounded-lg bg-white/10 px-4 py-2 text-sm font-semibold text-white ring-1 ring-white/20 transition hover:bg-white/20"
+                    className="rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
                   >
                     Close
                   </button>
@@ -2461,10 +2465,10 @@ const NetworkEditor: React.FC = () => {
                                         onClick={() => attachHostToCustomRole(custom.id, role.role, configNode.id)}
                                         className={`rounded px-2 py-1 text-[11px] font-semibold uppercase tracking-wide ${
                                           isBoundHere
-                                            ? 'bg-emerald-500/20 text-emerald-50 ring-1 ring-emerald-400/60'
+                                            ? 'border border-emerald-400/50 bg-emerald-500/20 text-emerald-50'
                                             : boundHostId
-                                            ? 'cursor-not-allowed bg-white/5 text-slate-400 ring-1 ring-white/10'
-                                            : 'bg-amber-500/20 text-amber-50 ring-1 ring-amber-400/60 hover:bg-amber-500/30'
+                                            ? 'cursor-not-allowed border border-white/10 bg-white/5 text-slate-400'
+                                            : 'border border-amber-400/50 bg-amber-500/20 text-amber-50 hover:bg-amber-500/30'
                                         }`}
                                       >
                                         {boundLabel}
@@ -2487,7 +2491,7 @@ const NetworkEditor: React.FC = () => {
 
         {contextMenu && (
           <div
-            className="absolute z-40 w-36 rounded-lg border border-white/10 bg-slate-900/95 py-2 text-sm shadow-2xl ring-1 ring-black/60"
+            className="absolute z-40 w-36 rounded-xl border border-white/10 bg-slate-900/95 py-1.5 text-sm shadow-2xl shadow-black/40 backdrop-blur-xl"
             style={{ left: contextMenu.x, top: contextMenu.y }}
           >
             <button

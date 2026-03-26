@@ -10,6 +10,8 @@ import ComingSoon from './partials/ComingSoon';
 const gameTypes: GameType[] = ['Injects', 'CTFs', 'Red vs. Blue'];
 const rvbServices: RvbService[] = ['Scoring Engine', 'DNS', 'CDN', 'CA'];
 
+const inputClass = "w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm shadow-sm transition-colors focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:ring-indigo-500/20";
+
 const GameEditor: React.FC = () => {
   const { gameId } = useParams();
   const navigate = useNavigate();
@@ -166,7 +168,7 @@ const GameEditor: React.FC = () => {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
         <NavBar role="user" userName={user.name} onLogout={logout} />
-        <main className="mx-auto max-w-5xl p-6">
+        <main className="mx-auto max-w-6xl px-6 py-10">
           <ComingSoon
             title="My Games"
             description="Only developers can manage games. Switch to a developer account to continue."
@@ -180,8 +182,8 @@ const GameEditor: React.FC = () => {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
         <NavBar role="developer" userName={user.name} onLogout={logout} />
-        <main className="mx-auto max-w-5xl p-6">
-          <div className="rounded-xl bg-white dark:bg-slate-900 p-6 text-sm text-slate-700 dark:text-slate-300 shadow-sm ring-1 ring-slate-200 dark:ring-slate-700">
+        <main className="mx-auto max-w-6xl px-6 py-10">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
             Game not found.
           </div>
         </main>
@@ -192,31 +194,31 @@ const GameEditor: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
       <NavBar role="developer" userName={user.name} onLogout={logout} />
-      <main className="mx-auto max-w-5xl p-6 space-y-6">
+      <main className="mx-auto max-w-3xl px-6 py-10 space-y-8">
         <div className="flex items-center justify-between gap-3">
-          <div className="space-y-1">
-            <p className="text-sm font-semibold uppercase tracking-wide text-indigo-600 dark:text-indigo-400">My Games</p>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{editing ? 'Edit game' : 'Create a new game'}</h1>
-            <p className="text-sm text-slate-600 dark:text-slate-400">Choose the experiences included in your game.</p>
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-widest text-indigo-600 dark:text-indigo-400">My Games</p>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">{editing ? 'Edit game' : 'Create a new game'}</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Choose the experiences included in your game.</p>
           </div>
           <button
             type="button"
             onClick={() => navigate('/my-games')}
-            className="rounded-lg bg-white dark:bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 shadow-sm ring-1 ring-slate-200 dark:ring-slate-700 transition hover:bg-slate-50 dark:hover:bg-slate-800"
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
           >
             Cancel
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-sm ring-1 ring-slate-200 dark:ring-slate-700 space-y-6">
-          <div className="space-y-1">
+        <form onSubmit={handleSubmit} className="rounded-2xl border border-slate-200 bg-white p-6 space-y-6 dark:border-slate-800 dark:bg-slate-900">
+          <div className="space-y-1.5">
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300" htmlFor="game-name">
               Game name
             </label>
             <input
               id="game-name"
               name="game-name"
-              className="w-full rounded-lg border border-slate-200 dark:border-slate-600 px-3 py-2 text-sm shadow-sm transition focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-500/30 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500"
+              className={inputClass}
               placeholder="Enter a game name"
               value={name}
               onChange={(event) => setName(event.target.value)}
@@ -225,13 +227,13 @@ const GameEditor: React.FC = () => {
           </div>
 
           <div className="space-y-3">
-            <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Select game types</p>
+            <p className="text-sm font-semibold text-slate-900 dark:text-white">Select game types</p>
             <div className="flex flex-wrap gap-4">
               {gameTypes.map((type) => (
-                <label key={type} className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+                <label key={type} className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
                   <input
                     type="checkbox"
-                    className="h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500"
+                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-600"
                     checked={selectedTypes.includes(type)}
                     onChange={() => toggleType(type)}
                   />
@@ -242,10 +244,10 @@ const GameEditor: React.FC = () => {
           </div>
 
           {hasRvbSelected && (
-            <div className="space-y-3 rounded-xl bg-slate-50 dark:bg-slate-800 p-4">
-              <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Red vs. Blue configuration</p>
+            <div className="space-y-4 rounded-xl bg-slate-50 p-5 dark:bg-slate-800">
+              <p className="text-sm font-semibold text-slate-900 dark:text-white">Red vs. Blue configuration</p>
 
-              <div className="flex items-center gap-4 text-sm text-slate-700 dark:text-slate-300">
+              <div className="flex items-center gap-4 text-sm text-slate-600 dark:text-slate-300">
                 <label className="flex items-center gap-2">
                   <input
                     type="radio"
@@ -253,7 +255,7 @@ const GameEditor: React.FC = () => {
                     value="scratch"
                     checked={creationMode === 'scratch'}
                     onChange={() => setCreationMode('scratch')}
-                    className="h-4 w-4 border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500"
+                    className="h-4 w-4 border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-600"
                   />
                   Create from scratch
                 </label>
@@ -264,7 +266,7 @@ const GameEditor: React.FC = () => {
                     value="preset"
                     checked={creationMode === 'preset'}
                     onChange={() => setCreationMode('preset')}
-                    className="h-4 w-4 border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500"
+                    className="h-4 w-4 border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-600"
                   />
                   Use a preset
                 </label>
@@ -272,13 +274,13 @@ const GameEditor: React.FC = () => {
 
               <div className="space-y-2">
                 <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Services to include</p>
-                <div className="flex flex-col gap-2 text-sm text-slate-700 dark:text-slate-300">
+                <div className="flex flex-col gap-2 text-sm text-slate-600 dark:text-slate-300">
                   {rvbServices.map((service) => (
-                    <label key={service} className={`flex items-center gap-2 ${creationMode === 'preset' ? 'opacity-60' : ''}`}>
+                    <label key={service} className={`flex items-center gap-2 ${creationMode === 'preset' ? 'opacity-50' : ''}`}>
                       <input
                         type="checkbox"
                         disabled={creationMode === 'preset'}
-                        className="h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500 disabled:cursor-not-allowed"
+                        className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 disabled:cursor-not-allowed dark:border-slate-600"
                         checked={selectedServices.includes(service)}
                         onChange={() => toggleService(service)}
                       />
@@ -289,7 +291,7 @@ const GameEditor: React.FC = () => {
               </div>
 
               {creationMode === 'preset' && (
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <label htmlFor="preset-select" className="text-sm font-medium text-slate-700 dark:text-slate-300">
                     Select a preset
                   </label>
@@ -297,7 +299,7 @@ const GameEditor: React.FC = () => {
                     id="preset-select"
                     value={selectedPreset}
                     onChange={(e) => setSelectedPreset(e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 dark:border-slate-600 px-3 py-2 text-sm shadow-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-500/30 dark:bg-slate-800 dark:text-slate-100"
+                    className={inputClass}
                   >
                     {presets.length === 0 && <option value="">Loading presets...</option>}
                     {presets.map((p) => (
@@ -309,25 +311,25 @@ const GameEditor: React.FC = () => {
                 </div>
               )}
 
-              <div className="space-y-1">
+              <div className="space-y-1.5">
                 <label className="text-sm font-medium text-slate-700 dark:text-slate-300" htmlFor="black-team-cidr">
                   Competition Network CIDR (Black Team)
                 </label>
                 <input
                   id="black-team-cidr"
                   name="black-team-cidr"
-                  className="w-full rounded-lg border border-slate-200 dark:border-slate-600 px-3 py-2 text-sm shadow-sm transition focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-500/30 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500"
+                  className={inputClass}
                   placeholder="10.20.0.0/16"
                   value={blackTeamCidr}
                   onChange={(event) => setBlackTeamCidr(event.target.value)}
                 />
-                <p className="text-xs text-slate-500 dark:text-slate-400">
+                <p className="text-xs text-slate-400 dark:text-slate-500">
                   Defines the IP range for the top-level competition router.
                 </p>
               </div>
 
               {hasScoringEngine && (
-                <div className="space-y-1">
+                <div className="space-y-1.5">
                   <label className="text-sm font-medium text-slate-700 dark:text-slate-300" htmlFor="scoring-interval">
                     Scoring Check Interval
                   </label>
@@ -339,28 +341,28 @@ const GameEditor: React.FC = () => {
                       min={15}
                       max={300}
                       step={1}
-                      className="w-28 rounded-lg border border-slate-200 dark:border-slate-600 px-3 py-2 text-sm shadow-sm transition focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-500/30 dark:bg-slate-800 dark:text-slate-100"
+                      className="w-28 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm shadow-sm transition-colors focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-indigo-500/20"
                       value={scoringCheckInterval}
                       onChange={(event) => {
                         const v = Number(event.target.value);
                         setScoringCheckInterval(Number.isNaN(v) ? 60 : Math.min(300, Math.max(15, v)));
                       }}
                     />
-                    <span className="text-sm text-slate-500 dark:text-slate-400">seconds</span>
+                    <span className="text-sm text-slate-400 dark:text-slate-500">seconds</span>
                   </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                  <p className="text-xs text-slate-400 dark:text-slate-500">
                     How often the scoring engine checks each service (15s – 5min).
                   </p>
                 </div>
               )}
 
-              <p className="text-xs text-slate-600 dark:text-slate-400">
+              <p className="text-xs text-slate-400 dark:text-slate-500">
                 Team counts are chosen when hosting a Red vs. Blue game.
               </p>
 
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <label className="text-sm font-semibold text-slate-800 dark:text-slate-100" htmlFor="credential-list">
+                  <label className="text-sm font-semibold text-slate-900 dark:text-white" htmlFor="credential-list">
                     Credentials (shared with players)
                   </label>
                   <button
@@ -368,7 +370,7 @@ const GameEditor: React.FC = () => {
                     onClick={() =>
                       setCredentials((prev) => [...prev, { username: 'user', password: 'password' }])
                     }
-                    className="rounded-lg bg-white dark:bg-slate-900 px-3 py-1 text-xs font-semibold text-indigo-700 dark:text-indigo-300 shadow-sm ring-1 ring-indigo-200 dark:ring-indigo-500/30 transition hover:bg-indigo-50 dark:hover:bg-indigo-500/30"
+                    className="rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-600 transition-colors hover:bg-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-400 dark:hover:bg-indigo-500/20"
                   >
                     Add credential
                   </button>
@@ -377,9 +379,9 @@ const GameEditor: React.FC = () => {
                   {credentials.map((credential, index) => (
                     <div
                       key={`${credential.username}-${index}`}
-                      className="grid gap-2 rounded-lg bg-white dark:bg-slate-900 p-3 text-sm shadow-sm ring-1 ring-slate-200 dark:ring-slate-700 md:grid-cols-2"
+                      className="grid gap-3 rounded-xl bg-white p-4 text-sm shadow-sm dark:bg-slate-900 md:grid-cols-2"
                     >
-                      <label className="flex flex-col gap-1 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                      <label className="flex flex-col gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300">
                         Username
                         <input
                           type="text"
@@ -392,10 +394,10 @@ const GameEditor: React.FC = () => {
                               )
                             );
                           }}
-                          className="rounded-lg border border-slate-200 dark:border-slate-600 px-3 py-2 text-sm shadow-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-500/30 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500"
+                          className={inputClass}
                         />
                       </label>
-                      <label className="flex flex-col gap-1 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                      <label className="flex flex-col gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300">
                         Password
                         <div className="flex items-center gap-2">
                           <input
@@ -409,7 +411,7 @@ const GameEditor: React.FC = () => {
                                 )
                               );
                             }}
-                            className="w-full rounded-lg border border-slate-200 dark:border-slate-600 px-3 py-2 text-sm shadow-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-500/30 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500"
+                            className={inputClass}
                           />
                           <button
                             type="button"
@@ -418,7 +420,7 @@ const GameEditor: React.FC = () => {
                                 prev.filter((_, entryIndex) => entryIndex !== index || prev.length === 1)
                               )
                             }
-                            className="rounded-lg bg-red-50 dark:bg-red-900/20 px-3 py-2 text-xs font-semibold text-red-600 dark:text-red-400 ring-1 ring-red-100 dark:ring-red-500/30 transition hover:bg-red-100 dark:hover:bg-red-900/30"
+                            className="rounded-lg bg-red-50 px-3 py-2.5 text-xs font-semibold text-red-600 transition-colors hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20"
                           >
                             Remove
                           </button>
@@ -427,17 +429,21 @@ const GameEditor: React.FC = () => {
                     </div>
                   ))}
                 </div>
-                <p className="text-xs text-slate-600 dark:text-slate-400">Defaults to root/changeme unless overridden.</p>
+                <p className="text-xs text-slate-400 dark:text-slate-500">Defaults to root/changeme unless overridden.</p>
               </div>
             </div>
           )}
 
-          {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+          {error && (
+            <p className="rounded-lg bg-red-50 px-4 py-2.5 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">
+              {error}
+            </p>
+          )}
 
           <div className="flex items-center justify-end">
             <button
               type="submit"
-              className="rounded-lg bg-indigo-600 dark:bg-indigo-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 dark:hover:bg-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+              className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-indigo-500 hover:shadow-md hover:shadow-indigo-500/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 dark:bg-indigo-500 dark:hover:bg-indigo-400"
             >
               {editing ? 'Save changes' : 'Create game'}
             </button>

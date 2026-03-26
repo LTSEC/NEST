@@ -26,6 +26,7 @@ interface NetworkNode {
   y: number;
   interfaces: NetworkInterface[];
   services: ServiceInstance[];
+  addDefaultUsers?: boolean;
 }
 
 interface NetworkInterface {
@@ -264,6 +265,7 @@ const NetworkEditor: React.FC = () => {
             ...service,
             protocol: service.protocol === 'udp' ? 'udp' : 'tcp',
           })),
+          addDefaultUsers: node.addDefaultUsers,
         })),
       );
       setLinks(snapshot.links.map((link) => ({ ...link })));
@@ -550,6 +552,7 @@ const NetworkEditor: React.FC = () => {
           position: { x: node.x, y: node.y },
           interfaces: node.interfaces.map((intf) => ({ ...intf })),
           services: node.services.map((service) => ({ ...service })),
+          addDefaultUsers: node.addDefaultUsers,
         })),
         links: links.map((link) => ({ ...link })),
         metadata: { offset, scale },
@@ -1834,6 +1837,22 @@ const NetworkEditor: React.FC = () => {
               </select>
             </div>
 
+            <label className="flex items-center gap-2 rounded border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-200">
+              <input
+                type="checkbox"
+                checked={Boolean(selectedNode.addDefaultUsers)}
+                onChange={(event) =>
+                  setNodes((current) =>
+                    current.map((node) =>
+                      node.id === selectedNode.id ? { ...node, addDefaultUsers: event.target.checked } : node,
+                    ),
+                  )
+                }
+                className="h-4 w-4 accent-emerald-400"
+              />
+              <span className="uppercase tracking-wide">Add default users</span>
+            </label>
+
             <div className="space-y-2">
               <div className="flex items-center justify-between text-[11px] uppercase tracking-wide text-slate-400">
                 <span>Interfaces</span>
@@ -2130,6 +2149,26 @@ const NetworkEditor: React.FC = () => {
                 </button>
               </div>
             )}
+
+            {selectedNode.kind === 'router' && String(selectedNode.imageId) === '1' && (
+              <div className="space-y-2">
+                <div className="text-[11px] uppercase tracking-wide text-slate-400">Services</div>
+                <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+                  <div className="flex items-center justify-between text-xs font-semibold text-slate-100">
+                    <span>ICMP Ping</span>
+                    <label className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-slate-300">
+                      <span>{selectedNode.services.some((s) => s.serviceId === 'icmp-ping') ? 'Enabled' : 'Disabled'}</span>
+                      <input
+                        type="checkbox"
+                        checked={selectedNode.services.some((s) => s.serviceId === 'icmp-ping')}
+                        onChange={(event) => toggleServiceForNode(selectedNode.id, 'icmp-ping', event.target.checked)}
+                        className="h-4 w-4 accent-emerald-400"
+                      />
+                    </label>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -2287,6 +2326,22 @@ const NetworkEditor: React.FC = () => {
                   </button>
                 </div>
                 <div className="flex-1 space-y-4 overflow-y-auto px-6 py-4">
+                  <label className="flex items-center gap-2 rounded border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(configNode.addDefaultUsers)}
+                      onChange={(event) =>
+                        setNodes((current) =>
+                          current.map((node) =>
+                            node.id === configNode.id ? { ...node, addDefaultUsers: event.target.checked } : node,
+                          ),
+                        )
+                      }
+                      className="h-4 w-4 accent-emerald-400"
+                    />
+                    <span className="uppercase tracking-wide">Add default users</span>
+                  </label>
+
                   <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                     Services — toggle and configure Ansible parameters
                   </div>

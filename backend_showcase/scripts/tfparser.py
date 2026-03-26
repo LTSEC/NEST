@@ -33,7 +33,7 @@ locals {{\n\
     for key,value in router_vms.items():
         interfaces = "{" + ", ".join(f"\"{k}\" = {{ ip = \"{v["ip"]}\", network = \"{v["network"]}\"}}" for k, v in value["interfaces"].items()) + "}"
         local_output += f"\
-        \"{key}\" = {{ interfaces = {interfaces}, network = \"{value["network"]}\", template_id = {value["template_id"]} }}\n"
+        \"{key}\" = {{ interfaces = {interfaces}, network = \"{value["network"]}\", template_id = {value["template_id"]}, add_default_users = {str(value.get("add_default_users", False)).lower()} }}\n"
     
     # Team Servers
     local_output += f"\
@@ -41,7 +41,7 @@ locals {{\n\
     servers = {{\n"
     for key,value in server_vms.items():
         local_output += f"\
-        \"{key}\" = {{ ip = \"{value["dhcp"]}\", network = \"{value["network"]}\", template_id = {value["template_id"]} }}\n"
+        \"{key}\" = {{ ip = \"{value["dhcp"]}\", network = \"{value["network"]}\", template_id = {value["template_id"]}, add_default_users = {str(value.get("add_default_users", False)).lower()} }}\n"
     
     # Infra Routers
     local_output += f"\
@@ -229,12 +229,14 @@ def Parse_device_JSON(data : json, network_map: dict, wan_network: list, infra_n
         if template_id is None:
              template_id = 2 # Default to VyOS (ID 2) if missing
 
+        add_default_users = vm.get("addDefaultUsers", False)
+
         eth = {}
 
         if vm["type"] == "Router":
             interfaces = vm["interfaces"]
             for eth_name, eth_ip in interfaces.items():
-                if "eth" in eth_name and eth_ip != None:
+                if eth_ip != None:
                     # Check if this interface matches the identified infra/WAN network
                     # Condition 1: eth0 and we have a known wan_network (legacy T detection)
                     # Condition 2: The network name matches the identified infra_network_name
@@ -284,7 +286,8 @@ def Parse_device_JSON(data : json, network_map: dict, wan_network: list, infra_n
                 router_vms[name] = {"interfaces": eth,
                                     "template_id": template_id,
                                     "host_id": host_id,
-                                    "network": network_context}
+                                    "network": network_context,
+                                    "add_default_users": add_default_users}
         if vm["type"] == "Server":
             dhcp = vm.get("dhcp", False)
             ip = "" if dhcp else vm.get("ip", "")
@@ -301,7 +304,8 @@ def Parse_device_JSON(data : json, network_map: dict, wan_network: list, infra_n
 
             server_vms[name] = {"template_id": template_id,
                                 "dhcp": ip,
-                                "network": server_network}
+                                "network": server_network,
+                                "add_default_users": add_default_users}
 
             if server_network is None and ip != "":
                  raise ValueError(f"Server {name} has IP {ip} but no matching network found.")

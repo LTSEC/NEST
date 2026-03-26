@@ -15,6 +15,7 @@ export interface PersistedNode {
   position: { x: number; y: number };
   interfaces: PersistedInterface[];
   services?: PersistedServiceInstance[];
+  addDefaultUsers?: boolean;
 }
 
 export interface PersistedServiceInstance {

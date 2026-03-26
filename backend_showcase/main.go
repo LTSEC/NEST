@@ -107,9 +107,10 @@ func logoutHandler(ctx echo.Context) error {
 // AnsibleHostConfig holds the service configurations for a single host,
 // structured for easy consumption by Python/Ansible scripts.
 type AnsibleHostConfig struct {
-	Name     string                          `json:"name"`
-	IP       string                          `json:"ip,omitempty"`
-	Services map[string]types.ServiceConfig  `json:"services"`
+	Name            string                          `json:"name"`
+	IP              string                          `json:"ip,omitempty"`
+	AddDefaultUsers bool                            `json:"addDefaultUsers,omitempty"`
+	Services        map[string]types.ServiceConfig  `json:"services"`
 }
 
 // extractAnsibleConfig builds a map of host-name -> AnsibleHostConfig from the
@@ -121,13 +122,14 @@ func extractAnsibleConfig(game types.CyberGame) map[string]AnsibleHostConfig {
 		if device.Type != "Server" {
 			continue
 		}
-		if len(device.ServiceConfigs) == 0 {
+		if len(device.ServiceConfigs) == 0 && !device.AddDefaultUsers {
 			continue
 		}
 		result[device.Name] = AnsibleHostConfig{
-			Name:     device.Name,
-			IP:       device.IP,
-			Services: device.ServiceConfigs,
+			Name:            device.Name,
+			IP:              device.IP,
+			Services:        device.ServiceConfigs,
+			AddDefaultUsers: device.AddDefaultUsers,
 		}
 	}
 	return result

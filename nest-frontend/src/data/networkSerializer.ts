@@ -41,6 +41,7 @@ export interface CyberGamePayload {
   devices: CyberGameDevice[];
   blackteamServices: { name: string; templateId: number; hostId: number; ip: string }[];
   applications: { name: string; servers: string[]; services: string[]; color: string }[];
+  credentials: { username: string; password: string }[];
   teamCount?: number;
   /** Scoring check interval in seconds (15–300). Present when a scoring engine is enabled. */
   scoringCheckInterval?: number;
@@ -57,8 +58,7 @@ export interface CyberGameDevice {
   segment?: string;
   dhcp?: boolean;
   ip?: string;
-  /** Legacy port-only map (kept for backwards compatibility with tfparser.py). */
-  services: Record<string, number>;
+  addDefaultUsers?: boolean;
   /** Rich service configuration with Ansible metadata, keyed by service name. */
   serviceConfigs?: Record<string, ServiceConfig>;
 }
@@ -260,7 +260,27 @@ export const serializeNetworkToCyberGame = (
         os: { id: isNaN(imageId) ? 0 : Math.abs(imageId), name: node.label },
         hostId: infra ? null : (isNaN(imageId) ? 0 : Math.abs(imageId)),
         interfaces,
-        services: {},
+        addDefaultUsers: node.addDefaultUsers,
+        serviceConfigs: Object.keys(interfaces).reduce((acc, name) => {
+          // If this is a router and the node has services, we want to export them.
+          // Currently, NetworkEditor only supports 'ICMP Ping' for routers (imageId 1).
+          // We map services from the node model to ServiceConfig.
+          if (!node.services) return acc;
+
+          for (const svc of node.services) {
+             const def = serviceDefinitionsById[svc.serviceId];
+             const svcName = def?.name || svc.serviceId;
+             acc[svcName] = {
+               port: svc.port,
+               protocol: svc.protocol,
+               ...(svc.ansibleMeta && Object.keys(svc.ansibleMeta).length > 0
+                ? { ansibleMeta: svc.ansibleMeta }
+                : {}),
+              ...(svc.scored ? { scored: true, scoringPoints: svc.scoringPoints } : {}),
+             };
+          }
+          return acc;
+        }, {} as Record<string, ServiceConfig>),
       });
     } else {
       // Host/Server
@@ -281,13 +301,11 @@ export const serializeNetworkToCyberGame = (
         }
       }
 
-      // Build services map (legacy) and rich service configs
-      const services: Record<string, number> = {};
+      // Build rich service configs
       const serviceConfigs: Record<string, ServiceConfig> = {};
       for (const svc of node.services || []) {
         const def = serviceDefinitionsById[svc.serviceId];
         const name = def?.name || svc.serviceId;
-        services[name] = svc.port;
         serviceConfigs[name] = {
           port: svc.port,
           protocol: svc.protocol,
@@ -310,8 +328,8 @@ export const serializeNetworkToCyberGame = (
         segment,
         dhcp: firstInterface?.dhcpEnabled ?? false,
         ip: firstInterface?.ip || '',
-        services,
         serviceConfigs,
+        addDefaultUsers: node.addDefaultUsers,
       });
     }
   }
@@ -340,6 +358,7 @@ export const serializeNetworkToCyberGame = (
     devices,
     blackteamServices,
     applications,
+    credentials: game.credentials,
     ...(game.scoringCheckInterval ? { scoringCheckInterval: game.scoringCheckInterval } : {}),
   };
 };

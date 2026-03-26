@@ -21,7 +21,7 @@ var Presets = map[string]types.CyberGame{
 					"eth0": "External WAN",
 					"eth1": "192.168.1.1/24",
 				},
-				Services: map[string]int{},
+				ServiceConfigs: map[string]types.ServiceConfig{},
 			},
 			{
 				Name:      "Server",
@@ -30,7 +30,7 @@ var Presets = map[string]types.CyberGame{
 				IP:        "192.168.1.10",
 				Router:    "Router",
 				Interface: "eth1",
-				Services:  map[string]int{},
+				ServiceConfigs: map[string]types.ServiceConfig{},
 			},
 		},
 		BlackteamServices: []types.BlackteamService{},
@@ -50,7 +50,7 @@ var Presets = map[string]types.CyberGame{
 					"eth0": "External WAN",
 					"eth1": "192.168.1.1/24",
 				},
-				Services: map[string]int{},
+				ServiceConfigs: map[string]types.ServiceConfig{},
 			},
 			{
 				Name:      "Web Server",
@@ -59,8 +59,8 @@ var Presets = map[string]types.CyberGame{
 				IP:        "192.168.1.10",
 				Router:    "Router",
 				Interface: "eth1",
-				Services: map[string]int{
-					"http": 80,
+				ServiceConfigs: map[string]types.ServiceConfig{
+					"http": {Port: 80, Protocol: "tcp"},
 				},
 			},
 			{
@@ -70,8 +70,8 @@ var Presets = map[string]types.CyberGame{
 				IP:        "192.168.1.11",
 				Router:    "Router",
 				Interface: "eth1",
-				Services: map[string]int{
-					"postgres": 5432,
+				ServiceConfigs: map[string]types.ServiceConfig{
+					"postgres": {Port: 5432, Protocol: "tcp"},
 				},
 			},
 		},

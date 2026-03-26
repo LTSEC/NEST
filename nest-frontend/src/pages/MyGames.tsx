@@ -91,7 +91,7 @@ const MyGames: React.FC = () => {
       source.close();
       sseRef.current = null;
     };
-  }, [consoleVisible, activeInfraId]);
+  }, [consoleVisible, activeInfraId, consoleMode]);
 
   const filteredGames = useMemo(
     () =>

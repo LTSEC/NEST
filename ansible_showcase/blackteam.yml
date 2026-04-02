@@ -21,7 +21,6 @@
       vyos.vyos.vyos_user:
         name: blackteam
         configured_password: G^H&J*K(LA@S#D$F%0987f
-        level: admin  # Options are usually 'admin' or 'operator'
         state: present
       when: ansible_network_os | default('') == 'vyos'
 

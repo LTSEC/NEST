@@ -22,8 +22,8 @@ RUN echo '@community https://dl-cdn.alpinelinux.org/alpine/edge/community' >> /e
 RUN apk add --no-cache \
     python3 py3-pip \
     openssh-client sshpass \
-    opentofu@community && \
-    pip3 install --break-system-packages ansible && \
+    opentofu@community \
+    ansible@community && \
     ansible-galaxy collection install vyos.vyos community.routeros
 
 # run

@@ -39,7 +39,7 @@ const ProfileMenu: React.FC<ProfileMenuProps> = ({ initial, items }) => {
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
-        className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-600 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:bg-indigo-500 dark:hover:bg-indigo-600 dark:focus:ring-indigo-400/30"
+        className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-indigo-600 text-sm font-semibold text-white shadow-sm transition-all hover:shadow-md hover:shadow-indigo-500/25 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:ring-offset-2 focus:ring-offset-white dark:from-indigo-500 dark:to-indigo-600 dark:focus:ring-offset-slate-900"
         aria-haspopup="menu"
         aria-expanded={open}
       >
@@ -47,7 +47,7 @@ const ProfileMenu: React.FC<ProfileMenuProps> = ({ initial, items }) => {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-44 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg ring-1 ring-black/5 dark:border-slate-600 dark:bg-slate-800 dark:ring-white/5">
+        <div className="absolute right-0 mt-2 w-44 animate-slide-down overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg shadow-slate-200/50 dark:border-slate-700 dark:bg-slate-800 dark:shadow-black/20">
           <ul className="py-1 text-sm text-slate-700 dark:text-slate-200">
             {items.map((item) => {
               if (item.to) {
@@ -55,7 +55,7 @@ const ProfileMenu: React.FC<ProfileMenuProps> = ({ initial, items }) => {
                   <li key={item.label}>
                     <Link
                       to={item.to}
-                      className="block px-4 py-2 transition hover:bg-indigo-50 hover:text-indigo-700 dark:hover:bg-indigo-500/20 dark:hover:text-indigo-300"
+                      className="block px-4 py-2.5 transition-colors hover:bg-slate-50 hover:text-indigo-600 dark:hover:bg-slate-700/50 dark:hover:text-indigo-400"
                       onClick={() => setOpen(false)}
                     >
                       {item.label}
@@ -68,7 +68,7 @@ const ProfileMenu: React.FC<ProfileMenuProps> = ({ initial, items }) => {
                 <li key={item.label}>
                   <button
                     type="button"
-                    className="flex w-full px-4 py-2 text-left transition hover:bg-indigo-50 hover:text-indigo-700 dark:hover:bg-indigo-500/20 dark:hover:text-indigo-300"
+                    className="flex w-full px-4 py-2.5 text-left transition-colors hover:bg-slate-50 hover:text-indigo-600 dark:hover:bg-slate-700/50 dark:hover:text-indigo-400"
                     onClick={() => handleAction(item.onClick)}
                   >
                     {item.label}

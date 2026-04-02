@@ -37,14 +37,14 @@ const DevSignIn: React.FC = () => {
       <div className="absolute right-4 top-4 z-10">
         <ThemeToggle />
       </div>
-      <div className="flex items-center justify-center bg-slate-900 p-12 text-white">
-        <div className="flex max-w-md flex-col items-center gap-4 text-center">
-          <div className="flex h-24 w-24 items-center justify-center rounded-full border border-indigo-300/70 bg-indigo-300/30 text-lg font-semibold uppercase tracking-wide text-indigo-100">
+      <div className="flex items-center justify-center bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 p-12 text-white">
+        <div className="flex max-w-md flex-col items-center gap-6 text-center">
+          <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-400/20 to-indigo-500/10 text-lg font-bold uppercase tracking-wide text-indigo-200 border border-indigo-300/30">
             Dev
           </div>
-          <div className="space-y-2">
-            <p className="text-2xl font-semibold">Developer tools</p>
-            <p className="text-sm text-slate-200">
+          <div className="space-y-3">
+            <p className="text-3xl font-bold tracking-tight">Developer tools</p>
+            <p className="text-sm leading-relaxed text-slate-300">
               Access build tools, analytics, and testing sandboxes to keep your games running smoothly.
             </p>
           </div>
@@ -54,22 +54,22 @@ const DevSignIn: React.FC = () => {
       <div className="flex items-center justify-center bg-white p-8 dark:bg-slate-950 md:p-12">
         <div className="w-full max-w-md space-y-8">
           <header className="space-y-2">
-            <p className="text-sm font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Developer sign in</p>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Enter your sandbox</h1>
-            <p className="text-sm text-slate-600 dark:text-slate-400">
+            <p className="text-xs font-semibold uppercase tracking-widest text-indigo-600 dark:text-indigo-400">Developer sign in</p>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Enter your sandbox</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
               Use your developer credentials to continue. Session tokens expire after {AUTH_TOKEN_EXPIRY_HOURS} hours.
             </p>
           </header>
 
-          <form className="space-y-6" onSubmit={handleSubmit}>
-            <div className="space-y-1">
+          <form className="space-y-5" onSubmit={handleSubmit}>
+            <div className="space-y-1.5">
               <label className="text-sm font-medium text-slate-700 dark:text-slate-300" htmlFor="username">
                 Username
               </label>
               <input
                 id="username"
                 name="username"
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm transition focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-indigo-500 dark:focus:ring-indigo-500/30"
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm shadow-sm transition-colors focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-indigo-500 dark:focus:ring-indigo-500/20"
                 placeholder="Enter your username"
                 value={username}
                 onChange={(event) => setUsername(event.target.value)}
@@ -78,7 +78,7 @@ const DevSignIn: React.FC = () => {
               />
             </div>
 
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <label className="text-sm font-medium text-slate-700 dark:text-slate-300" htmlFor="password">
                 Password
               </label>
@@ -86,7 +86,7 @@ const DevSignIn: React.FC = () => {
                 id="password"
                 name="password"
                 type="password"
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm transition focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-indigo-500 dark:focus:ring-indigo-500/30"
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm shadow-sm transition-colors focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-indigo-500 dark:focus:ring-indigo-500/20"
                 placeholder="Enter your password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
@@ -95,19 +95,23 @@ const DevSignIn: React.FC = () => {
               />
             </div>
 
-            {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+            {error && (
+              <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">
+                {error}
+              </p>
+            )}
 
             <button
               type="submit"
-              className="flex w-full items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 dark:bg-indigo-500 dark:hover:bg-indigo-400"
+              className="flex w-full items-center justify-center rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-indigo-500 hover:shadow-md hover:shadow-indigo-500/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 dark:bg-indigo-500 dark:hover:bg-indigo-400"
             >
               Sign In
             </button>
           </form>
 
-          <div className="text-sm text-slate-600 dark:text-slate-400">
+          <div className="text-sm text-slate-500 dark:text-slate-400">
             Looking for the player portal?{' '}
-            <Link to="/signin" className="font-semibold text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300">
+            <Link to="/signin" className="font-semibold text-indigo-600 transition-colors hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300">
               Go to user sign in
             </Link>
           </div>

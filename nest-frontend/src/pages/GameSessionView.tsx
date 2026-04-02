@@ -117,8 +117,8 @@ const GameSessionView: React.FC = () => {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
         {isDeveloper ? <NavBar role="developer" userName={user?.name} onLogout={logout} /> : <AppNav />}
-        <main className="mx-auto max-w-5xl p-6">
-          <div className="rounded-xl bg-white p-6 text-sm text-slate-700 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-300 dark:ring-slate-700">
+        <main className="mx-auto max-w-6xl px-6 py-10">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
             Session not found.
           </div>
         </main>
@@ -171,10 +171,10 @@ const GameSessionView: React.FC = () => {
       {entries.map((credential, index) => (
         <div
           key={`${credential.username}-${index}`}
-          className="flex flex-col gap-1 rounded-lg bg-white px-3 py-2 text-sm text-slate-800 shadow-sm ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700 md:flex-row md:items-center md:justify-between"
+          className="flex flex-col gap-1 rounded-xl bg-slate-50 px-4 py-3 text-sm dark:bg-slate-800 md:flex-row md:items-center md:justify-between"
         >
-          <span className="font-semibold">{credential.username}</span>
-          <span className="text-slate-600 dark:text-slate-400">Password: {credential.password}</span>
+          <span className="font-semibold text-slate-900 dark:text-white">{credential.username}</span>
+          <span className="text-slate-500 dark:text-slate-400">Password: {credential.password}</span>
         </div>
       ))}
     </div>
@@ -183,33 +183,33 @@ const GameSessionView: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
       {isDeveloper ? <NavBar role="developer" userName={user?.name} onLogout={logout} /> : <AppNav />}
-      <main className="mx-auto max-w-6xl space-y-6 p-6">
-        <header className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="space-y-1">
-            <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600 dark:text-indigo-400">Game session</p>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{session.gameName}</h1>
-            <p className="text-sm text-slate-600 dark:text-slate-400">
+      <main className="mx-auto max-w-6xl space-y-6 px-6 py-10">
+        <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-widest text-indigo-600 dark:text-indigo-400">Game session</p>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">{session.gameName}</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
               Hosted by {session.developerName} · {new Date(session.startTime).toLocaleString()} —{' '}
               {new Date(session.endTime).toLocaleString()}
             </p>
-            <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300">
+            <div className="flex flex-wrap gap-1.5 text-xs font-semibold">
               {session.types.map((type) => (
-                <span key={type} className="rounded-full bg-indigo-50 px-3 py-1 text-indigo-700 ring-1 ring-indigo-100 dark:bg-indigo-500/20 dark:text-indigo-300 dark:ring-indigo-500/30">
+                <span key={type} className="rounded-lg bg-indigo-50 px-2.5 py-1 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400">
                   {type}
                 </span>
               ))}
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-800 dark:bg-slate-700 dark:text-slate-200">{session.visibility}</span>
+              <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-slate-600 dark:bg-slate-800 dark:text-slate-300">{session.visibility}</span>
             </div>
           </div>
 
           <div className="flex items-center gap-2 text-xs font-semibold">
             <span
-              className={`rounded-full px-3 py-1 ring-1 ${
+              className={`rounded-full px-3 py-1.5 ${
                 session.status === 'running'
-                  ? 'bg-emerald-50 text-emerald-700 ring-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:ring-emerald-500/30'
+                  ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400'
                   : session.status === 'paused'
-                  ? 'bg-amber-50 text-amber-700 ring-amber-100 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-500/30'
-                  : 'bg-slate-100 text-slate-700 ring-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:ring-slate-600'
+                  ? 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400'
+                  : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
               }`}
             >
               {session.status}
@@ -218,19 +218,19 @@ const GameSessionView: React.FC = () => {
         </header>
 
         <div
-          className={`flex items-start gap-3 rounded-xl border px-4 py-3 text-sm ${
+          className={`flex items-start gap-3 rounded-xl px-4 py-3 text-sm ${
             session.status === 'running'
-              ? 'border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-500/30 dark:bg-emerald-900/20 dark:text-emerald-300'
+              ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300'
               : session.status === 'paused'
-              ? 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-500/30 dark:bg-amber-900/20 dark:text-amber-300'
-              : 'border-slate-200 bg-white text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200'
+              ? 'bg-amber-50 text-amber-800 dark:bg-amber-500/10 dark:text-amber-300'
+              : 'border border-slate-200 bg-white text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300'
           }`}
         >
-          <span className="mt-0.5 inline-flex h-2 w-2 flex-shrink-0 rounded-full bg-current" />
+          <span className="mt-1 inline-flex h-2 w-2 flex-shrink-0 rounded-full bg-current" />
           <p className="leading-relaxed">{statusDescription[session.status]}</p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 text-sm font-semibold text-slate-800 dark:text-slate-200">
+        <div className="flex items-center gap-1 rounded-xl bg-slate-100 p-1 text-sm font-semibold dark:bg-slate-800">
           {availableTabs
             .filter((tab) => tab.enabled)
             .map((tab) => (
@@ -238,10 +238,10 @@ const GameSessionView: React.FC = () => {
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`rounded-full px-4 py-2 ring-1 transition ${
+                className={`rounded-lg px-4 py-2 transition-all ${
                   activeTab === tab.id
-                    ? 'bg-indigo-600 text-white ring-indigo-500 dark:bg-indigo-500 dark:ring-indigo-400'
-                    : 'bg-white text-slate-700 ring-slate-200 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-600 dark:hover:bg-slate-700'
+                    ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white'
+                    : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
                 }`}
               >
                 {tab.label}
@@ -249,25 +249,25 @@ const GameSessionView: React.FC = () => {
             ))}
         </div>
 
-        <section className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
           {activeTab === 'overview' && (
-            <div className="space-y-4">
+            <div className="space-y-5">
               <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2 rounded-xl bg-slate-50 p-4 dark:bg-slate-800">
-                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Participants</p>
+                <div className="space-y-3 rounded-xl bg-slate-50 p-5 dark:bg-slate-800">
+                  <p className="text-sm font-semibold text-slate-900 dark:text-white">Participants</p>
                   {isDeveloper ? (
-                    <ul className="space-y-2 text-sm text-slate-700 dark:text-slate-300">
+                    <ul className="space-y-2 text-sm">
                       {participantTeams.map((team) => (
                         <li
                           key={team.id}
-                          className="flex items-center justify-between rounded-lg bg-white px-3 py-2 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700"
+                          className="flex items-center justify-between rounded-xl bg-white px-4 py-3 shadow-sm dark:bg-slate-900"
                         >
-                          <span>{team.name}</span>
+                          <span className="text-slate-700 dark:text-slate-300">{team.name}</span>
                           {session.status !== 'completed' && (
                             <button
                               type="button"
                               onClick={() => handleKick(team.id)}
-                              className="rounded-lg bg-red-50 px-3 py-1 text-xs font-semibold text-red-600 ring-1 ring-red-100 transition hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:ring-red-500/30 dark:hover:bg-red-900/30"
+                              className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 transition-colors hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20"
                             >
                               Kick team
                             </button>
@@ -275,47 +275,47 @@ const GameSessionView: React.FC = () => {
                         </li>
                       ))}
                       {!participantTeams.length && (
-                        <li className="text-xs text-slate-500 dark:text-slate-400">No teams have joined yet.</li>
+                        <li className="text-xs text-slate-400 dark:text-slate-500">No teams have joined yet.</li>
                       )}
                     </ul>
                   ) : (
-                    <div className="rounded-lg bg-white px-3 py-2 text-sm text-slate-700 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-300 dark:ring-slate-700">
+                    <div className="rounded-xl bg-white px-4 py-3 text-sm text-slate-500 shadow-sm dark:bg-slate-900 dark:text-slate-400">
                       Participant lists are hidden from players to keep match rosters private.
                     </div>
                   )}
                 </div>
 
-                <div className="space-y-2 rounded-xl bg-slate-50 p-4 dark:bg-slate-800">
-                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Schedule</p>
-                  <p className="text-sm text-slate-700 dark:text-slate-300">
+                <div className="space-y-3 rounded-xl bg-slate-50 p-5 dark:bg-slate-800">
+                  <p className="text-sm font-semibold text-slate-900 dark:text-white">Schedule</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-300">
                     Start: {new Date(session.startTime).toLocaleString()}
                     <br />
                     End: {new Date(session.endTime).toLocaleString()}
                   </p>
-                  <p className="text-xs text-slate-600 dark:text-slate-400">Minimum players per team: {session.minPlayers}</p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500">Minimum players per team: {session.minPlayers}</p>
                 </div>
               </div>
 
               {isDeveloper && (
-                <div className="flex flex-wrap gap-3 text-sm font-semibold text-slate-800 dark:text-slate-200">
+                <div className="flex flex-wrap gap-3 text-sm font-semibold">
                   <button
                     type="button"
                     onClick={handlePause}
-                    className="rounded-lg bg-amber-100 px-4 py-2 text-amber-800 ring-1 ring-amber-200 transition hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:ring-amber-500/30 dark:hover:bg-amber-900/40"
+                    className="rounded-xl bg-amber-50 px-4 py-2.5 text-amber-700 transition-colors hover:bg-amber-100 dark:bg-amber-500/10 dark:text-amber-400 dark:hover:bg-amber-500/20"
                   >
                     Pause game
                   </button>
                   <button
                     type="button"
                     onClick={handleResume}
-                    className="rounded-lg bg-emerald-600 px-4 py-2 text-white shadow-sm transition hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400"
+                    className="rounded-xl bg-emerald-600 px-4 py-2.5 text-white shadow-sm transition-all hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400"
                   >
                     Resume
                   </button>
                   <button
                     type="button"
                     onClick={handleShutdown}
-                    className="rounded-lg bg-red-600 px-4 py-2 text-white shadow-sm transition hover:bg-red-500 dark:bg-red-500 dark:hover:bg-red-400"
+                    className="rounded-xl bg-red-600 px-4 py-2.5 text-white shadow-sm transition-all hover:bg-red-500 dark:bg-red-500 dark:hover:bg-red-400"
                   >
                     Shutdown game
                   </button>
@@ -325,30 +325,30 @@ const GameSessionView: React.FC = () => {
           )}
 
           {activeTab === 'injects' && (
-            <div className="space-y-2">
-              <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Inject queue</p>
-              <ul className="space-y-1 text-sm text-slate-700 dark:text-slate-300">
-                <li className="rounded-lg bg-slate-50 px-3 py-2 ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700">Incident briefing (pending)</li>
-                <li className="rounded-lg bg-slate-50 px-3 py-2 ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700">Forensics report upload (pending)</li>
-                <li className="rounded-lg bg-slate-50 px-3 py-2 ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700">Executive summary (pending)</li>
+            <div className="space-y-3">
+              <p className="text-sm font-semibold text-slate-900 dark:text-white">Inject queue</p>
+              <ul className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
+                <li className="rounded-xl bg-slate-50 px-4 py-3 dark:bg-slate-800">Incident briefing (pending)</li>
+                <li className="rounded-xl bg-slate-50 px-4 py-3 dark:bg-slate-800">Forensics report upload (pending)</li>
+                <li className="rounded-xl bg-slate-50 px-4 py-3 dark:bg-slate-800">Executive summary (pending)</li>
               </ul>
             </div>
           )}
 
           {activeTab === 'ctfs' && (
-            <div className="space-y-4">
-              <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">CTF board</p>
+            <div className="space-y-5">
+              <p className="text-sm font-semibold text-slate-900 dark:text-white">CTF board</p>
               {sampleCtfCategories.map((category) => (
-                <div key={category.name} className="space-y-2 rounded-xl bg-slate-50 p-4 dark:bg-slate-800">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">{category.name}</p>
+                <div key={category.name} className="space-y-3 rounded-xl bg-slate-50 p-5 dark:bg-slate-800">
+                  <p className="text-xs font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">{category.name}</p>
                   <div className="grid gap-2 md:grid-cols-2">
                     {category.challenges.map((challenge) => (
                       <div
                         key={challenge.name}
-                        className="rounded-lg bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-100 dark:ring-slate-700"
+                        className="rounded-xl bg-white px-4 py-3 shadow-sm dark:bg-slate-900"
                       >
-                        <p>{challenge.name}</p>
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400">{challenge.points} pts</p>
+                        <p className="font-semibold text-slate-900 dark:text-white">{challenge.name}</p>
+                        <p className="text-xs text-slate-400 dark:text-slate-500">{challenge.points} pts</p>
                       </div>
                     ))}
                   </div>
@@ -358,24 +358,24 @@ const GameSessionView: React.FC = () => {
           )}
 
           {activeTab === 'credentials' && (
-            <div className="space-y-2">
-              <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Competition credentials</p>
+            <div className="space-y-3">
+              <p className="text-sm font-semibold text-slate-900 dark:text-white">Competition credentials</p>
               {renderCredentials(game?.credentials ?? [])}
             </div>
           )}
 
           {activeTab === 'services' && (
-            <div className="space-y-3">
+            <div className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Service health</p>
-                  <p className="text-xs text-slate-600 dark:text-slate-400">
+                  <p className="text-sm font-semibold text-slate-900 dark:text-white">Service health</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
                     View current status, uptime, and the last 10 checks for tracked services.
                   </p>
                 </div>
                 {isDeveloper && (
                   <select
-                    className="rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                    className="rounded-xl border border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     value={selectedServiceTeam ?? ''}
                     onChange={(event) => setSelectedServiceTeam(event.target.value)}
                   >
@@ -388,23 +388,23 @@ const GameSessionView: React.FC = () => {
                   </select>
                 )}
                 {!isDeveloper && playerTeam && (
-                  <div className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 dark:bg-slate-700 dark:text-slate-300">
+                  <div className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                     Team {playerTeam.name}
                   </div>
                 )}
               </div>
 
-              <div className="space-y-2 text-sm text-slate-700 dark:text-slate-300">
+              <div className="space-y-3 text-sm">
                 {listServiceHealthForSession(
                   session.id,
                   isDeveloper ? selectedServiceTeam ?? undefined : playerTeam?.id
                 ).map((service) => {
                   const tone =
                     service.status === 'up'
-                      ? 'bg-emerald-50 text-emerald-700 ring-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:ring-emerald-500/30'
+                      ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400'
                       : service.status === 'down'
-                      ? 'bg-red-50 text-red-700 ring-red-100 dark:bg-red-900/20 dark:text-red-400 dark:ring-red-500/30'
-                      : 'bg-slate-100 text-slate-700 ring-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:ring-slate-600';
+                      ? 'bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400'
+                      : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400';
 
                   const uptimeColor =
                     service.uptimePercentage >= 80
@@ -414,13 +414,13 @@ const GameSessionView: React.FC = () => {
                       : 'bg-red-500';
 
                   return (
-                    <div key={service.name} className="space-y-3 rounded-lg border border-slate-200 p-3 shadow-sm dark:border-slate-700">
+                    <div key={service.name} className="space-y-3 rounded-xl border border-slate-200 p-4 dark:border-slate-800">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div>
-                          <p className="font-semibold text-slate-800 dark:text-slate-100">{service.name}</p>
-                          <p className="text-[11px] text-slate-500 dark:text-slate-400">SLAs: {service.slaCount}</p>
+                          <p className="font-semibold text-slate-900 dark:text-white">{service.name}</p>
+                          <p className="text-xs text-slate-400 dark:text-slate-500">SLAs: {service.slaCount}</p>
                         </div>
-                        <span className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${tone}`}>
+                        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${tone}`}>
                           {service.status === 'up'
                             ? 'Up'
                             : service.status === 'down'
@@ -430,22 +430,22 @@ const GameSessionView: React.FC = () => {
                       </div>
 
                       <div className="space-y-2">
-                        <div className="relative h-8 overflow-hidden rounded-lg bg-slate-100 ring-1 ring-slate-200 dark:bg-slate-700 dark:ring-slate-600">
+                        <div className="relative h-7 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                           <div
-                            className={`h-full ${uptimeColor}`}
+                            className={`h-full rounded-full transition-all ${uptimeColor}`}
                             style={{ width: `${service.uptimePercentage}%` }}
                           />
                           <div className="absolute inset-0 flex items-center justify-center text-xs font-semibold text-white drop-shadow">
                             {service.uptimePercentage.toFixed(1)}%
                           </div>
                         </div>
-                        <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-600 dark:text-slate-400">
-                          <span className="font-semibold text-slate-800 dark:text-slate-100">Last 10 checks:</span>
-                          <div className="flex flex-wrap items-center gap-1">
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                          <span className="font-semibold text-slate-700 dark:text-slate-300">Last 10 checks:</span>
+                          <div className="flex items-center gap-1">
                             {service.lastTenStatuses.map((status, index) => {
                               const dotColor =
-                                status === 'up' ? 'bg-emerald-500' : status === 'down' ? 'bg-red-500' : 'bg-slate-400';
-                              return <span key={`${service.name}-${index}`} className={`h-3 w-3 rounded-full ${dotColor}`} />;
+                                status === 'up' ? 'bg-emerald-500' : status === 'down' ? 'bg-red-500' : 'bg-slate-300 dark:bg-slate-600';
+                              return <span key={`${service.name}-${index}`} className={`h-2.5 w-2.5 rounded-full ${dotColor}`} />;
                             })}
                           </div>
                         </div>
@@ -458,7 +458,7 @@ const GameSessionView: React.FC = () => {
                   session.id,
                   isDeveloper ? selectedServiceTeam ?? undefined : playerTeam?.id
                 ).length && (
-                  <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:ring-slate-700">
+                  <p className="rounded-xl bg-slate-50 px-4 py-3 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
                     Service telemetry has not been reported for this team yet.
                   </p>
                 )}
@@ -467,18 +467,18 @@ const GameSessionView: React.FC = () => {
           )}
         </section>
 
-        <div className="flex flex-wrap justify-between gap-3 text-sm font-semibold text-indigo-700 dark:text-indigo-300">
+        <div className="flex flex-wrap justify-between gap-3">
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className="rounded-lg bg-white px-4 py-2 text-slate-700 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-600 dark:hover:bg-slate-700"
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
           >
             Back to games
           </button>
           <button
             type="button"
             onClick={() => navigate('/teams')}
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-white shadow-sm transition hover:bg-indigo-500 dark:bg-indigo-500 dark:hover:bg-indigo-400"
+            className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-indigo-500 dark:bg-indigo-500 dark:hover:bg-indigo-400"
           >
             View team
           </button>

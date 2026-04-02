@@ -11,7 +11,7 @@ const DeveloperHome: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
       <NavBar role="developer" userName={user.name} onLogout={logout} />
-      <main className="mx-auto max-w-5xl p-6">
+      <main className="mx-auto max-w-6xl px-6 py-10">
         <ComingSoon
           title="Developer Dashboard"
           description="Use the navigation to jump into My Games or explore upcoming areas like Analytics and Game Lists."

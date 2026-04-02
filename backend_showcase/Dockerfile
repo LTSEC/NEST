@@ -20,7 +20,7 @@ RUN echo '@community https://dl-cdn.alpinelinux.org/alpine/edge/community' >> /e
 
 # install python, opentofu, ansible, and SSH tooling
 RUN apk add --no-cache \
-    python3 py3-pip \
+    python3 py3-passlib \
     openssh-client sshpass \
     opentofu@community \
     ansible@community && \

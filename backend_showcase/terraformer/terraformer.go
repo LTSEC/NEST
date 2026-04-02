@@ -112,19 +112,10 @@ func logEnvVarStatus(logCh chan<- string) map[string]string {
 	return env
 }
 
-// Takes in an absolute filepath and runs the terraform to create a game
-func RunTerraform(filePath string, logManager *logger.LogManager, gid int) error {
-	// Logger setup
-	logCh := logManager.CreateChannel(gid)
-	defer logManager.CloseChannel(gid)
-
-	// Check if the game ID can be found
-	_, ok := games.GlobalGameManager.Get(gid)
-	if !ok {
-		logCh <- fmt.Sprintf("[ERROR] Game ID %d not found in game manager", gid)
-		return nil
-	}
-
+// RunTerraformApply runs terraform init and apply, streaming output to the
+// provided log channel. It does NOT manage the channel lifecycle or set the
+// final game state — callers (e.g. the game pipeline) are responsible for that.
+func RunTerraformApply(filePath string, logCh chan string, gid int) error {
 	games.GlobalGameManager.SetStatus(gid, types.StateStarting)
 	logCh <- fmt.Sprintf("[INFO] Starting Terraform process for game ID %d...", gid)
 	logCh <- fmt.Sprintf("[INFO] Terraform working directory: %s", filePath)
@@ -175,8 +166,27 @@ func RunTerraform(filePath string, logManager *logger.LogManager, gid int) error
 	}
 
 	logCh <- "[OK] Terraform applied successfully."
-	games.GlobalGameManager.SetStatus(gid, types.StateRunning)
+	return nil
+}
 
+// RunTerraform is the standalone entrypoint that manages its own log channel
+// and sets the final game state. Use RunTerraformApply when chaining with
+// other steps (e.g. ansible) under a shared log channel.
+func RunTerraform(filePath string, logManager *logger.LogManager, gid int) error {
+	logCh := logManager.CreateChannel(gid)
+	defer logManager.CloseChannel(gid)
+
+	_, ok := games.GlobalGameManager.Get(gid)
+	if !ok {
+		logCh <- fmt.Sprintf("[ERROR] Game ID %d not found in game manager", gid)
+		return nil
+	}
+
+	if err := RunTerraformApply(filePath, logCh, gid); err != nil {
+		return err
+	}
+
+	games.GlobalGameManager.SetStatus(gid, types.StateRunning)
 	return nil
 }
 

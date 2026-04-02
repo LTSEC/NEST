@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	ansiblerunner "NESTBackendShowcase/ansible_runner"
 	"NESTBackendShowcase/database"
 	"NESTBackendShowcase/games"
 	"NESTBackendShowcase/logger"
@@ -136,6 +137,77 @@ func extractAnsibleConfig(game types.CyberGame) map[string]AnsibleHostConfig {
 }
 
 // ---------------------------------------------------------------------------
+// Game pipeline: Terraform → Inventory → Ansible
+// ---------------------------------------------------------------------------
+
+// runGamePipeline orchestrates the full infrastructure lifecycle for a game.
+// It streams all output (terraform + ansible) to a single SSE log channel so
+// the frontend console shows a continuous, clearly separated flow.
+func runGamePipeline(gameDir string, gid int, game types.CyberGame) {
+	logCh := logManager.CreateChannel(gid)
+	defer logManager.CloseChannel(gid)
+
+	_, ok := games.GlobalGameManager.Get(gid)
+	if !ok {
+		logCh <- fmt.Sprintf("[ERROR] Game ID %d not found in game manager", gid)
+		return
+	}
+
+	// ---- Phase 1: Terraform Apply ----
+	if err := terraformer.RunTerraformApply(gameDir, logCh, gid); err != nil {
+		// Terraform failed — do NOT proceed to ansible.
+		logCh <- "[ERROR] Terraform failed. Skipping Ansible configuration."
+		return
+	}
+
+	// ---- Separator: Terraform complete, Ansible starting ----
+	logCh <- ""
+	logCh <- "════════════════════════════════════════════════════════════════"
+	logCh <- "[OK] TERRAFORM COMPLETE — All infrastructure has been provisioned."
+	logCh <- "════════════════════════════════════════════════════════════════"
+	logCh <- ""
+
+	// ---- Phase 2: Generate Ansible Inventory ----
+	games.GlobalGameManager.SetStatus(gid, types.StateConfiguring)
+	logCh <- "[INFO] Generating Ansible inventory from game configuration..."
+
+	inventoryPath, err := ansiblerunner.GenerateInventory(gameDir, game)
+	if err != nil {
+		logCh <- fmt.Sprintf("[ERROR] Failed to generate Ansible inventory: %v", err)
+		games.GlobalGameManager.SetStatus(gid, types.StateError)
+		return
+	}
+	logCh <- fmt.Sprintf("[INFO] Inventory written to: %s", inventoryPath)
+
+	// ---- Phase 3: Run Ansible ----
+	wd, err := os.Getwd()
+	if err != nil {
+		logCh <- fmt.Sprintf("[ERROR] Failed to determine working directory: %v", err)
+		games.GlobalGameManager.SetStatus(gid, types.StateError)
+		return
+	}
+	ansibleDir := filepath.Join(wd, "..", "ansible_showcase")
+
+	logCh <- "[INFO] Starting Ansible configuration (blackteam provisioning)..."
+	logCh <- ""
+
+	if err := ansiblerunner.RunAnsible(ansibleDir, inventoryPath, logCh); err != nil {
+		logCh <- fmt.Sprintf("[ERROR] Ansible configuration failed: %v", err)
+		games.GlobalGameManager.SetStatus(gid, types.StateError)
+		return
+	}
+
+	logCh <- ""
+	logCh <- "════════════════════════════════════════════════════════════════"
+	logCh <- "[OK] ANSIBLE COMPLETE — All hosts have been configured."
+	logCh <- "════════════════════════════════════════════════════════════════"
+	logCh <- ""
+	logCh <- "[OK] Game infrastructure is ready."
+
+	games.GlobalGameManager.SetStatus(gid, types.StateRunning)
+}
+
+// ---------------------------------------------------------------------------
 // Terraform game hosting (preserves existing flow + per-game directories)
 // ---------------------------------------------------------------------------
 
@@ -228,8 +300,8 @@ func createGame(ctx echo.Context) error {
 		_ = os.WriteFile(filepath.Join(gameDir, "main.tf"), data, 0o644)
 	}
 
-	// Run terraform in the per-game directory
-	go terraformer.RunTerraform(gameDir, logManager, id)
+	// Run the full game pipeline: terraform → inventory → ansible
+	go runGamePipeline(gameDir, id, game)
 
 	gameState, success := games.GlobalGameManager.Get(id)
 	if !success {

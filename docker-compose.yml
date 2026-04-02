@@ -20,8 +20,11 @@ services:
       - "${BACKEND_PORT:-4545}:${BACKEND_PORT:-4545}"
     environment:
       PORT: ${BACKEND_PORT:-4545}
+      ANSIBLE_HOST_KEY_CHECKING: "False"
     env_file:
       - .secrets
+    volumes:
+      - ${SSH_KEY_DIR:-~/.ssh}:/root/.ssh:ro
 
   db:
     image: postgres:16
